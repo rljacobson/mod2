@@ -1,0 +1,280 @@
+use crate::{
+  abstractions::{
+    IString,
+    NaturalNumber,
+    Integer
+  },
+  parser::ast::{
+    ItemAST,
+    ModuleAST,
+    SymbolDeclarationAST,
+    VariableDeclarationAST,
+    SortDeclarationAST,
+    RuleDeclarationAST,
+    EquationDeclarationAST,
+    TermAST,
+    BxTermAST,
+    SortSpecAST,
+    BxSortSpecAST,
+    AttributeAST,
+    ConditionAST
+  },
+  theory::symbol::{
+      VARIADIC,
+      UNSPECIFIED
+  }
+};
+
+grammar;
+
+
+// Lexer definitions
+
+// Ignore patters: whitespace and comments
+// See http://lalrpop.github.io/lalrpop/lexer_tutorial/001_lexer_gen.html#customizing-skipping-between-tokens
+match {
+    // The default whitespace skipping is disabled if an `ignore pattern` is specified
+    r"\s*" => { },
+
+    // Skip `// comments`
+    // ToDo: Track row/columns for better error handling
+    r"//[^\n\r]*[\n\r]*" => { },
+
+    // Skip `/* comments */`
+    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => { },
+    _
+}
+
+Identifier: IString = {
+    <id: r#"[a-zA-Z][a-zA-Z_]*"#> => IString::from(id)
+};
+
+NaturalNumber: NaturalNumber = {
+    <n: r#"\d+"#> => { n.parse().unwrap() }
+};
+
+StringLiteral: String = <s:r#""[a-z ]*""#> => s[1..s.len()-1].into();
+
+AndOp            : () = { "/\\", "∧", "⋀" };
+OrOp             : () = { "\\/", "∨", "⋁" };
+ArrowOp          : () = "->";
+SortOp           : () = "::";
+RuleOp           : () = "=>";
+EqualOp          : () = "=";
+MatchOp          : () = ":=";
+SymbolKeyword    : () = { "symbol",     "sym" };
+VariableKeyword  : () = { "variable",   "var" };
+RuleKeyword      : () = { "rule",       "rl" };
+EquationKeyword  : () = { "equation",   "eq" };
+MembershipKeyword: () = { "membership", "mb" };
+
+// Grammar rules
+
+// Macros
+
+// Comma separated list with at least one element. Trailing comma is allowed.
+/*
+CommaList<T>: Vec<T> = {
+ <mut v:(<T> ",")*> <e:T?> => match e {
+     None => v,
+     Some(e) => {
+         v.push(e);
+         v
+     }
+ }
+};
+*/
+
+// Comma separated list with at least one element and no trailing comma.
+CommaList<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T> => {
+        v.push(e);
+        v
+    }
+};
+
+SortList      = CommaList<Identifier>;
+TermList   = CommaList<Term>;
+AttributeList = CommaList<Attribute>;
+
+// Top-most rule.
+pub Module: Box<ModuleAST> = {
+    <items: Item*> => Box::new(ModuleAST { name: IString::from("Global"), items }),
+};
+
+Item: ItemAST = {
+    <Submodule>           => ItemAST::Submodule(<>),
+    <VariableDeclaration> => ItemAST::VarDecl(Box::new(<>)),
+    <SymbolDeclaration>   => ItemAST::SymDecl(Box::new(<>)),
+    <SortDeclaration>     => ItemAST::SortDecl(Box::new(<>)),
+    <RuleDeclaration>     => ItemAST::Rule(Box::new(<>)),
+    <EquationDeclaration> => ItemAST::Equation(Box::new(<>)),
+};
+
+Submodule: Box<ModuleAST> = {
+    "mod" <name: Identifier> "{" <mut module: Module> "}" => {
+        module.name = name;
+        module
+    },
+};
+
+Attribute: AttributeAST = {
+    "ctor"             => AttributeAST::Constructor,
+    "constructor"      => AttributeAST::Constructor,
+    "assoc"            => AttributeAST::Associative,
+    "associative"      => AttributeAST::Associative,
+    "comm"             => AttributeAST::Commutative,
+    "commutative"      => AttributeAST::Commutative,
+    "id" "(" <pattern: Term> ")"       => AttributeAST::Identity(pattern),
+    "identity" "(" <pattern: Term> ")" => AttributeAST::Identity(pattern),
+    /*
+    Unimplemented:
+        Precedence, Gather, Format, Latex, Strategy, Memoized, Frozen, Config, Object, Message, MsgStatement,
+        LeftIdentity, RightIdentity, Idempotent, Iterated, PolymorphicConstant, Polymorphic, Ditto
+    Take no data:
+        Associative, Commutative, Idempotent, Memoized, Constructor, Config, Object, Message, Iterated,
+        PolymorphicConstant
+    */
+
+};
+
+SymbolDeclaration: SymbolDeclarationAST = {
+    SymbolKeyword <name: Identifier> <arity: ("/" <NaturalNumber>)?> <sort_spec: (SortOp <SortSpec>)?> <attributes: AttributeSpec?> ";" => {
+        let arity: Integer = match arity {
+          Some(n) => {
+            // ToDo: Do better error handling in the parser. Right now if a number too large to be represented is
+            //       parsed, the parsed symbol is treated as generic.
+            n.try_into().unwrap_or(VARIADIC)
+          }
+          None => VARIADIC
+        };
+        SymbolDeclarationAST {
+          name,
+          attributes: attributes.unwrap_or_default(),
+          arity,
+          sort_spec
+        }
+    }
+};
+
+VariableDeclaration: VariableDeclarationAST = {
+    VariableKeyword <name: Identifier> <arity: ("/" <NaturalNumber>)?> <sort_spec: (SortOp <SortSpec>)?> <attributes: AttributeSpec?> ";" => {
+        let arity: Integer = match arity {
+          Some(v) => {
+            v.try_into().unwrap_or(UNSPECIFIED)
+          },
+          None => UNSPECIFIED
+        };
+        VariableDeclarationAST {
+          name,
+          attributes: attributes.unwrap_or_default(),
+          arity,
+          sort_spec
+        }
+    }
+};
+
+SortDeclaration: SortDeclarationAST = {
+    "sort" <sorts_lt: SortList> <maybe_sorts_gt: ("<" <SortList>)?> ";" => {
+        SortDeclarationAST {
+            sorts_lt,
+            sorts_gt: maybe_sorts_gt.unwrap_or(vec![])
+        }
+    }
+};
+
+RuleDeclaration: RuleDeclarationAST = {
+    RuleKeyword <lhs: Term> RuleOp <rhs: Term> <maybe_conditions: ConditionSpec?> ";" => {
+        RuleDeclarationAST {
+            lhs,
+            rhs,
+            conditions: maybe_conditions
+        }
+    }
+};
+
+EquationDeclaration: EquationDeclarationAST = {
+    EquationKeyword <lhs: Term> EqualOp <rhs: Term> <maybe_conditions: ConditionSpec?> ";" => {
+        EquationDeclarationAST {
+            lhs,
+            rhs,
+            conditions: maybe_conditions
+        }
+    }
+};
+
+// Term and Pattern definitions
+Term: BxTermAST = {
+    <string_literal: StringLiteral> => Box::new(TermAST::StringLiteral(string_literal)),
+    <name: Identifier> => Box::new(TermAST::Identifier(name)),
+    <n: NaturalNumber> => Box::new(TermAST::NaturalNumber(n as NaturalNumber)),
+    <head: Term> "(" <tail: TermList> ")" => {
+        Box::new(TermAST::Application { head, tail })
+    },
+    "(" <Term> ")"
+};
+
+SortSpec: BxSortSpecAST = {
+    <SortSpecLHS>,
+    <arg_sorts: SortSpecLHS+> ArrowOp <sort_spec: SortSpec> => {
+        Box::new(
+            SortSpecAST::Functor{
+                arg_sorts,
+                sort_spec
+            }
+        )
+    }
+};
+
+SortSpecLHS: BxSortSpecAST = {
+    <name: Identifier> => Box::new(SortSpecAST::Sort(name)),
+    "(" <SortSpec> ")",
+};
+
+
+// SortSpecSequence: Vec<BxSortSpec> => {
+//     <v: SortSpec+> => {v}
+// };
+
+AttributeSpec: Vec<AttributeAST> = {
+    "[" <AttributeList> "]"
+};
+
+ConditionSpec: Vec<ConditionAST> = {
+    "if" <mut v: (<Condition> AndOp)*> <c: Condition> => {
+        v.push(c);
+        v
+    }
+};
+
+Condition: ConditionAST = {
+    <lhs: Term> EqualOp <rhs: Term> => {
+        ConditionAST::Equality { lhs, rhs }
+    },
+
+    <lhs: Term> MatchOp <rhs: Term> => {
+        ConditionAST::Match { lhs, rhs }
+    },
+
+    <lhs: Term> SortOp <sort: SortSpec> => {
+        ConditionAST::SortMembership { lhs, sort }
+    },
+
+    <lhs: Term> RuleOp <rhs: Term> => {
+        ConditionAST::Rewrite { lhs, rhs }
+    },
+
+    <term: Term> => {
+        ConditionAST::Boolean(term)
+    }
+
+};
+
+//EqualityCondition: ConditionAST = {
+//    <Term> EqualOp <Term> => {
+//    }
+//};
+
+
+
+

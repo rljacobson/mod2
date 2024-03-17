@@ -1,0 +1,35 @@
+[package]
+name        = "mod2"
+version     = "0.1.0"
+edition     = "2021"
+description = "New implementation of Maude's state-of-the-art pattern matching algorithms"
+authors     = ["Robert Jacobson <rljacobson@gmail.com"]
+repository  = "https://www.github.com/rljacobson/mod2"
+license     = "MIT OR Apache-2.0"
+readme      = "README.md"
+keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-rewriting", "equational-logic"]
+categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
+publish     = false
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[build-dependencies]
+lalrpop = "0.20.2" # Parser
+
+
+[dependencies]
+lazy_static = "1.4.0"
+ustr        = "1.0.0" # String interning
+
+# Parser
+lalrpop-util  = { version = "0.20.2", features = ["lexer", "unicode"] }
+#pratt        = { path = "../pratt", default-features = false, features = ["ustr"] }
+
+bit-set        = "0.5.3" # Implements NatSet
+tiny_logger    = { path = "../tiny_logger" }
+unicode-blocks = "0.1.6" # Greek Unicode characters
+simple-error   = "0.3.0" # Minimal error handling
+enumflags2     = "0.7.9" # BitFlags from an enum
+

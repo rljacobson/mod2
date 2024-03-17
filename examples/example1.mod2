@@ -1,0 +1,29 @@
+symbol f [assoc, comm, id(h)];
+symbol g/2;
+symbol h/3 :: Int;
+
+variable X;
+variable Y;
+variable Z;
+
+rule f(X, h(Y, g(Z, Z), f(X))) => f(X, h(Y, g(Z, Z), X)) ;
+
+mod NaturalNumbers {
+    // op _+_ :: NzNat NzNat -> NzNat [ctor assoc comm id: 0] .
+
+    symbol plus/2 [assoc, comm, ctor, id(h)];
+    symbol minus :: Nat NzNat -> Nat;
+    symbol z :: Nat;
+    symbol s :: Nat -> NzNat;
+    symbol v :: Nat -> Nat ; // Variadic
+
+    variable X :: Any;
+
+    rule plus(z, X) => X if z = X;
+    rule plus(s(Y), X) => plus(Y, s(X));
+    rule minus(X, z) => X if X => plus(z, z);
+    rule minus(s(X), s(Y)) => minus(X, Y);
+
+    equation plus(X, Y) = plus(Y, X);
+    equation minus(X, Y) = minus(Y, X) if X = 0 /\ Y = 0;
+}
