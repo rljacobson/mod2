@@ -1,4 +1,27 @@
+# The type system
+
+Sorts are named types that do not necessarily describe a data layout, that is,
+they can be purely abstract. Right now, sorts cannot describe functor types.
+Internally, a type is a `SortSpec` (a sort specification), which is either a
+sort or a functor (or either of the special marker types `None` or `Any`).
+
+Issues to consider:
+
+ 1. Sorts cannot be functions.
+ 2. Sort specs cannot be named in general, though they can be just a single named sort.
+ 3. Both sorts and sort specs lack native support for variadic list-like types. (We don't have a syntax for variadic functors yet.) List-like types can still be defined, but it's not ergonomic.
+
+It would be nice to have a more orthogonal type system, but it's not yet
+clear what the sort solving algorithms require, and my priority right now is
+to first understand the algorithms over and above writing the perfect system.
+
 # The module system
+
+## Unanswered questions
+
+### Are `Kind`s used after construction?
+
+If `Kind`s have a use after the construction of the adjacency lists in the `Sorts` and the assignment of each `Sort`'s `Sort.kind` field, then we need to keep them around. But so far I don't see a use for them. I don't have a good understanding of how they are used during runtime.
 
 ### Are items in a parent module automatically available within a submodule? 
 
@@ -82,6 +105,11 @@ conjunctands.
 | Match Condition    | Assignment Condition                 | `…if X := Y…`                 |
 | Rewrite Condition  | Rule Condition                       | `…if X => Y…`                 |
 
+## Concepts
+
+| Name               | Meaning                                              |
+|:-------------------|:-----------------------------------------------------|
+| ConnectedComponent | Kind, which is a connected component of the lattice induced by the subsort relation on sorts. |
 
 
 ## Equational Theories

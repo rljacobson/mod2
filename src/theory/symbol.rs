@@ -10,26 +10,22 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
-use crate::{
-  abstractions::{
-    IString,
-    RcCell
+use crate::{abstractions::{
+  IString,
+  RcCell
+}, heap_construct, rc_cell, theory::{
+  free_theory::free_symbol::FreeSymbol,
+  symbol_type::{
+    CoreSymbolType,
+    SymbolAttribute
+    ,
+    SymbolType
   },
-  rc_cell,
-  theory::{
-    free_theory::free_symbol::FreeSymbol,
-    symbol_type::{
-      CoreSymbolType,
-      SymbolAttribute
-      ,
-      SymbolType
-    },
-    variable_theory::variable_symbol::VariableSymbol
-  }
-};
+  variable_theory::variable_symbol::VariableSymbol
+}};
 use crate::core::sort::sort_spec::BxSortSpec;
 
-pub type RcSymbol = RcCell<Symbol>;
+pub type SymbolPtr = *mut Symbol;
 
 // Special arity values.
 // ToDo: Make this a newtype.
@@ -62,31 +58,38 @@ impl Symbol {
     }
   }
 
-  pub fn true_literal() -> RcSymbol {
-    let true_symbol: RcSymbol = rc_cell!(Symbol{
-      name        : IString::from("true"),
-      arity       : UNSPECIFIED,
-      symbol_type : SymbolType{
-        core_type : CoreSymbolType::SystemTrue,
-        attributes: Default::default(),
-      },
-      sort_spec    : None,
-      theory_symbol: None,
+  // ToDo: It would be better if we had a static object for constants like this.
+
+  /// Constructs a new heap-allocated symbol representing the
+  /// "system" true constant, returning an owning mutable pointer.
+  pub fn true_literal() -> SymbolPtr {
+    let true_symbol: SymbolPtr = heap_construct!(
+      Symbol{
+          name        : IString::from("true"),
+          arity       : UNSPECIFIED,
+          symbol_type : SymbolType{
+            core_type : CoreSymbolType::SystemTrue,
+            attributes: Default::default(),
+          },
+          sort_spec    : None,
+          theory_symbol: None,
     });
 
     true_symbol
   }
 
-  pub fn false_literal() -> RcSymbol {
-    let false_symbol: RcSymbol = rc_cell!(Symbol{
+  /// Constructs a new heap-allocated symbol representing the
+  /// "system" false constant, returning an owning mutable pointer.
+  pub fn false_literal() -> SymbolPtr {
+    let false_symbol: SymbolPtr = heap_construct!(Symbol{
       name        : IString::from("false"),
-      arity       : UNSPECIFIED,
-      symbol_type : SymbolType{
-        core_type : CoreSymbolType::SystemFalse,
-        attributes: Default::default(),
-      },
-      sort_spec    : None,
-      theory_symbol: None,
+          arity       : UNSPECIFIED,
+          symbol_type : SymbolType{
+            core_type : CoreSymbolType::SystemFalse,
+            attributes: Default::default(),
+          },
+          sort_spec    : None,
+          theory_symbol: None,
     });
 
     false_symbol

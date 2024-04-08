@@ -11,10 +11,13 @@ use enumflags2::{bitflags, BitFlags};
 
 use crate::{
   abstractions::IString,
-  theory::term::BxTerm
+  core::{
+    pre_equation::condition::Conditions,
+    sort::sort::SortPtr
+  },
+  theory::term::BxTerm,
 };
-use crate::core::pre_equation::condition::Conditions;
-use crate::core::sort::sort::RcSort;
+use crate::core::sort::sort_spec::BxSortSpec;
 
 
 #[bitflags]
@@ -54,7 +57,7 @@ pub enum PreEquationKind {
 
   // Membership Axiom ("Sort constraint")
   Membership {
-    sort: RcSort,
+    sort_spec: BxSortSpec,
   },
 
   // StrategyDefinition

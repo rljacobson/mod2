@@ -134,6 +134,7 @@ pub(crate) enum ItemAST {
   SortDecl(BxSortDeclarationAST),
   Rule(BxRuleDeclarationAST),
   Equation(BxEquationDeclarationAST),
+  Membership(BxMembershipDeclarationAST)
 }
 
 /// A sort declaration has the form
@@ -160,5 +161,15 @@ pub(crate) type BxEquationDeclarationAST = Box<EquationDeclarationAST>;
 pub(crate) struct EquationDeclarationAST {
   pub lhs       : BxTermAST,
   pub rhs       : BxTermAST,
+  pub conditions: Option<Vec<ConditionAST>>
+}
+
+
+/// Declaration of the form
+///     MembershipDeclaration := ("membership" | "mb") Term SortOp SortSpec ConditionSpec? ";" ;
+pub(crate) type BxMembershipDeclarationAST = Box<MembershipDeclarationAST>;
+pub(crate) struct MembershipDeclarationAST {
+  pub lhs       : BxTermAST,
+  pub rhs       : BxSortSpecAST,
   pub conditions: Option<Vec<ConditionAST>>
 }

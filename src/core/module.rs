@@ -13,20 +13,36 @@ same statuses as Maude, but it's not clear to me if I'll need them.
 The connected components of the lattice of sorts (the "kinds") is computed by computing the transitive closure of the
 subsort relation.
 
+## See Also...
+
+ * The module system section of the [Design Notes](doc/DesignNotes.md).
+
 */
 
+use tiny_logger::{Channel, log};
 use crate::{
   abstractions::{
-    HashMap
-    ,
+    HashMap,
     IString
   },
-  theory::symbol::RcSymbol
+  core::{
+    sort::{
+      collection::SortCollection,
+      kind::Kind,
+      kind_error::KindError,
+    },
+    pre_equation::PreEquation
+  },
+  heap_destroy,
+  theory::symbol::{
+    Symbol,
+    SymbolPtr
+  },
 };
-use crate::core::sort::collection::SortCollection;
-use crate::core::sort::kind::RcKind;
+use crate::core::sort::kind::{BxKind, KindPtr};
 
-#[derive(Copy, Clone, Default)]
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub enum ModuleStatus {
   #[default]
   Open,
@@ -45,13 +61,14 @@ pub struct Module {
   pub submodules: Vec<BxModule>,
   pub status    : ModuleStatus,
 
-  // Sorts
-  pub sorts     : SortCollection, // ToDo: Why not just have the sorts in `kinds`?
-  pub kinds     : Vec<RcKind>,
-  pub symbols   : HashMap<IString, RcSymbol>,
-  // pub sort_constraints: Vec<RcPreEquation>,
-  // pub equations       : Vec<RcPreEquation>,
-  // pub rules           : Vec<RcPreEquation>,
+  // ToDo: Why not just have the sorts in `kinds`? Do we need `kinds` after construction?
+  pub sorts     : SortCollection,
+  pub kinds     : Vec<BxKind>,
+  pub symbols   : HashMap<IString, SymbolPtr>,
+  pub equations : Vec<PreEquation>,
+  pub rules     : Vec<PreEquation>,
+  pub membership: Vec<PreEquation>,
+  // pub strategies: Vec<PreEquation>, // Unimplemented
 
   // ProfileModule members (performance profiling)
   // symbol_info: Vec<SymbolProfile>,
@@ -62,16 +79,59 @@ pub struct Module {
 }
 
 impl Module {
-  pub fn new(name: IString) -> Module {
-    Module {
-      name,
-      ..Module::default()
+  /**
+  Computes the transitive closure of the subsort relation, constructing the lattice of sorts. This only needs to be
+  done once when the module is constructed. It is not idempotent.
+
+  The `ModuleAST::construct(…)` method calls this method automatically, so any module constructed by the parser,
+  for example, will not need to have this method called on it.
+
+  Before this method call, a module will have `status == ModuleStatus::Open`. The method sets the status to
+  `ModuleStatus::SortSetClosed`, so at any point after this method call, a module will have
+  `status >= ModuleStatus::SortSetClosed`.
+
+  ToDo: It would be nice if this method were idempotent. Low priority.
+  */
+  pub unsafe fn compute_kind_closures(&mut self) {
+    assert_eq!(self.status, ModuleStatus::Open, "tried to compute kind closure when module status is not open");
+
+    for (_, sort) in
+        self.sorts
+            .iter()
+            .filter(|(_, sort_ptr)| (**sort_ptr).kind.is_null())
+    {
+      let kind = unsafe { Kind::new(sort) };
+      let mut kind = kind.unwrap_or_else(
+        | kind_error | {
+          let msg = kind_error.to_string();
+          match kind_error {
+
+            KindError::NoMaximalSort { kind, .. }
+            | KindError::CycleDetected { kind, .. } => {
+              log(Channel::Warning, 1, msg.as_str());
+              // Box::into_raw(kind)
+              kind
+            }
+
+          }
+        }
+      );
+
+      // Maude sets the index_in_parent of the kind here.
+      self.kinds.push(kind);
+    }
+    self.status = ModuleStatus::SortSetClosed
+  }
+
+}
+
+
+impl Drop for Module {
+  fn drop(&mut self) {
+    for (_, symbol_ptr) in self.symbols.iter() {
+      unsafe {
+        heap_destroy!(*symbol_ptr);
+      }
     }
   }
-
-  /// Computes the transitive closure of the connected components of the lattice of sorts. Each connected component is called a kind.
-  pub fn compute_kind_closures(&mut self) {
-
-  }
-
 }

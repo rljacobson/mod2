@@ -4,9 +4,9 @@ use crate::core::module::Module;
 use crate::core::pre_equation::{PreEquation, PreEquationKind};
 use crate::core::pre_equation::condition::Conditions;
 use crate::core::sort::collection::SortCollection;
-use crate::parser::ast::{BxEquationDeclarationAST, BxRuleDeclarationAST, BxSortDeclarationAST, ItemAST, symbol_decl};
+use crate::parser::ast::{BxEquationDeclarationAST, BxMembershipDeclarationAST, BxRuleDeclarationAST, BxSortDeclarationAST, ItemAST, symbol_decl};
 use crate::parser::ast::symbol_decl::{BxSymbolDeclarationAST, BxVariableDeclarationAST};
-use crate::theory::symbol::RcSymbol;
+use crate::theory::symbol::SymbolPtr;
 use crate::theory::symbol_type::CoreSymbolType;
 
 pub(crate) type BxModuleAST = Box<ModuleAST>;
@@ -22,25 +22,27 @@ impl ModuleAST {
   /// Constructs a `Module` representation of `self`, consuming `self`.
   pub fn construct_module(mut self) -> Module {
     // The items of the module are binned according to type before processing.
-    let mut modules   : Vec<BxModuleAST>              = Vec::new();
-    let mut var_decls : Vec<BxVariableDeclarationAST> = Vec::new();
-    let mut sym_decls : Vec<BxSymbolDeclarationAST>   = Vec::new();
-    let mut sort_decls: Vec<BxSortDeclarationAST>     = Vec::new();
-    let mut rule_decls: Vec<BxRuleDeclarationAST>     = Vec::new();
-    let mut eq_decls  : Vec<BxEquationDeclarationAST> = Vec::new();
+    let mut modules   : Vec<BxModuleAST>                = Vec::new();
+    let mut var_decls : Vec<BxVariableDeclarationAST>   = Vec::new();
+    let mut sym_decls : Vec<BxSymbolDeclarationAST>     = Vec::new();
+    let mut sort_decls: Vec<BxSortDeclarationAST>       = Vec::new();
+    let mut rule_decls: Vec<BxRuleDeclarationAST>       = Vec::new();
+    let mut eq_decls  : Vec<BxEquationDeclarationAST>   = Vec::new();
+    let mut mb_decls  : Vec<BxMembershipDeclarationAST> = Vec::new();
 
     for item in self.items.drain(..) {
       match item {
-        ItemAST::Submodule(i) => modules.push(i),
-        ItemAST::VarDecl(i)   => var_decls.push(i),
-        ItemAST::SymDecl(i)   => sym_decls.push(i),
-        ItemAST::SortDecl(i)  => sort_decls.push(i),
-        ItemAST::Rule(i)      => rule_decls.push(i),
-        ItemAST::Equation(i)  => eq_decls.push(i),
+        ItemAST::Submodule(i)  => modules.push(i),
+        ItemAST::VarDecl(i)    => var_decls.push(i),
+        ItemAST::SymDecl(i)    => sym_decls.push(i),
+        ItemAST::SortDecl(i)   => sort_decls.push(i),
+        ItemAST::Rule(i)       => rule_decls.push(i),
+        ItemAST::Equation(i)   => eq_decls.push(i),
+        ItemAST::Membership(i) => mb_decls.push(i)
       }
     }
 
-    // Todo: How submodules work determines how we construct modules. See [Design Questions](doc/DesignQuestions.md).
+    // Todo: How submodules work determines how we construct modules. See [the Design doc](doc/DesignNotes.md).
     /*
     Sorts can be declared explicitly, or they can be implicitly declared by being referenced without declaration.
     The transitive closure of the subsort relation and the construction of the connected components is done in
@@ -49,8 +51,8 @@ impl ModuleAST {
     Every sort that is encountered is checked to see if it has already been created. If it has, the existing sort
     object is fetched. Otherwise, the sort is created.
     */
-    let mut sorts  : SortCollection             = SortCollection::new();
-    let mut symbols: HashMap<IString, RcSymbol> = HashMap::new();
+    let mut sorts  : SortCollection              = SortCollection::new();
+    let mut symbols: HashMap<IString, SymbolPtr> = HashMap::new();
 
     // Sort Declarations
     for sort_decl in sort_decls.iter() {
@@ -64,8 +66,10 @@ impl ModuleAST {
           let supersort = sorts.get_or_create_sort(*supersort_name);
           // ToDo: Check that this constraint has not already been declared by checking that `subsort.supersorts` does
           //       not already contain `supersort` (and vice versa).
-          subsort.borrow_mut().supersorts.push(supersort.downgrade());
-          supersort.borrow_mut().subsorts.push(subsort.downgrade());
+          unsafe {
+            (*subsort).supersorts.push(supersort);
+            (*supersort).subsorts.push(subsort);
+          }
         }
       }
     }
@@ -96,9 +100,9 @@ impl ModuleAST {
       );
     }
 
-    let mut pre_equations: Vec<PreEquation> = Vec::new();
 
     // Rule Declarations
+    let mut rules: Vec<PreEquation> = Vec::new();
     for rule_decl in rule_decls {
       let lhs  = rule_decl.lhs.construct(&mut symbols);
       let rhs  = rule_decl.rhs.construct(&mut symbols);
@@ -120,14 +124,16 @@ impl ModuleAST {
         kind      : rule,
       };
 
-      pre_equations.push(pre_equation);
+      rules.push(pre_equation);
     }
 
+
     // Equation Declarations
+    let mut equations: Vec<PreEquation> = Vec::new();
     for eq_decl in eq_decls {
-      let lhs  = eq_decl.lhs.construct(&mut symbols);
-      let rhs  = eq_decl.rhs.construct(&mut symbols);
-      let rule = PreEquationKind::Equation{
+      let lhs      = eq_decl.lhs.construct(&mut symbols);
+      let rhs      = eq_decl.rhs.construct(&mut symbols);
+      let equation = PreEquationKind::Equation{
         rhs_term: Box::new(rhs),
       };
       let conditions: Conditions
@@ -142,19 +148,54 @@ impl ModuleAST {
         attributes: Default::default(),
         conditions,
         lhs_term  : Box::new(lhs),
-        kind      : rule,
+        kind      : equation,
       };
 
-      pre_equations.push(pre_equation);
+      equations.push(pre_equation);
     }
 
-    Module{
+
+    // Membership Axiom Declarations
+    let mut membership: Vec<PreEquation> = Vec::new();
+    for mb_decl in mb_decls {
+      let lhs        = mb_decl.lhs.construct(&mut symbols);
+      let rhs        = mb_decl.rhs.construct(&mut sorts);
+      let membership = PreEquationKind::Membership{
+        sort_spec: rhs,
+      };
+      let conditions: Conditions
+          = mb_decl.conditions
+                   .unwrap_or_default()
+                   .into_iter()
+                   .map(|c| Box::new(c.construct(&mut symbols, &mut sorts)))
+                   .collect();
+
+      let pre_equation = PreEquation{
+        name      : None,
+        attributes: Default::default(),
+        conditions,
+        lhs_term  : Box::new(lhs),
+        kind      : membership,
+      };
+
+      equations.push(pre_equation);
+    }
+
+    let mut new_module = Module{
       name      : Default::default(),
       submodules: vec![],
       status    : Default::default(),
       sorts,
       kinds     : vec![],
       symbols,
+
+      rules,
+      equations,
+      membership,
+    };
+    unsafe {
+      new_module.compute_kind_closures();
     }
+    new_module
   }
 }

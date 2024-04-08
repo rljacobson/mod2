@@ -5,30 +5,26 @@ use std::{
   rc::Rc,
 };
 
-use crate::{
-  abstractions::{
-    HashMap,
-    Integer,
-    IString,
-    rc_cell,
-    RcCell
+use crate::{abstractions::{
+  HashMap,
+  Integer,
+  IString,
+  rc_cell,
+  RcCell
+}, heap_construct, parser::ast::{
+  attribute::AttributeAST,
+  BxSortSpecAST
+}, theory::{
+  symbol::{
+    SymbolPtr,
+    Symbol,
+    symbol_for_symbol_type
   },
-  parser::ast::{
-    attribute::AttributeAST,
-    BxSortSpecAST
+  symbol_type::{
+    CoreSymbolType,
+    SymbolType
   },
-  theory::{
-    symbol::{
-      RcSymbol,
-      Symbol,
-      symbol_for_symbol_type
-    },
-    symbol_type::{
-      CoreSymbolType,
-      SymbolType
-    },
-  }
-};
+}};
 use crate::core::sort::collection::SortCollection;
 
 pub(crate) type BxSymbolDeclarationAST = Box<SymbolDeclarationAST>;
@@ -52,7 +48,7 @@ pub(crate) struct VariableDeclarationAST {
 
 /// Common code for VariableDeclarationAST and SymbolDeclarationAST
 pub fn construct_symbol_from_decl(
-  symbols         : &mut HashMap<IString, RcSymbol>,
+  symbols         : &mut HashMap<IString, SymbolPtr>,
   sorts           : &mut SortCollection,
   name            : IString,
   sort_spec       : Option<BxSortSpecAST>,
@@ -93,7 +89,7 @@ pub fn construct_symbol_from_decl(
 
     Entry::Vacant(v) => {
       // The symbol doesn't exist. Create it.
-      let mut s = rc_cell!(
+      let mut s = heap_construct!(
             Symbol{
               name,
               arity,

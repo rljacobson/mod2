@@ -16,7 +16,7 @@ use crate::{
   abstractions::NatSet,
   theory::{
     symbol::{
-      RcSymbol,
+      SymbolPtr,
       Symbol
     }
   }
@@ -49,7 +49,7 @@ impl Term {
 /// The part of the term that holds the subterms.
 pub enum TermNode{
 
-  Symbol(RcSymbol),
+  Symbol(SymbolPtr),
 
   Application {
     head: BxTerm,

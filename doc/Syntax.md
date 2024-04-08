@@ -26,6 +26,7 @@ Declaration := VariableDeclaration
             | SortDeclaration
             | RuleDeclaration
             | EquationDeclaration
+            | MembershipDeclaration
             # | StrategyDeclaration
             ;
 

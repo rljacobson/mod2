@@ -38,7 +38,7 @@ use crate::{
     BxTermAST
   },
   theory::{
-    symbol::RcSymbol,
+    symbol::SymbolPtr,
     term::Term
   },
 };
@@ -62,7 +62,7 @@ pub(crate) enum ConditionAST {
 impl ConditionAST {
   pub fn construct(
     &self,
-    symbols: &mut HashMap<IString, RcSymbol>,
+    symbols: &mut HashMap<IString, SymbolPtr>,
     sorts  : &mut SortCollection
   ) -> Condition
   {

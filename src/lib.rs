@@ -1,4 +1,7 @@
 #![allow(unused)]
+#![doc(include = "../doc/DesignNodes.md")]
+#![doc(include = "../doc/Syntax.md")]
+#![doc(include = "../doc/QuickStart.md")]`
 
 mod parser;
 pub mod abstractions;

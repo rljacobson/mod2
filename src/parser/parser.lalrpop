@@ -12,6 +12,7 @@ use crate::{
     SortDeclarationAST,
     RuleDeclarationAST,
     EquationDeclarationAST,
+    MembershipDeclarationAST,
     TermAST,
     BxTermAST,
     SortSpecAST,
@@ -103,12 +104,13 @@ pub Module: Box<ModuleAST> = {
 };
 
 Item: ItemAST = {
-    <Submodule>           => ItemAST::Submodule(<>),
-    <VariableDeclaration> => ItemAST::VarDecl(Box::new(<>)),
-    <SymbolDeclaration>   => ItemAST::SymDecl(Box::new(<>)),
-    <SortDeclaration>     => ItemAST::SortDecl(Box::new(<>)),
-    <RuleDeclaration>     => ItemAST::Rule(Box::new(<>)),
-    <EquationDeclaration> => ItemAST::Equation(Box::new(<>)),
+    <Submodule>             => ItemAST::Submodule(<>),
+    <VariableDeclaration>   => ItemAST::VarDecl(Box::new(<>)),
+    <SymbolDeclaration>     => ItemAST::SymDecl(Box::new(<>)),
+    <SortDeclaration>       => ItemAST::SortDecl(Box::new(<>)),
+    <RuleDeclaration>       => ItemAST::Rule(Box::new(<>)),
+    <EquationDeclaration>   => ItemAST::Equation(Box::new(<>)),
+    <MembershipDeclaration> => ItemAST::Membership(Box::new(<>))
 };
 
 Submodule: Box<ModuleAST> = {
@@ -196,6 +198,16 @@ RuleDeclaration: RuleDeclarationAST = {
 EquationDeclaration: EquationDeclarationAST = {
     EquationKeyword <lhs: Term> EqualOp <rhs: Term> <maybe_conditions: ConditionSpec?> ";" => {
         EquationDeclarationAST {
+            lhs,
+            rhs,
+            conditions: maybe_conditions
+        }
+    }
+};
+
+MembershipDeclaration: MembershipDeclarationAST = {
+    MembershipKeyword <lhs: Term> SortOp <rhs: SortSpec> <maybe_conditions: ConditionSpec?> ";" => {
+        MembershipDeclarationAST {
             lhs,
             rhs,
             conditions: maybe_conditions

@@ -4,30 +4,26 @@ use std::{
   rc::Rc,
 };
 
-use crate::{
-  abstractions::{
-    HashMap,
-    IString,
-    RcCell,
-    rc_cell,
-    NaturalNumber
+use crate::{abstractions::{
+  HashMap,
+  IString,
+  RcCell,
+  rc_cell,
+  NaturalNumber
+}, builtin::{
+  integer_symbol::IntegerSymbol,
+  string_symbol::StringSymbol
+}, heap_construct, theory::{
+  symbol::{
+    SymbolPtr,
+    Symbol
   },
-  builtin::{
-    integer_symbol::IntegerSymbol,
-    string_symbol::StringSymbol
-  },
-  theory::{
-    symbol::{
-      RcSymbol,
-      Symbol
-    },
-    term::{
-      Term,
-      TermAttributes,
-      TermNode
-    }
+  term::{
+    Term,
+    TermAttributes,
+    TermNode
   }
-};
+}};
 
 pub(crate) type BxTermAST = Box<TermAST>;
 pub(crate) enum TermAST {
@@ -46,17 +42,17 @@ pub(crate) enum TermAST {
 }
 
 impl TermAST {
-  pub fn construct(&self, symbols: &mut HashMap<IString, RcSymbol>) -> Term {
+  pub fn construct(&self, symbols: &mut HashMap<IString, SymbolPtr>) -> Term {
     // ToDo: How do we construct term attributes.
 
     match self {
 
       TermAST::Identifier(name) => {
-        let symbol = match symbols.entry(*name) {
-          Entry::Occupied(s) => s.get().clone(),
+        let symbol: SymbolPtr = match symbols.entry(*name) {
+          Entry::Occupied(s) => *s.get(),
           Entry::Vacant(v) => {
-            let s = rc_cell!(Symbol::new(*name));
-            v.insert(s.clone());
+            let s = heap_construct!(Symbol::new(*name));
+            v.insert(s);
             s
           }
         };
@@ -80,7 +76,7 @@ impl TermAST {
       TermAST::StringLiteral(string_literal) => {
         // ToDo: Where do we store literal symbols? They cannot be stored in the `symbols`  `HashMap` because they have
         //       no names.
-        let symbol = rc_cell!(StringSymbol::new(string_literal.clone()));
+        let symbol = heap_construct!(StringSymbol::new(string_literal.clone()));
 
         Term {
           term_node: TermNode::Symbol(symbol),
@@ -90,7 +86,7 @@ impl TermAST {
 
       TermAST::NaturalNumber(natural_number) => {
         // ToDo: As with string literals, figure out if number literal symbols should be stored and reused.
-        let symbol = rc_cell!(IntegerSymbol::new(natural_number.clone()));
+        let symbol = heap_construct!(IntegerSymbol::new(natural_number.clone()));
 
         Term {
           term_node: TermNode::Symbol(symbol),
