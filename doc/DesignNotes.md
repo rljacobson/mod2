@@ -1,4 +1,6 @@
-# The type system
+# Design Notes
+
+## The type system
 
 Sorts are named types that do not necessarily describe a data layout, that is,
 they can be purely abstract. Right now, sorts cannot describe functor types.
@@ -9,21 +11,26 @@ Issues to consider:
 
  1. Sorts cannot be functions.
  2. Sort specs cannot be named in general, though they can be just a single named sort.
- 3. Both sorts and sort specs lack native support for variadic list-like types. (We don't have a syntax for variadic functors yet.) List-like types can still be defined, but it's not ergonomic.
+ 3. Both sorts and sort specs lack native support for variadic list-like types. (We don't have a syntax for variadic 
+    functors yet.) List-like types can still be defined, but it's not ergonomic.
+
+There is also what Maude calls a symbol's `SymbolType`, which stores the symbol's attributes (precedence, gather,
+associative, etc.) and built-in type (if not "`Standard`"). The `SymbolType` seems to me to be type information
+internal to Maude's implementation rather than intended to be part of the exposed type system.
 
 It would be nice to have a more orthogonal type system, but it's not yet
 clear what the sort solving algorithms require, and my priority right now is
 to first understand the algorithms over and above writing the perfect system.
 
-# The module system
+## The module system
 
-## Unanswered questions
+### Unanswered questions
 
-### Are `Kind`s used after construction?
+#### Are `Kind`s used after construction?
 
 If `Kind`s have a use after the construction of the adjacency lists in the `Sorts` and the assignment of each `Sort`'s `Sort.kind` field, then we need to keep them around. But so far I don't see a use for them. I don't have a good understanding of how they are used during runtime.
 
-### Are items in a parent module automatically available within a submodule? 
+#### Are items in a parent module automatically available within a submodule? 
 
 If so: 
 
@@ -38,7 +45,7 @@ If not:
  - What happens when names collide?
 
 
-# Object Ownership
+## Object Ownership
 
 Module items are owned by the `Module` in which they are defined. References that can potentially create cycles, 
 such as the references within `Sort`s to other `Sort`s, are `Weak` references. Other references, like references 
@@ -84,13 +91,13 @@ TheoryTerm <|-- ACUTerm
 
 ```
 
-# Confused Maude Terminology
+## Confused Maude Terminology
 
-## Syntactic Structures
+### Syntactic Structures
 
-Some concepts in Maude are referred to in multiple ways, which can be confusing. This is my attempt to disentangle everything.[^1]
+Some concepts in Maude are referred to in multiple ways, which can be confusing. This is my attempt to disentangle everything.[^strict]
 
-[^1]: I might introduce my own terms or syntax, so this is not strictly as found in Maude.
+[^strict]: I might introduce my own terms or syntax, so this is not strictly as found in Maude.
 
 Maude calls the entire conjunction of conjunctands the condition, while individual conjunctands it calls a 
 `ConditionFragment`. I just use the word `Condition` for a conjunctand and `Conditions` for the conjunction of all 
@@ -105,14 +112,15 @@ conjunctands.
 | Match Condition    | Assignment Condition                 | `…if X := Y…`                 |
 | Rewrite Condition  | Rule Condition                       | `…if X => Y…`                 |
 
-## Concepts
+### Concepts
 
-| Name               | Meaning                                              |
-|:-------------------|:-----------------------------------------------------|
+| Name               | Meaning                                                                                       |
+|:-------------------|:----------------------------------------------------------------------------------------------|
 | ConnectedComponent | Kind, which is a connected component of the lattice induced by the subsort relation on sorts. |
+| Symbol type | This seems to be the part of the symbol's type that isn't encoded in the symbol's sort.       |
 
 
-## Equational Theories
+### Equational Theories
 
 _Unitary_ means _with identity_. An identity (a unit) can be a left identity or a right identity (or both). 
 

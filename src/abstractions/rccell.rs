@@ -1,8 +1,8 @@
 #![allow(unused)]
 /*!
 
-Adapted with improvements from [rccell](https://crates.io/crates/rccell) ([GitHub](https://github
-com/romancardenas/rccell)),
+Adapted with improvements from [rccell](https://crates.io/crates/rccell)
+([GitHub](https://github.com/romancardenas/rccell)),
 Copyright (c) 2021 Román Cárdenas, distributed unter the MIT License. Modified to allow unsized inner types.
 
 A convenient wrapper for `Rc<RefCell<T>>>` and `Weak<RefCell<T>>>`.

@@ -11,27 +11,33 @@ same statuses as Maude, but it's not clear to me if I'll need them.
 ### Closure of the Sort Set
 
 The connected components of the lattice of sorts (the "kinds") is computed by computing the transitive closure of the
-subsort relation.
+subsort relation. This is done by calling the method `Module::compute_kind_closures(…)`.
 
 ## See Also...
 
- * The module system section of the [Design Notes](doc/DesignNotes.md).
+ * The module system section of the [Design Notes](crate).
 
 */
 
-use tiny_logger::{Channel, log};
+
 use crate::{
   abstractions::{
     HashMap,
-    IString
+    IString,
+    Channel,
+    log
   },
   core::{
     sort::{
       collection::SortCollection,
-      kind::Kind,
+      kind::{
+        Kind,
+        BxKind,
+        KindPtr
+      },
       kind_error::KindError,
     },
-    pre_equation::PreEquation
+    pre_equation::PreEquation,
   },
   heap_destroy,
   theory::symbol::{
@@ -39,7 +45,6 @@ use crate::{
     SymbolPtr
   },
 };
-use crate::core::sort::kind::{BxKind, KindPtr};
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]

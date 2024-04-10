@@ -1,13 +1,33 @@
 use std::collections::HashMap;
-use crate::abstractions::IString;
-use crate::core::module::Module;
-use crate::core::pre_equation::{PreEquation, PreEquationKind};
-use crate::core::pre_equation::condition::Conditions;
-use crate::core::sort::collection::SortCollection;
-use crate::parser::ast::{BxEquationDeclarationAST, BxMembershipDeclarationAST, BxRuleDeclarationAST, BxSortDeclarationAST, ItemAST, symbol_decl};
-use crate::parser::ast::symbol_decl::{BxSymbolDeclarationAST, BxVariableDeclarationAST};
-use crate::theory::symbol::SymbolPtr;
-use crate::theory::symbol_type::CoreSymbolType;
+
+use crate::{
+  abstractions::IString,
+  core::{
+    pre_equation::{
+      PreEquation,
+      PreEquationKind,
+      condition::Conditions
+    },
+    sort::collection::SortCollection,
+    module::Module
+  },
+  parser::ast::{
+    symbol_decl::{
+      BxSymbolDeclarationAST,
+      BxVariableDeclarationAST
+    },
+    construct_symbol_from_decl,
+    BxEquationDeclarationAST,
+    BxMembershipDeclarationAST,
+    BxRuleDeclarationAST,
+    BxSortDeclarationAST,
+    ItemAST
+  },
+  theory::{
+    symbol::SymbolPtr,
+    symbol_type::CoreSymbolType
+  }
+};
 
 pub(crate) type BxModuleAST = Box<ModuleAST>;
 
@@ -76,7 +96,7 @@ impl ModuleAST {
 
     // Variable Declarations
     for var_decl in var_decls {
-      symbol_decl::construct_symbol_from_decl(
+      construct_symbol_from_decl(
         &mut symbols,
         &mut sorts,
         var_decl.name,
@@ -89,7 +109,7 @@ impl ModuleAST {
 
     // Symbol Declarations
     for sym_decl in sym_decls {
-      symbol_decl::construct_symbol_from_decl(
+      construct_symbol_from_decl(
         &mut symbols,
         &mut sorts,
         sym_decl.name,

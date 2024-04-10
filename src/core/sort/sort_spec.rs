@@ -1,11 +1,11 @@
 /*!
 
-A [`SortSpec`](crate::core::sort::sort_spec::SortSpec) is a generalization of `Sort` that additionally permits
+A [`SortSpec`] is a generalization of `Sort` that additionally permits
 functors. `SortSpec`s are not named.
 
 ## See Also...
 
- - A [`Sort`](crate::core::sort::sort::Sort) is a named type.
+ - A [`Sort`] is a named type.
  - A [`Kind`](crate::core::sort::kind::Kind) is a connected component of the lattice of `Sort`s induced by the subsort
    relation.
 

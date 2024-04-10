@@ -1,21 +1,24 @@
 /*!
 
-A `SymbolType` has a `CoreSymbolType` plus additional attributes.
+A `SymbolType` has a `CoreSymbolType` plus additional attributes. It is mostly orthogonal to the notion of a sort
+(except for built-ins like `Float` and `String`)--or rather, it contains the additional type information not contained
+by the sort (or `SortSpec`).
 
 */
 
 use enumflags2::{bitflags, BitFlags, make_bitflags};
 
+/// The type of a `Symbol` is the `CoreSymbolType` plus its `SymbolAttributes`
 #[derive(Copy, Clone, Eq, PartialEq, Default)]
 pub struct SymbolType {
-  pub core_type: CoreSymbolType,
+  pub core_type : CoreSymbolType,
   pub attributes: SymbolAttributes
 }
 
 /// The most important `CoreSymbolType`s are `Standard` and `Variable`.
 ///
 /// Most of the `CoreSymbolType`s are unimplemented symbol types that are used in Maude.
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default, Debug)]
 pub enum CoreSymbolType {
   #[default]
   Standard,
@@ -69,7 +72,7 @@ pub enum CoreSymbolType {
 
 #[bitflags]
 #[repr(u32)]
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum SymbolAttribute {
   // Syntactic attributes
   Precedence,

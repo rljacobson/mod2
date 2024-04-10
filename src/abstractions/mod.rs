@@ -58,7 +58,7 @@ use std::iter::once;
 /**
 Join an iterator of strings, which doesn't exist in the stdlib. (C.f. `Vec::join(…)`)
 
-From: https://stackoverflow.com/a/66951473
+From: <https://stackoverflow.com/a/66951473>
 Usage:
 
     let iter = [1, 3, 5, 7, 9].iter().cloned();

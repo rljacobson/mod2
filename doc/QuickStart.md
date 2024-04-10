@@ -1,3 +1,5 @@
+# Quick Start
+
 ## Terms and Symbols
 
 The expressions on which the rewriting system acts are called terms. A *term* is a syntactic entity that can be a constant, a variable, or an application of a function symbol (or *functor*) to a sequence of other terms. In the context of algebraic specification and term rewriting systems, terms are the primary objects of manipulation and computation. Symbols are fundamental elements that serve as building blocks for constructing terms.
@@ -9,7 +11,7 @@ A symbol can represent either a constant or a function (or *functor*) that takes
 - **Constant Symbols**: These are the simplest form of symbols, representing atomic values or entities that do not require arguments. Examples include numbers or strings. A symbol can also be any named item that stands alone without further decomposition, which you can think of as a function of arity zero, that is, a function that takes no arguments.
 - **Function Symbols**: These symbols represent operations or functions that take a specified number of arguments (their *arity*) and produce a term. Function symbols are used to construct more complex terms from simpler ones. The arity of a function symbol can be zero, in which case it is also considered a constant.
 
-We will use the terms “function symbol”, “function”, “operator symbol”, “operator”, and “operation” interchangeably.
+We will use the terms “function symbol,” “function,” “operator symbol,” “operator,” and “operation” interchangeably.
 
 ### Role in Terms
 
@@ -24,14 +26,14 @@ Each symbol is associated with a *sort*, which is a type that classifies the sym
 
 **Example:**
 
-The following defines two symbols of sort `Nat`[^1].
+The following defines two symbols of sort `Nat`[^nat].
 
 ```maude
 symbol a: Nat;
 symbol b: Nat;
 ```
 
-[1]: The `Nat` sort is part of the standard library. It models natural numbers, that is, nonnegative integers.
+[^nat]: The `Nat` sort is part of the standard library. It models natural numbers, that is, nonnegative integers.
 
 ### Function Signatures
 

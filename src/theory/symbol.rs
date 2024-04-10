@@ -27,21 +27,20 @@ use crate::core::sort::sort_spec::BxSortSpec;
 
 pub type SymbolPtr = *mut Symbol;
 
-// Special arity values.
-// ToDo: Make this a newtype.
+/// Special arity values.
+// ToDo: Make arity a newtype.
 pub const VARIADIC   : i16 = -1;
 pub const UNSPECIFIED: i16 = -2;
 
 pub struct Symbol {
-  /// `NamedEntity` members
   pub name       : IString,
   pub arity      : i16, // -1 means variadic, -2 means unspecified
   pub symbol_type: SymbolType,
   // ToDo: Should `sort_spec` be a member of `SymbolType`?
   pub sort_spec  : Option<BxSortSpec>,
 
-  // The theory-specific implementation of a symbol. (An alternative design is used for `PreEquation`, where the
-  // subtype is implemented as an enum.)
+  /// The theory-specific implementation of a symbol. (An alternative design is used for `PreEquation`, where the
+  /// subtype is implemented as an enum.)
   pub theory_symbol: Option<Box<dyn TheorySymbol>>,
 }
 

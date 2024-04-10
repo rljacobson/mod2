@@ -1,10 +1,10 @@
 #![allow(unused)]
-#![doc(include = "../doc/DesignNodes.md")]
-#![doc(include = "../doc/Syntax.md")]
-#![doc(include = "../doc/QuickStart.md")]`
+#![doc = include_str!("../doc/QuickStart.md")]
+#![doc = include_str!("../doc/DesignNotes.md")]
+#![doc = include_str!("../doc/Syntax.md")]
 
 mod parser;
-pub mod abstractions;
+mod abstractions;
 mod theory;
 mod core;
 mod builtin;
