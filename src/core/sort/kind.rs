@@ -173,21 +173,24 @@ impl Kind {
     }
   }
 
-  /// Auxiliary method to construct the sort lattice
+  /// Auxiliary method to construct the sort lattice. This algorithm ensures that all supersorts have been added before
+  /// the current sort is added, ensuring that subsorts always have a greater index than their supersorts.
   unsafe fn process_subsorts(&mut self, sort: SortPtr) {
     assert!(!sort.is_null(), "tried to process subsorts of a null porter to a sort");
     for subsort in (*sort).subsorts.iter() {
       assert!(!subsort.is_null(), "discovered a null subsort pointer");
-      // We "resolve" `self` as a supersort for each of `self`'s subsorts. If `self` is the last unresolved supersort for the subsort, it is finally time to add the subsort to its kind. This ensures all supersorts of that subsort have been "resolved" before the subsort is added.
+      // We "resolve" `self` as a supersort for each of `self`'s subsorts. If `self` is the last unresolved supersort
+      // for the subsort, it is finally time to add the subsort to its kind. This ensures all supersorts of that
+      // subsort have been "resolved" before the subsort is added.
       (**subsort).unresolved_supersort_count -= 1;
       if (**subsort).unresolved_supersort_count == 0 {
-        // Add the
+        // Finally add the current sort.
         (**subsort).index_within_kind = self.append_sort(*subsort);;
       }
     }
   }
 
-  /// Pushes the sort onto `self.sorts`, returning the index of the sort in `self.sorts`.
+  /// Pushes the sort onto `self.sorts`, returning the index of the sort in `self.sorts`. Used during construction.
   pub fn append_sort(&mut self, sort: SortPtr) -> usize {
     self.sorts.push(sort);
     self.sorts.len() - 1

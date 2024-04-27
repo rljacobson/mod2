@@ -75,7 +75,7 @@ pub struct Module {
   pub membership: Vec<PreEquation>,
   // pub strategies: Vec<PreEquation>, // Unimplemented
 
-  // ProfileModule members (performance profiling)
+  // Members for performance profiling
   // symbol_info: Vec<SymbolProfile>,
   // mb_info    : Vec<StatementProfile>, // Membership
   // eq_info    : Vec<StatementProfile>, // Equation
@@ -108,6 +108,7 @@ impl Module {
       let kind = unsafe { Kind::new(sort) };
       let mut kind = kind.unwrap_or_else(
         | kind_error | {
+          // Maude sets the "is_bad" flag of a module in the case of a cycle in the Sort graph.
           let msg = kind_error.to_string();
           match kind_error {
 
@@ -132,6 +133,8 @@ impl Module {
 
 
 impl Drop for Module {
+  /// A module owns its symbols, which are raw pointers to allocated memory. The module must reclaim this owned memory
+  /// when it is dropped.
   fn drop(&mut self) {
     for (_, symbol_ptr) in self.symbols.iter() {
       unsafe {
