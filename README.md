@@ -1,13 +1,18 @@
 # mod2 expression pattern matching library
 
-This code is a new independent implementation of the pattern matching algorithms in Maude and
-is being written in parallel to Mod. The purpose of this library is to help me understand
-architecture issues that I face writing Mod. It is unlikely to be useful to anyone else.
+This code is a new independent implementation of the pattern matching algorithms in
+Maude and is being written in parallel to Mod. The purpose of this library is to resolve
+architecture issues that I face writing Mod. Roughly speaking, this library is the
+"front end," while the Mod code is the "back end," although in this case "front end"
+corresponds more closely to the front and middle of a traditional compiler pipeline.
 
-My approach to writing Mod is to start with internal algorithms and data structures. On the other hand, mod2
-starts with a frontend, including a simple programming language, and an internal representation of these frontend
-interfaces. The work on mod2 is largely independent of the Maude source code, the idea being that a natural
-code shape will emerge with mod2. The work on Mod, on the other hand, is very dependent on Maude's source code.
+My approach to writing Mod is to start with internal algorithms and data structures.
+On the other hand, mod2 starts with a front end, including a simple programming
+language, and an internal representation of these frontend interfaces. The work on mod2
+is largely independent of the Maude source code, the idea being that a natural code
+shape will emerge with mod2. The work on Mod, on the other hand, is very dependent on
+Maude's source code. Therefore, code in this repository can be released under a more
+permissive license, either the MIT license or the Apache 2.0 license at your preference.
 
 # Status
 

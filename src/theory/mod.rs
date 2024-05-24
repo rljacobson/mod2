@@ -8,4 +8,6 @@ pub mod free_theory;
 pub mod variable_theory;
 pub mod term;
 pub mod symbol_type;
+pub mod dag_node;
+pub mod dag_node_attributes;
 

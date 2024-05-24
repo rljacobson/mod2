@@ -5,12 +5,8 @@ checking uniqueness, types, etc.
 
 */
 
-
-use crate::add;
-
 mod ast;
 mod parser;
-
 
 
 #[cfg(test)]
