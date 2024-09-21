@@ -30,7 +30,7 @@ use std::{
   cell::RefCell,
   rc::Rc
 };
-
+use std::fmt::Display;
 use crate::{
   abstractions::{
     IString,
@@ -50,22 +50,29 @@ pub type SortPtrs = Vec<SortPtr>;
 #[derive(Clone)]
 pub struct Sort {
   pub name:       IString,
-  /// The `index_within_kind` is the index of the sort within its `Kind`. It is used with `fast_compare_index` as an optimization for subsort computations..
+  /// The `index_within_kind` is the index of the sort within its `Kind`.
+  // ToDo: As it is only computed after subsort closure and `unresolved_supersort_count` is only used during subsort closure,
+  //       we could also use this field for `unresolved_supersort_count` as an optimization for subsort computations.
   pub index_within_kind: usize,
 
 
   /// This is the index for which all sorts with `index >= fast_compare_index` are subsorts.
   fast_compare_index: usize,
 
-  /// Only used during `Kind` construction to compute `fast_compare_index`. Only when all
+  /// Only used during `Kind` construction to compute `unresolved_supersort_count`. Only when all
   /// supersorts have been assigned an `index_within_kind` can this `Sort`'s `index_within_kind`
   /// be assigned, which only occurs when `unresolved_supersort_count` reaches zero.
   pub unresolved_supersort_count: usize,
 
-
-  pub subsorts  : SortPtrs, // There may be sorts within the connected component that are
-  pub supersorts: SortPtrs, // incomparable to this one and thus neither a super- nor sub-sort.
-  /// Holds the indices within kind of sorts that are subsorts of this sort.
+  /// Adjacency lists, generally only immediately adjacent sorts. Besides sorts that
+  /// are subsorts (resp supersorts) via transitivity, there may be sorts within the
+  /// connected component that are incomparable to this one and thus neither a super- nor
+  /// sub-sort. The transitive closure of `<=` is computed and stored in `leq_sorts`.
+  pub subsorts  : SortPtrs,
+  pub supersorts: SortPtrs,
+  /// Holds the indices within kind of sorts that are subsorts of this sort, including transitively.
+  // ToDo: If `subsorts`/`supersorts` aren't used after construction, don't store them in `Sort`. It looks like
+  //       `supersorts` is not but `subsorts` might be.
   pub leq_sorts :  NatSet,
 
   // The connected component this sort belongs to.
@@ -77,8 +84,8 @@ impl Default for Sort {
     Sort {
       name                      : IString::default(),
       index_within_kind         : 0,
+      unresolved_supersort_count: 0, // Only used during kind construction until `index_within_kind` is determined.
       fast_compare_index        : 0,
-      unresolved_supersort_count: 0,
       subsorts                  : SortPtrs::default(),
       supersorts                : SortPtrs::default(),
       leq_sorts                 : NatSet::default(),
@@ -104,49 +111,8 @@ impl Sort {
     }
   }
 
-  /* This method was moved into `Kind`
-  /// Sets the `Sort`'s `Kind` to the given kind, then recursively calls `register_connected_sorts` on sub- and
-  /// supersorts that do not yet have their kind set.
-  ///
-  /// This method is called during `Kind` closure.
-  pub(crate) unsafe fn register_connected_sorts(&mut self, kind: *mut Kind) {
-    assert!(!kind.is_null(), "tried to register connected sorts with null pointer to Kind");
-
-    self.kind = kind;
-    unsafe {
-      (*kind).visited_sort_count += 1;
-    }
-
-    {
-      let subsort_count = self.subsorts.len();
-      for i in 0..subsort_count {
-        let s = self.subsorts[i];
-        if (*s).kind.is_null() {
-          (*s).register_connected_sorts(kind);
-        }
-      }
-    }
-
-    {
-      let supersort_count = self.supersorts.len();
-      if supersort_count == 0 {
-        self.sort_index = (*kind).append_sort(self);
-      } else {
-        self.unresolved_supersort_count = supersort_count;
-        for i in 0..supersort_count {
-          let s = self.supersorts[i];
-          if (*s).kind.is_null() {
-            (*s).register_connected_sorts(kind);
-          }
-        }
-      }
-    }
-  }
-  */
-
 
   /// Antisymmetrically inserts `other` as a subsort of `self` and `self` as a supersort of `other`.
-  /// Used during subsort relation closure, during `Kind` construction.
   pub fn insert_subsort(&mut self, other: SortPtr) {
     assert!(!other.is_null(), "other sort is null pointer");
     self.subsorts.push(other);
@@ -155,7 +121,11 @@ impl Sort {
     }
   }
 
-  /// Used during subsort relation closure, during `Kind` construction. Constructs `self.leq_sorts`.
+  /// Compute the transitive closure of the subsort relation as stored in `self.leq_sorts`.
+  ///
+  /// This only works if this method is called on each sort in the connected component in increasing order. This is
+  /// guaranteed by how `sort.register_connected_sorts` is called. Used during subsort relation closure, during `Kind`
+  /// construction.
   pub fn compute_leq_sorts(&mut self) {
     self.leq_sorts.insert(self.index_within_kind);
     for subsort in self.subsorts.iter() {
@@ -172,5 +142,11 @@ impl Sort {
         break;
       }
     }
+  }
+}
+
+impl Display for Sort {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.name)
   }
 }

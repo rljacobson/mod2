@@ -9,7 +9,7 @@ symbols. The `Symbol` struct delegates to a `TheorySymbol` for theory-specific i
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
-
+use std::write;
 use crate::{abstractions::{
   IString,
   RcCell
@@ -137,16 +137,22 @@ pub fn symbol_for_symbol_type(symbol_type: &SymbolType) -> Box<dyn TheorySymbol>
   else if symbol_type.attributes.contains(SymbolAttribute::Associative) {
     if symbol_type.attributes.contains(SymbolAttribute::Commutative) {
       // ACU Theory
-      unimplemented!("ACU Theory is not implemented")
+      // unimplemented!("ACU Theory is not implemented")
+      // Everything is a free symbol until we implement something else.
+      Box::new(FreeSymbol::default())
     }
     else {
       // AU Theory
-      unimplemented!("AU Theory is not implemented")
+      // unimplemented!("AU Theory is not implemented")
+      // Everything is a free symbol until we implement something else.
+      Box::new(FreeSymbol::default())
     }
   }
   else if symbol_type.attributes.contains(SymbolAttribute::Commutative) {
     // CUI Theory
-    unimplemented!("CUI Theory is not implemented")
+    // unimplemented!("CUI Theory is not implemented")
+    // Everything is a free symbol until we implement something else.
+    Box::new(FreeSymbol::default())
   }
   else {
     // Free Theory

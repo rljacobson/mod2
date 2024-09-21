@@ -19,7 +19,8 @@ subsort relation. This is done by calling the method `Module::compute_kind_closu
 
 */
 
-
+use std::fmt::{Debug, Display, Formatter};
+use tiny_logger::{Channel, log};
 use crate::{
   abstractions::{
     HashMap,
@@ -45,7 +46,9 @@ use crate::{
     SymbolPtr
   },
 };
-
+use crate::abstractions::join_iter;
+use crate::core::sort::kind::{BxKind, KindPtr};
+use crate::core::sort::Sort;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub enum ModuleStatus {
@@ -129,8 +132,52 @@ impl Module {
     self.status = ModuleStatus::SortSetClosed
   }
 
-}
 
+  /// Formats the module for display with `prefix` for each line. The `Debug` impl defers to this method. Interior
+  /// indentation is affixed to `prefix`.
+  fn debug_fmt(&self, f: &mut Formatter<'_>, prefix: &String) -> std::fmt::Result {
+    let inner_prefix = format!("{}{}", prefix, " ".repeat(crate::DISPLAY_INDENT));
+    writeln!(f, "{}Module {{", prefix)?;
+    writeln!(f, "{}name: {}", inner_prefix, self.name)?;
+    writeln!(f, "{}status: {:?}", inner_prefix, self.status)?;
+    //sorts (as kinds)
+    if !self.kinds.is_empty()  {
+      format_named_list(f, inner_prefix.as_str(), "sorts", &self.kinds)?
+      // let sort_vec = join_iter(self.sorts.iter().map(|(name, _)| name.as_str()), |_| ", ",).collect::<String>();
+      // writeln!(f, "{}sorts: [{}]", inner_prefix, sort_vec)?;
+    }
+    //symbols
+    if !self.symbols.is_empty() {
+      let iter = self.symbols.iter().map(|(n, _)| n.as_str());
+      let sep = ", ";
+      writeln!(
+        f,
+        "{}symbols: [{}]",
+        inner_prefix,
+        join_iter(iter, |_| sep).collect::<String>()
+      )?;
+    }
+    //equations
+    if !self.equations.is_empty() {
+      format_named_list(f, inner_prefix.as_str(), "equations", &self.equations)?
+    }
+    //rules
+    if !self.rules.is_empty() {
+      format_named_list(f, inner_prefix.as_str(), "rules", &self.rules)?
+    }
+    //membership
+    if !self.membership.is_empty() {
+      format_named_list(f, inner_prefix.as_str(), "membership", &self.membership)?
+    }
+    //modules
+    for module in &self.submodules {
+      module.debug_fmt(f, &inner_prefix)?;
+    }
+    writeln!(f, "{}}}", prefix)
+
+  }
+
+}
 
 impl Drop for Module {
   /// A module owns its symbols, which are raw pointers to allocated memory. The module must reclaim this owned memory
@@ -141,5 +188,76 @@ impl Drop for Module {
         heap_destroy!(*symbol_ptr);
       }
     }
+  }
+}
+
+impl Debug for Module {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    let prefix = "".to_string();
+    self.debug_fmt(f, &prefix)
+  }
+}
+
+
+/// Helper function to format a named list of something:
+/// ```txt
+/// thing_name: [
+///   thing1
+///   thing2
+///   thing3
+/// ]
+/// ```
+fn format_named_list<T: Display>(f: &mut Formatter<'_>, prefix: &str, name: &str, list: &Vec<T>)
+  -> std::fmt::Result
+{
+  let tab = " ".repeat(crate::DISPLAY_INDENT);
+  writeln!(f, "{}{}: [", prefix, name)?;
+  for item in list.iter() {
+    writeln!(f, "{}{}{}", prefix, tab, item)?;
+  }
+  writeln!(f, "{}]", prefix)
+}
+
+
+
+#[cfg(test)]
+mod tests {
+  use std::assert_matches::assert_matches;
+  use lalrpop_util::{
+    lexer::Token,
+    ParseError
+  };
+  use crate::parser::ast::ModuleAST;
+  use super::*;
+
+  fn parse_ex1() -> Result<Box<ModuleAST>, ()>{
+    let path = "examples/example1.mod2";
+    let text = match std::fs::read_to_string(path) {
+      Ok(s) => { s }
+      Err(e) => {
+        panic!("Failed to read {}: {}", path, e);
+      }
+    };
+
+    let parser = crate::parser::parser::ModuleParser::new();
+    let result: Result<Box<ModuleAST>, ParseError<usize, Token, &str>> =  parser.parse(&text);
+    match result {
+      Ok(ast) => {
+        println!("SUCCESS!");
+        return Ok(ast);
+      },
+      Err(e) => {
+        eprintln!("Parse error: {}", e);
+        return Err(());
+      }
+    }
+  }
+
+
+  #[test]
+  fn test_ex1_construction() {
+    let ast: Box<ModuleAST> =  parse_ex1().expect("Failed to parse module");
+    let constructed = ast.construct_module();
+    println!("{:?}", constructed);
   }
 }

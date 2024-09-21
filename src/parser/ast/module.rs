@@ -1,33 +1,13 @@
 use std::collections::HashMap;
-
-use crate::{
-  abstractions::IString,
-  core::{
-    pre_equation::{
-      PreEquation,
-      PreEquationKind,
-      condition::Conditions
-    },
-    sort::collection::SortCollection,
-    module::Module
-  },
-  parser::ast::{
-    symbol_decl::{
-      BxSymbolDeclarationAST,
-      BxVariableDeclarationAST
-    },
-    construct_symbol_from_decl,
-    BxEquationDeclarationAST,
-    BxMembershipDeclarationAST,
-    BxRuleDeclarationAST,
-    BxSortDeclarationAST,
-    ItemAST
-  },
-  theory::{
-    symbol::SymbolPtr,
-    symbol_type::CoreSymbolType
-  }
-};
+use crate::abstractions::IString;
+use crate::core::module::Module;
+use crate::core::pre_equation::{PreEquation, PreEquationKind};
+use crate::core::pre_equation::condition::Conditions;
+use crate::core::sort::collection::SortCollection;
+use crate::parser::ast::{BxEquationDeclarationAST, BxMembershipDeclarationAST, BxRuleDeclarationAST, BxSortDeclarationAST, ItemAST, symbol_decl};
+use crate::parser::ast::symbol_decl::{BxSymbolDeclarationAST, BxVariableDeclarationAST};
+use crate::theory::symbol::SymbolPtr;
+use crate::theory::symbol_type::CoreSymbolType;
 
 pub(crate) type BxModuleAST = Box<ModuleAST>;
 
@@ -201,14 +181,21 @@ impl ModuleAST {
       equations.push(pre_equation);
     }
 
-    let mut new_module = Module{
-      name      : Default::default(),
-      submodules: vec![],
-      status    : Default::default(),
-      sorts,
-      kinds     : vec![],
-      symbols,
 
+    // Submodules
+    let mut submodules: Vec<BxModule> =
+        modules.into_iter()
+               .map(|m| Box::new(m.construct_module()))
+               .collect();
+
+
+    let mut new_module = Module{
+      name      : self.name,
+      status    : Default::default(),
+      kinds     : vec![], // computed below
+      submodules,
+      sorts,
+      symbols,
       rules,
       equations,
       membership,
@@ -217,5 +204,12 @@ impl ModuleAST {
       new_module.compute_kind_closures();
     }
     new_module
+  }
+}
+
+// Todo: Implement a more appropriate debug representation.
+impl Debug for ModuleAST {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "<ModuleAST>")
   }
 }

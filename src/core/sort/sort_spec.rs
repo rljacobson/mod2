@@ -11,6 +11,7 @@ functors. `SortSpec`s are not named.
 
 */
 
+use std::fmt::Display;
 use crate::{
   core::sort::{
     Sort,
@@ -18,6 +19,7 @@ use crate::{
   },
   theory::symbol::UNSPECIFIED
 };
+use crate::abstractions::join_string;
 
 /// A boxed `SortSpec`.
 pub type BxSortSpec = Box<SortSpec>;
@@ -25,6 +27,7 @@ pub type BxSortSpec = Box<SortSpec>;
 /// A generalization of a `Sort` that additionally permits functors.
 pub enum SortSpec {
   Sort(SortPtr),
+  // arg1_sort arg2_sort -> result_sort
   Functor{
     arg_sorts: Vec<BxSortSpec>,
     sort_spec: BxSortSpec
@@ -47,6 +50,32 @@ impl SortSpec {
       SortSpec::Functor { arg_sorts, ..} => arg_sorts.len() as i16,
 
       _ => UNSPECIFIED
+    }
+  }
+}
+
+
+impl Display for SortSpec {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+
+      SortSpec::Sort(sort) => {
+        assert!(!sort.is_null());
+        write!(f, "{}", unsafe{ &*(*sort) })
+      }
+
+      SortSpec::Functor { arg_sorts, sort_spec } => {
+        write!(f, "{} -> {}", join_string(arg_sorts.iter(), " "), sort_spec)
+      }
+
+      SortSpec::Any => {
+        write!(f, "any")
+      }
+
+      SortSpec::None => {
+        write!(f, "none")
+      }
+
     }
   }
 }

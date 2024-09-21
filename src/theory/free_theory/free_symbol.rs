@@ -1,3 +1,4 @@
+use std::fmt::Formatter;
 use crate::theory::symbol::TheorySymbol;
 
 #[derive(Copy, Clone, Default)]

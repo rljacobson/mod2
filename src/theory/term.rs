@@ -8,6 +8,7 @@ While there is only a single `Symbol` for `f`, there are two (sub)`Term`s in whi
 
 */
 
+use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 
 use enumflags2::{bitflags, BitFlags};
@@ -21,7 +22,7 @@ use crate::{
     }
   }
 };
-
+use crate::abstractions::{join_iter, join_string};
 
 /// A `Term` struct holds other subterms in its `term_node` field.
 pub struct Term {
@@ -46,6 +47,12 @@ impl Term {
   }
 }
 
+impl Display for Term {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.term_node)
+  }
+}
+
 /// The part of the term that holds the subterms.
 pub enum TermNode{
 
@@ -56,6 +63,20 @@ pub enum TermNode{
     tail: Vec<BxTerm>
   }
 
+}
+
+impl Display for TermNode {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      TermNode::Symbol(symbol) => {
+        assert!(!symbol.is_null());
+        write!(f, "{}", unsafe{(**symbol).name})
+      }
+      TermNode::Application { head, tail } => {
+        write!(f, "{}({})", head, join_string(tail.iter(), ", ") )
+      }
+    }
+  }
 }
 
 

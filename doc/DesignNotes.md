@@ -28,7 +28,9 @@ to first understand the algorithms over and above writing the perfect system.
 
 #### Are `Kind`s used after construction?
 
-If `Kind`s have a use after the construction of the adjacency lists in the `Sorts` and the assignment of each `Sort`'s `Sort.kind` field, then we need to keep them around. But so far I don't see a use for them. I don't have a good understanding of how they are used during runtime.
+If `Kind`s have a use after the construction of the adjacency lists in the `Sorts` and the
+assignment of each `Sort`'s `Sort.kind` field, then we need to keep them around. But so far I
+don't see a use for them. I don't have a good understanding of how they are used during runtime.
 
 #### Are items in a parent module automatically available within a submodule? 
 
@@ -115,7 +117,7 @@ conjunctands.
 ### Concepts
 
 | Name               | Meaning                                                                                       |
-|:-------------------|:----------------------------------------------------------------------------------------------|
+|:-------------------|:-----------------------------------------------------|
 | ConnectedComponent | Kind, which is a connected component of the lattice induced by the subsort relation on sorts. |
 | Symbol type | This seems to be the part of the symbol's type that isn't encoded in the symbol's sort.       |
 

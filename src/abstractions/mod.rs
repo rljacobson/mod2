@@ -19,9 +19,7 @@ mod heap;
 
 // A fast hash set and hash map
 pub use std::collections::{HashSet, HashMap};
-
-
-
+use std::fmt::Display;
 pub use tiny_logger::{log, set_verbosity, Channel};
 
 
@@ -55,6 +53,8 @@ pub type Integer       = i16;
 pub type Float         = f64;
 
 use std::iter::once;
+use crate::add;
+
 /**
 Join an iterator of strings, which doesn't exist in the stdlib. (C.f. `Vec::join(…)`)
 
@@ -73,9 +73,43 @@ Usage:
 pub fn join_iter<T>(mut iter: impl Iterator<Item = T>, sep: impl Fn(&T) -> T)
   -> impl Iterator<Item = T>
 {
-  let j: Integer = 374u64.try_into().unwrap_or(-1);
   iter
       .next()
       .into_iter()
       .chain(iter.flat_map(move |s| once(sep(&s)).chain(once(s))))
+}
+
+/// Join a list of things that can be displayed as string with a given separator.
+///
+/// This is a convenience function that defers to `join_iter`.
+pub fn join_string<T:Display>(mut iter: impl Iterator<Item = T>, sep: &str) -> String {
+  join_iter(iter.map(|t| t.to_string()), |_| sep.to_string()).collect::<String>()
+}
+
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn join_iter_test() {
+    let iter = [1, 3, 5, 7, 9].iter().cloned();
+    let joined = format!("{:?}", join_iter(iter, |v| v - 1).collect::<Vec<_>>());
+    assert_eq!(joined, "[1, 2, 3, 4, 5, 6, 7, 8, 9]");
+    // [1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    let iter = ["Hello", "World"].iter().cloned();
+    let sep = ", ";
+    let joined = format!("{:?}", join_iter(iter, |_| sep).collect::<String>());
+    assert_eq!(joined, "\"Hello, World\"");
+    // "Hello, World"
+  }
+
+  #[test]
+  fn join_string_test(){
+    let list = [1, 3, 5, 7, 9];
+    let sep = ", ";
+    let joined = join_string(list.iter(), sep);
+    assert_eq!(joined, "1, 3, 5, 7, 9");
+  }
 }

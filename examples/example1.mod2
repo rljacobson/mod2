@@ -11,6 +11,12 @@ rule f(X, h(Y, g(Z, Z), f(X))) => f(X, h(Y, g(Z, Z), X)) ;
 // This membership axiom isn't meant to make sense.
 membership f(X, h(Y, g(Z, Z), f(X))) :: NzNat -> NzNat -> NzNat if X := Y;
 
+// Create a diamond-shaped Kind
+sort A < B;
+sort A< C;
+sort B <D;
+sort C<D;
+
 mod NaturalNumbers {
     // op _+_ :: NzNat NzNat -> NzNat [ctor assoc comm id: 0] .
 

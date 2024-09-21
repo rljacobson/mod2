@@ -36,7 +36,7 @@ impl IntegerSymbol {
     Symbol {
       // ToDo: What should the name be? So far we have assumed the symbol name uniquely identifies the symbol. However,
       //       literals have no name.
-      name         : IString::from(""),
+      name         : IString::from(format!("{}", integer_literal).as_str()),
       arity        : UNSPECIFIED,
       symbol_type,
       sort_spec    : None,

@@ -7,6 +7,7 @@ implemented.) The subclass is implemented as enum `PreEquationKind`.
 
 pub mod condition;
 
+use std::fmt::{Display, Formatter};
 use enumflags2::{bitflags, BitFlags};
 
 use crate::{
@@ -17,6 +18,7 @@ use crate::{
   },
   theory::term::BxTerm,
 };
+use crate::abstractions::join_string;
 use crate::core::sort::sort_spec::BxSortSpec;
 
 
@@ -34,6 +36,19 @@ pub enum PreEquationAttribute {
 }
 pub type PreEquationAttributes = BitFlags<PreEquationAttribute>;
 
+impl Display for PreEquationAttribute {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      PreEquationAttribute::Compiled   => write!(f, "compiled"),
+      PreEquationAttribute::NonExecute => write!(f, "nonexecute"),
+      PreEquationAttribute::Otherwise  => write!(f, "otherwise"),
+      PreEquationAttribute::Variant    => write!(f, "variant"),
+      PreEquationAttribute::Print      => write!(f, "print"),
+      PreEquationAttribute::Narrowing  => write!(f, "narrowing"),
+      PreEquationAttribute::Bad        => write!(f, "bad"),
+    }
+  }
+}
 
 pub struct PreEquation {
   pub name      : Option<IString>,
@@ -61,4 +76,46 @@ pub enum PreEquationKind {
   },
 
   // StrategyDefinition
+}
+
+impl Display for PreEquation {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match &self.kind {
+
+      PreEquationKind::Equation { rhs_term } => {
+        write!(f, "equation {} = {}", self.lhs_term,  rhs_term)?;
+      }
+
+      PreEquationKind::Rule { rhs_term } => {
+        write!(f, "rule {} => {}", self.lhs_term,  rhs_term)?;
+
+      }
+
+      PreEquationKind::Membership { sort_spec } => {
+        write!(f, "membership {} :: {}", self.lhs_term,  sort_spec)?;
+
+      }
+
+    }
+
+    // conditions
+    if !self.conditions.is_empty() {
+      write!(
+        f,
+        " if {}",
+        join_string(self.conditions.iter(), " ⋀ ")
+      )?;
+    }
+
+    // attributes
+    if !self.attributes.is_empty() {
+      write!(
+        f,
+        " [{}]",
+        join_string(self.attributes.iter(), ", ")
+      )?;
+    }
+
+    write!(f, ";")
+  }
 }
