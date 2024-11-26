@@ -36,6 +36,7 @@ impl BooleanSymbol {
       // ToDo: What should the name be?
       name         : IString::from(""),
       arity        : UNSPECIFIED,
+      order_hash   : Symbol::new_order_hash(0),
       symbol_type,
       sort_spec    : None,
       theory_symbol: Some(Box::new(

@@ -6,6 +6,7 @@ A string literal is represented by a special string literal symbol.
 
 use crate::{
   abstractions::IString,
+  core::sort::sort_spec::SortSpec,
   theory::{
     symbol::{
       Symbol,
@@ -16,9 +17,8 @@ use crate::{
       CoreSymbolType,
       SymbolType
     },
-  }
+  },
 };
-use crate::core::sort::sort_spec::SortSpec;
 
 pub struct StringSymbol {
   value: String, // ToDo: Maude uses a rope data structure.
@@ -36,6 +36,7 @@ impl StringSymbol {
       //       strings have no name.
       name         : IString::from(""),
       arity        : UNSPECIFIED,
+      order_hash   : Symbol::new_order_hash(0),
       symbol_type,
       sort_spec    : Some(Box::new(SortSpec::Any)),
       theory_symbol: Some(Box::new(StringSymbol{value: string_literal})),

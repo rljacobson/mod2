@@ -5,34 +5,39 @@ use std::{
   rc::Rc,
 };
 
-use crate::{abstractions::{
-  HashMap,
-  Integer,
-  IString,
-  rc_cell,
-  RcCell
-}, heap_construct, parser::ast::{
-  attribute::AttributeAST,
-  BxSortSpecAST
-}, theory::{
-  symbol::{
-    SymbolPtr,
-    Symbol,
-    symbol_for_symbol_type
+use crate::{
+  abstractions::{
+    HashMap,
+    Integer,
+    IString,
+    rc_cell,
+    RcCell
   },
-  symbol_type::{
-    CoreSymbolType,
-    SymbolType
+  core::sort::collection::SortCollection,
+  heap_construct,
+  parser::ast::{
+    attribute::AttributeAST,
+    BxSortSpecAST
   },
-}};
-use crate::core::sort::collection::SortCollection;
+  theory::{
+    symbol::{
+      SymbolPtr,
+      Symbol,
+      symbol_for_symbol_type
+    },
+    symbol_type::{
+      CoreSymbolType,
+      SymbolType
+    },
+  }
+};
 
 pub(crate) type BxSymbolDeclarationAST = Box<SymbolDeclarationAST>;
 
 pub(crate) struct SymbolDeclarationAST {
   pub name      : IString,
   pub attributes: Vec<AttributeAST>,
-  pub arity     : Integer,               // -1 means variadic
+  pub arity     : Integer,               // -1 means variadic, -2 means unspecified
   pub sort_spec : Option<BxSortSpecAST>, // Empty is the special "None" sort.
 }
 
@@ -79,12 +84,7 @@ pub fn construct_symbol_from_decl(
     Entry::Occupied(s) => {
       // ToDo: Under what circumstances would a symbol already exist? If the symbol is already declared, this
       //       should be a duplicate declaration and thus an error.
-      panic!("duplicate symbol declaration")
-      // let mut symbol       = s.get().borrow_mut();
-      // symbol.arity         = arity;
-      // symbol.sort_spec     = sort_spec;
-      // symbol.symbol_type   = symbol_type;
-      // symbol.theory_symbol = Some(theory_symbol);
+      panic!("duplicate symbol declaration");
     },
 
     Entry::Vacant(v) => {
@@ -93,6 +93,7 @@ pub fn construct_symbol_from_decl(
             Symbol{
               name,
               arity,
+              order_hash: Symbol::new_order_hash(arity),
               symbol_type,
               sort_spec,
               theory_symbol: Some(theory_symbol),

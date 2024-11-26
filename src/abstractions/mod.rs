@@ -38,9 +38,8 @@ pub use rccell::{rc_cell, RcCell, WeakCell};
 pub use heap::{heap_construct, heap_destroy};
 
 
-use ustr::Ustr;
 /// Interned strings. Create an interned string with `IString::from(..)`
-pub type IString = Ustr;
+pub use ustr::Ustr as IString;
 
 
 

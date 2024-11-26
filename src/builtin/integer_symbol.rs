@@ -38,6 +38,7 @@ impl IntegerSymbol {
       //       literals have no name.
       name         : IString::from(format!("{}", integer_literal).as_str()),
       arity        : UNSPECIFIED,
+      order_hash   : Symbol::new_order_hash(0),
       symbol_type,
       sort_spec    : None,
       theory_symbol: Some(Box::new(
