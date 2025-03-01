@@ -20,13 +20,13 @@ subsort relation. This is done by calling the method `Module::compute_kind_closu
 */
 
 use std::fmt::{Debug, Display, Formatter};
-use tiny_logger::{Channel, log};
 use crate::{
   abstractions::{
     HashMap,
     IString,
     Channel,
-    log
+    log,
+    join_iter
   },
   core::{
     sort::{
@@ -37,6 +37,7 @@ use crate::{
         KindPtr
       },
       kind_error::KindError,
+      Sort
     },
     pre_equation::PreEquation,
   },
@@ -46,9 +47,6 @@ use crate::{
     SymbolPtr
   },
 };
-use crate::abstractions::join_iter;
-use crate::core::sort::kind::{BxKind, KindPtr};
-use crate::core::sort::Sort;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub enum ModuleStatus {

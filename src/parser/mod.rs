@@ -20,7 +20,7 @@ mod tests {
   use lalrpop_util::ParseError;
   use crate::parser::ast::ModuleAST;
   use super::*;
-
+  
   fn parse_ex1() -> Result<Box<ModuleAST>, ()>{
     let path = "examples/example1.mod2";
     let text = match std::fs::read_to_string(path) {
@@ -54,5 +54,6 @@ mod tests {
   fn test_ex1_construction() {
     let ast: Box<ModuleAST> =  parse_ex1().expect("Failed to parse module");
     let constructed = ast.construct_module();
+    
   }
 }

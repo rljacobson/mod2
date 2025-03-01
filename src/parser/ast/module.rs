@@ -1,13 +1,37 @@
-use std::collections::HashMap;
-use crate::abstractions::IString;
-use crate::core::module::Module;
-use crate::core::pre_equation::{PreEquation, PreEquationKind};
-use crate::core::pre_equation::condition::Conditions;
-use crate::core::sort::collection::SortCollection;
-use crate::parser::ast::{BxEquationDeclarationAST, BxMembershipDeclarationAST, BxRuleDeclarationAST, BxSortDeclarationAST, ItemAST, symbol_decl};
-use crate::parser::ast::symbol_decl::{BxSymbolDeclarationAST, BxVariableDeclarationAST};
-use crate::theory::symbol::SymbolPtr;
-use crate::theory::symbol_type::CoreSymbolType;
+use std::{
+  collections::HashMap,
+  fmt::{Debug, Formatter}
+};
+use crate::{
+  core::{
+    pre_equation::{
+      condition::Conditions,
+      PreEquation,
+      PreEquationKind
+    },
+    module::{BxModule, Module},
+    sort::collection::SortCollection
+  },
+  abstractions::IString,
+  parser::{
+    ast::{
+      BxEquationDeclarationAST,
+      BxMembershipDeclarationAST,
+      BxRuleDeclarationAST,
+      BxSortDeclarationAST,
+      ItemAST,
+      construct_symbol_from_decl,
+      symbol_decl::{
+        BxSymbolDeclarationAST, 
+        BxVariableDeclarationAST
+      }
+    }
+  },
+  theory::{
+    symbol::SymbolPtr,
+    symbol_type::CoreSymbolType
+  }
+};
 
 pub(crate) type BxModuleAST = Box<ModuleAST>;
 
