@@ -1,0 +1,24 @@
+[package]
+name        = "mod2-lib"
+description = "A RIIR for Maude's state-of-the-art pattern matching algorithms"
+authors.workspace    = true
+repository.workspace = true
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+publish.workspace    = true
+readme      = "README.md"
+keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-rewriting", "equational-logic"]
+categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
+
+[features]
+gc_debug = []
+default  = ["gc_debug"]
+
+[dependencies]
+mod2-abs = { path = "../mod2-abs" }
+
+paste.workspace      = true
+enumflags2.workspace = true
+once_cell.workspace  = true
+rand.workspace       = true
