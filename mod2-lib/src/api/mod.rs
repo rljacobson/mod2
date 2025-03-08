@@ -7,10 +7,11 @@ The public API of the library.
 
 pub mod atom;
 pub mod symbol;
-mod variable;
-pub(crate) mod term;
+pub mod term;
 pub(crate) mod dag_node;
+pub mod variable_theory;
 pub mod free_theory;
+pub mod built_in;
 
 // Special Values
 // ToDo: Do UNDEFINED the right way. Is this great? No. But it's convenient.
@@ -29,7 +30,6 @@ pub enum Arity {
   Value(u16)
 }
 
-/*
 impl From<Arity> for i16 {
   fn from(arity: Arity) -> Self {
     match arity {
@@ -40,7 +40,7 @@ impl From<Arity> for i16 {
       Arity::Any
       | Arity::Variadic => -1,
 
-      Arity::Value(val) => val
+      Arity::Value(val) => val as i16
 
     }
   }
@@ -55,8 +55,7 @@ impl From<i16> for Arity {
     } else if i == -1 {
       return Arity::Variadic;
     } else {
-      return Arity::Value(i)
+      return Arity::Value(i as u16)
     }
   }
 }
-*/

@@ -23,7 +23,7 @@ use crate::{
     symbol::{Symbol, SymbolPtr}
   },
   core::{
-    allocator::{
+    gc::{
       gc_vector::{GCVector, GCVectorRefMut},
       increment_active_node_count
     },

@@ -13,13 +13,12 @@ This project is a work in progress. For a more complete work, check out [Loris](
 
 # Status
 
-- [X]  Lexer & parser
-- [X]  M-expression
-- [X]  symbol declarations
-  - [ ]  variadic syntax
-- [X]  modules syntax
-- [ ]  Module & submodule semantics
-- [ ]  custom operators
+- [X] Lexer & parser
+- [X] M-expression
+- [X] symbol declarations
+- [X] modules syntax
+- [ ] Module & submodule semantics
+- [ ] custom operators
 - [ ] Imperative Language
   - [ ]  match
   - [ ]  match_all

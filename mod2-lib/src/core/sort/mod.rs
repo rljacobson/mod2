@@ -86,6 +86,7 @@ pub mod kind;
 pub mod sort;
 pub mod sort_spec;
 pub mod collection;
-pub(crate) mod kind_error;
+pub mod kind_error;
+pub(crate) mod sort_table;
 
 pub use sort::*;

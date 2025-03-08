@@ -12,6 +12,7 @@ mod bucket;
 pub(crate) mod gc_vector;
 mod node_allocator;
 mod storage_allocator;
+pub(crate) mod root_container;
 
 #[cfg(test)]
 mod tests;

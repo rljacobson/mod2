@@ -5,21 +5,15 @@ use std::{
 };
 
 use mod2_abs::{HashMap, IString, RcCell, rc_cell, heap_construct};
-
-use crate::{builtin::{
-  integer_symbol::IntegerSymbol,
-  string_symbol::StringSymbol
-}, theory::{
-  symbol::{
-    SymbolPtr,
-    Symbol
+use mod2_lib::api::symbol::{Symbol, SymbolPtr};
+use mod2_lib::api::term::Term;
+use crate::{
+  builtin::{
+    integer_symbol::IntegerSymbol,
+    string_symbol::StringSymbol
   },
-  term::{
-    Term,
-    TermAttributes,
-    TermNode
-  }
-}, NaturalNumber};
+  NaturalNumber
+};
 
 pub(crate) type BxTermAST = Box<TermAST>;
 pub(crate) enum TermAST {
@@ -47,7 +41,7 @@ impl TermAST {
         let symbol: SymbolPtr = match symbols.entry(name.clone()) {
           Entry::Occupied(s) => *s.get(),
           Entry::Vacant(v) => {
-            let s = heap_construct!(Symbol::new(name.clone()));
+            let s = heap_construct!(Symbol::with_name(name.clone()));
             v.insert(s);
             s
           }

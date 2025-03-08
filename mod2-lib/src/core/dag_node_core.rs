@@ -36,7 +36,7 @@ use crate::{
     free_theory::FreeDagNode,
   },
   core::{
-    allocator::{
+    gc::{
       allocate_dag_node,
     }
   },

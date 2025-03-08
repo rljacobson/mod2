@@ -116,7 +116,7 @@ impl Term for FreeTerm {
 
   /// In sync with `normalize`.
   fn semantic_hash(&self) -> u32 {
-    let mut hash_value: u32 = self.symbol_ref().hash_value;
+    let mut hash_value: u32 = self.symbol_ref().hash();
 
     for arg in &self.args {
       hash_value = term_hash(hash_value, arg.semantic_hash());
@@ -128,7 +128,7 @@ impl Term for FreeTerm {
   /// In sync with `semantic_hash`
   fn normalize(&mut self, full: bool) -> (u32, bool) {
     let mut changed: bool = false;
-    let mut hash_value: u32 = self.symbol_ref().hash_value;
+    let mut hash_value: u32 = self.symbol_ref().hash();
 
     for arg in &mut self.args.iter_mut() {
       let (child_hash, child_changed): (u32, bool) = arg.normalize(full);

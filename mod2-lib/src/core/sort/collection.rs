@@ -47,7 +47,7 @@ impl SortCollection {
   /// Creates and returns an iterator over the `SortCollection`.
   // Can we just stop to appreciate how stupid the return type of this method is? And how obnoxious it is to have to
   // specify it?
-  pub(crate) fn iter(&self) -> Map<Iter<'_, IString, SortPtr>, fn((&IString, &SortPtr)) -> (IString, SortPtr)> {
+  pub fn iter(&self) -> Map<Iter<'_, IString, SortPtr>, fn((&IString, &SortPtr)) -> (IString, SortPtr)> {
     self.sorts.iter().map(|(istr, rcs)| (istr.clone(), *rcs))
   }
 }

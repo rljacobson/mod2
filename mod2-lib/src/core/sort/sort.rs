@@ -56,7 +56,7 @@ impl SpecialSort {
 }
 
 
-#[derive(Clone)]
+#[derive(Eq, PartialEq, Clone)]
 pub struct Sort {
   pub name: IString,
   /// The `index_within_kind` is the index of the sort within its `Kind`.
@@ -84,6 +84,10 @@ pub struct Sort {
   // The connected component this sort belongs to.
   pub kind: KindPtr, // This should be a weak reference
 }
+
+// This is an abomination. See `api/built_in/mod.rs`.
+unsafe impl Send for Sort {}
+unsafe impl Sync for Sort {}
 
 impl Default for Sort {
   fn default() -> Self {

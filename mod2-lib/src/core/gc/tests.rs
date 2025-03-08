@@ -7,14 +7,15 @@ use crate::{
     Arity
   },
   core::{
-    allocator::*,
-    dag_node_core::{DagNodeCore, DagNodeTheory},
-    RootContainer
+    gc::*,
+    dag_node_core::{DagNodeCore, DagNodeTheory}
   }
 };
 use mod2_abs::IString;
 use rand::Rng;
-
+use crate::api::symbol::{SymbolAttributes, SymbolType};
+use crate::core::gc::root_container::RootContainer;
+use crate::core::sort::sort_spec::SortSpec;
 /*
 Recursively builds a random tree of `DagNode`s with a given height and arity rules.
 
@@ -40,7 +41,7 @@ pub fn build_random_tree(
   let min_width = std::cmp::min(max_width, min_width);
   let max_width = std::cmp::max(max_width, min_width);
 
-  let mut rng   = rand::thread_rng();
+  let mut rng   = rand::rng();
 
   // Get the parent node's arity from its symbol
   let parent_arity = if let Arity::Value(v) = unsafe { (*parent).arity() } { v as usize } else { 0 };
@@ -51,7 +52,7 @@ pub fn build_random_tree(
     let child_arity = if max_height == 1 {
       0 // Leaf nodes must have arity 0
     } else {
-      rng.gen_range(min_width..=max_width) // Random arity between min_width and max_width
+      rng.random_range(min_width..=max_width) // Random arity between min_width and max_width
     };
 
     // Create the child node with the symbol corresponding to its arity
@@ -151,7 +152,7 @@ fn test_dag_creation() {
       .map(|x| {
         // let name = IString::from(format!("sym({})", x).as_str());
         let name = IString::from("sym");
-        Symbol::new(name, Arity::Value(x))
+        Symbol::with_arity(name, Arity::Value(x))
       })
       .collect::<Vec<_>>();
 
@@ -176,7 +177,7 @@ fn test_garbage_collection() {
   let mut symbols = (0..=10)
       .map(|x| {
         let name = IString::from(format!("sym({})", x).as_str());
-        Symbol::new(name, Arity::Value(x))
+        Symbol::with_arity(name, Arity::Value(x))
       })
       .collect::<Vec<_>>();
 
@@ -206,7 +207,7 @@ fn test_garbage_collection() {
 
 #[test]
 fn test_arena_exhaustion() {
-  let mut symbol = Symbol::new(IString::from("mysymbol"), Arity::Value(1));
+  let mut symbol = Symbol::with_arity(IString::from("mysymbol"), Arity::Value(1));
   let symbol_ptr = &mut symbol;
   let root: DagNodePtr = DagNodeCore::new(symbol_ptr);
   println!("root: {:p}", root);

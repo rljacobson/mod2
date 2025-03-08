@@ -18,8 +18,7 @@ The following compares Maude's `DagNode` to our implementation here.
 
 */
 
-mod root_container;
-pub(crate) mod allocator;
+pub(crate) mod gc;
 pub mod sort;
 pub mod module;
 pub mod pre_equation;
@@ -40,7 +39,7 @@ pub(crate) use variable_info::VariableInfo;
 
 
 #[allow(unused_imports)]
-pub use root_container::RootContainer;
+pub use gc::root_container::RootContainer;
 
 /// A `*mut Void` is a pointer to a `u8`
 pub type Void = u8;

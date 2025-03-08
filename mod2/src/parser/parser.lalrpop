@@ -57,7 +57,7 @@ StringLiteral: String = <s:r#""[a-z ]*""#> => s[1..s.len()-1].into();
 AndOp            : () = { "/\\", "∧", "⋀" };
 OrOp             : () = { "\\/", "∨", "⋁" };
 ArrowOp          : () = "->";
-SortOp           : () = "::";
+SortOp           : () = ":";
 RuleOp           : () = "=>";
 EqualOp          : () = "=";
 MatchOp          : () = ":=";

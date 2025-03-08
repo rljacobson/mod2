@@ -1,11 +1,7 @@
 use mod2_abs::IString;
-use crate::{
-  core::{
-    sort::{
-      collection::SortCollection,
-      sort_spec::{BxSortSpec, SortSpec}
-    }
-  }
+use mod2_lib::core::sort::{
+  collection::SortCollection,
+  sort_spec::{BxSortSpec, SortSpec}
 };
 
 pub(crate) type BxSortSpecAST = Box<SortSpecAST>;

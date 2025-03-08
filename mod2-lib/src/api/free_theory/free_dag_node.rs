@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
   core::{
-    allocator::{
+    gc::{
       allocate_dag_node,
       increment_active_node_count
     },

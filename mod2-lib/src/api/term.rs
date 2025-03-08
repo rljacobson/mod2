@@ -53,10 +53,10 @@ use crate::{
   }
 };
 
-pub type BxTerm  = Box<dyn Term>;
-pub type MaybeTerm   = Option<&'static dyn Term>;
-pub type RcTerm  = RcCell<dyn Term>;
-pub type TermSet = HashMap<u32, usize>;
+pub type BxTerm    = Box<dyn Term>;
+pub type MaybeTerm = Option<&'static dyn Term>;
+pub type RcTerm    = RcCell<dyn Term>;
+pub type TermSet   = HashMap<u32, usize>;
 
 pub trait Term: Formattable {
   fn as_any(&self) -> &dyn Any;
@@ -180,7 +180,7 @@ pub trait Term: Formattable {
 
   #[inline(always)]
   fn compare_dag_node(&self, other: &dyn DagNode) -> Ordering {
-    if self.symbol_ref().hash_value == other.symbol_ref().hash_value {
+    if self.symbol_ref().hash() == other.symbol_ref().hash() {
       self.compare_dag_arguments(other)
     } else {
       self.symbol_ref().compare(other.symbol_ref())

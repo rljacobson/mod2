@@ -35,7 +35,7 @@ use crate::{
       Symbol,
       SymbolPtr
     },
-    variable::Variable
+    variable_theory::Variable
   }
 };
 

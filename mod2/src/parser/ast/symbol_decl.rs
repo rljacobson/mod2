@@ -12,21 +12,25 @@ use mod2_abs::{
   RcCell,
   heap_construct,
 };
-
-use crate::{core::sort::collection::SortCollection, parser::ast::{
-  attribute::AttributeAST,
-  BxSortSpecAST
-}, theory::{
-  symbol::{
-    SymbolPtr,
-    Symbol,
-    symbol_for_symbol_type
-  },
-  symbol_type::{
-    CoreSymbolType,
-    SymbolType
-  },
-}, Integer};
+use mod2_lib::{
+  core::sort::collection::SortCollection,
+  api::{
+    symbol::{
+      SymbolPtr,
+      Symbol,
+      SymbolType,
+    }
+  }
+};
+use mod2_lib::api::Arity;
+use mod2_lib::core::sort::sort_spec::SortSpec;
+use crate::{
+  parser::ast::{
+    attribute::AttributeAST,
+    BxSortSpecAST
+  }, 
+  Integer
+};
 
 pub(crate) type BxSymbolDeclarationAST = Box<SymbolDeclarationAST>;
 
@@ -49,13 +53,13 @@ pub(crate) struct VariableDeclarationAST {
 
 /// Common code for VariableDeclarationAST and SymbolDeclarationAST
 pub fn construct_symbol_from_decl(
-  symbols         : &mut HashMap<IString, SymbolPtr>,
+  symbols         : &mut HashMap<IString, Symbol>,
   sorts           : &mut SortCollection,
   name            : IString,
   sort_spec       : Option<BxSortSpecAST>,
   arity           : i16,
   attributes_ast  : Vec<AttributeAST>,
-  core_symbol_type: CoreSymbolType,
+  symbol_type     : SymbolType,
 )
 {
   let sort_spec = sort_spec.map(|s| s.construct(sorts));
@@ -63,17 +67,13 @@ pub fn construct_symbol_from_decl(
   let arity = match &sort_spec {
     None => arity,
     Some(sort_spec) => {
-      max(arity, sort_spec.arity())
+      max(arity, sort_spec.arity().into())
     }
   };
 
   // Construct the symbol type.
   let attributes  = AttributeAST::construct_attributes(&attributes_ast);
-  let symbol_type = SymbolType {
-    core_type: core_symbol_type,
-    attributes,
-  };
-  let theory_symbol = symbol_for_symbol_type(&symbol_type);
+  
 
   match symbols.entry(name.clone()) {
 
@@ -85,16 +85,14 @@ pub fn construct_symbol_from_decl(
 
     Entry::Vacant(v) => {
       // The symbol doesn't exist. Create it.
-      let mut s = heap_construct!(
-            Symbol{
-              name,
-              arity,
-              order_hash: Symbol::new_order_hash(arity),
-              symbol_type,
-              sort_spec,
-              theory_symbol: Some(theory_symbol),
-            }
-          );
+      let mut s = Symbol::new(
+        name,
+        Arity::from(arity),
+        attributes,
+        symbol_type,
+        SortSpec::default(),
+      );
+      
       v.insert(s);
     }
 

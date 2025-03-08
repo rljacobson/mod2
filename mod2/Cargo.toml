@@ -17,6 +17,7 @@ lalrpop = "0.22.1" # Parser
 
 [dependencies]
 mod2-abs = { path = "../mod2-abs" }
+mod2-lib = { path = "../mod2-lib" }
 
 #pratt        = { path = "../pratt", default-features = false, features = ["ustr"] }
 lalrpop-util.workspace = true

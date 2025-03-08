@@ -12,7 +12,7 @@ use std::{
 use crate::{
   core::dag_node_core::DagNodeCore,
   core::{
-    allocator::node_allocator::ARENA_SIZE,
+    gc::node_allocator::ARENA_SIZE,
   }
 };
 

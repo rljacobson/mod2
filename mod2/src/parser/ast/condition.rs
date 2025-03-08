@@ -31,18 +31,22 @@ use mod2_abs::{
   IString
 };
 
-use crate::{
+use mod2_lib::{
   core::{
     pre_equation::condition::Condition,
     sort::collection::SortCollection
   },
+  api::{
+    symbol::SymbolPtr,
+    term::Term,
+  },
+};
+use mod2_lib::api::built_in::get_built_in_symbol;
+use mod2_lib::api::free_theory::FreeTerm;
+use crate::{
   parser::ast::{
     BxSortSpecAST,
     BxTermAST
-  },
-  theory::{
-    symbol::SymbolPtr,
-    term::Term
   },
 };
 
@@ -101,9 +105,10 @@ impl ConditionAST {
 
       ConditionAST::Boolean(lhs) => {
         // The RHS is just boolean true.
+        let true_symbol = get_built_in_symbol("true").unwrap();
         Condition::Equality {
           lhs_term: Box::new(lhs.construct(symbols)),
-          rhs_term: Term::true_literal(),
+          rhs_term: Box::new(FreeTerm::new(true_symbol)),
         }
       }
 

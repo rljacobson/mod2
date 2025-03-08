@@ -24,7 +24,7 @@ use once_cell::sync::Lazy;
 use mod2_abs::{debug, info};
 use crate::{
   core::{
-    allocator::bucket::Bucket,
+    gc::bucket::Bucket,
     Void
   }
 };

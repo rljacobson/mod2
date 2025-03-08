@@ -21,30 +21,47 @@ use mod2_abs::{
 
 use crate::{
   api::Arity,
-  core::format::{FormatStyle, Formattable}
+  core::format::{FormatStyle, Formattable},
+  core::sort::sort_table::SortTable,
 };
+use crate::core::sort::Sort;
+use crate::core::sort::sort_spec::SortSpec;
 
 pub type SymbolPtr = *mut Symbol;
 pub type SymbolSet = Set<Symbol>;
 
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash)]
 pub struct Symbol {
   pub name       : IString,
 
   pub arity      : Arity,
   pub attributes : SymbolAttributes,
   pub symbol_type: SymbolType,
+  
+  sort_table: Option<SortTable>,
 
-  // ToDo: Can the `IString` value be used as the `hash_value`?
-  // Unique integer for comparing symbols, also called order.
-  // In Maude, the `order` has lower bits equal to the value of an integer that is incremented every time a symbol is
-  // created and upper 8 bits (bits 24..32) equal to the arity.
-  pub hash_value : u32,
+  /// Unique integer for comparing symbols, also called order. In Maude, the `order`
+  /// has lower bits equal to the value of an integer that is incremented every time
+  /// a symbol is created and upper 8 bits (bits 24..32) equal to the arity. Note:
+  /// We enforce symbol creation with `Symbol::new()` by making hash_value private.
+  hash_value : u32,
 }
 
+// This is an abomination. See `api/built_in/mod.rs`.
+unsafe impl Send for Symbol {}
+unsafe impl Sync for Symbol {}
+
 impl Symbol {
-  pub fn new(name: IString, arity: Arity) -> Symbol {
+  /// All symbols must be created with `Symbol::new()`. If attributes, arity, symbol_type unknown, use defaults.
+  pub fn new(
+      name: IString, 
+      arity: Arity, 
+      attributes : SymbolAttributes, 
+      symbol_type: SymbolType,
+      sort_spec: SortSpec,
+    ) -> Symbol 
+  {
     // Compute hash
     static mut SYMBOL_COUNT: u32 = 0;
     unsafe{ SYMBOL_COUNT += 1; }
@@ -58,24 +75,37 @@ impl Symbol {
     let symbol = Symbol{
       name,
       arity,
-      attributes : SymbolAttributes::default(),
-      symbol_type: SymbolType::default(),
+      attributes,
+      symbol_type,
+      sort_table: Some(SortTable::new(sort_spec)),
       hash_value
     };
 
     symbol
   }
 
+  #[inline(always)]
+  pub fn with_arity(name: IString, arity: Arity)  -> Symbol {
+    Symbol::new(name, arity, SymbolAttributes::default(), SymbolType::default(), SortSpec::Any)
+  }
+
+  #[inline(always)]
+  pub fn with_name(name: IString)  -> Symbol {
+    Symbol::new(name, Arity::None, SymbolAttributes::default(), SymbolType::default(), SortSpec::Any)
+  }
 
   #[inline(always)]
   pub fn is_variable(&self) -> bool {
     self.symbol_type == SymbolType::Variable
   }
-
-
-  /// Comparison based only on name and arity
+  
+  #[inline(always)]
   pub fn compare(&self, other: &Symbol) -> std::cmp::Ordering {
     self.hash_value.cmp(&other.hash_value)
+  }
+  
+  pub fn hash(&self) -> u32 {
+    self.hash_value
   }
 }
 
@@ -103,7 +133,10 @@ pub enum SymbolType {
   Standard,
   Variable,
   Operator,
-  Data
+  Data,
+  
+  True,
+  False,
 }
 
 
@@ -189,5 +222,4 @@ impl SymbolAttribute {
     }
   );
 }
-
 

@@ -17,8 +17,11 @@ AttributeSpec := "[" AttributeList "]" ;
 */
 
 use crate::{
-  parser::ast::BxTermAST,
-  theory::symbol_type::{
+  parser::ast::BxTermAST
+};
+
+use mod2_lib::{
+  api::symbol::{
     SymbolAttribute,
     SymbolAttributes
   }

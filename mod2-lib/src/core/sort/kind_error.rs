@@ -6,8 +6,11 @@ When computing the closure of the subsort relation, encountering a cycle is an e
 
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use crate::core::sort::kind::BxKind;
-use crate::core::sort::SortPtr;
+
+use crate::core::sort::{
+  kind::BxKind,
+  SortPtr
+};
 
 pub enum KindError {
   CycleDetected {

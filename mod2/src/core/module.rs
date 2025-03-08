@@ -28,25 +28,16 @@ use mod2_abs::{
   join_iter,
   heap_destroy,
 };
-
-use crate::{
+use mod2_lib::{
+  api::symbol::SymbolPtr,
   core::{
+    pre_equation::PreEquation,
     sort::{
       collection::SortCollection,
-      kind::{
-        Kind,
-        BxKind,
-        KindPtr
-      },
-      kind_error::KindError,
-      Sort
-    },
-    pre_equation::PreEquation,
-  },
-  theory::symbol::{
-    Symbol,
-    SymbolPtr
-  },
+      kind::{BxKind, Kind},
+      kind_error::KindError
+    }
+  }
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]

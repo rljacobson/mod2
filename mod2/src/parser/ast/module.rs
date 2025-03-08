@@ -5,15 +5,21 @@ use std::{
 
 use mod2_abs::IString;
 
-use crate::{
+use mod2_lib::{
   core::{
     pre_equation::{
-      condition::Conditions,
       PreEquation,
-      PreEquationKind
+      PreEquationKind,
+      condition::Conditions
     },
-    module::{BxModule, Module},
     sort::collection::SortCollection
+  },
+  api::symbol::{Symbol, SymbolType},
+};
+
+use crate::{
+  core::{
+    module::{BxModule, Module},
   },
   parser::{
     ast::{
@@ -29,10 +35,6 @@ use crate::{
       }
     }
   },
-  theory::{
-    symbol::SymbolPtr,
-    symbol_type::CoreSymbolType
-  }
 };
 
 pub(crate) type BxModuleAST = Box<ModuleAST>;
@@ -77,8 +79,8 @@ impl ModuleAST {
     Every sort that is encountered is checked to see if it has already been created. If it has, the existing sort
     object is fetched. Otherwise, the sort is created.
     */
-    let mut sorts  : SortCollection              = SortCollection::new();
-    let mut symbols: HashMap<IString, SymbolPtr> = HashMap::new();
+    let mut sorts  : SortCollection           = SortCollection::new();
+    let mut symbols: HashMap<IString, Symbol> = HashMap::new();
 
     // Sort Declarations
     for sort_decl in sort_decls.iter() {
@@ -109,7 +111,7 @@ impl ModuleAST {
         var_decl.sort_spec,
         var_decl.arity,
         var_decl.attributes,
-        CoreSymbolType::Variable
+        SymbolType::Variable
       );
     }
 
@@ -122,7 +124,7 @@ impl ModuleAST {
         sym_decl.sort_spec,
         sym_decl.arity,
         sym_decl.attributes,
-        CoreSymbolType::Standard
+        SymbolType::Standard
       );
     }
 

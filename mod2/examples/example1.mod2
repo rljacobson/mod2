@@ -1,6 +1,6 @@
 symbol f [assoc, comm, id(h)];
 symbol g/2;
-symbol h/3 :: Int;
+symbol h/3 : Int;
 
 variable X;
 variable Y;
@@ -9,7 +9,7 @@ variable Z;
 rule f(X, h(Y, g(Z, Z), f(X))) => f(X, h(Y, g(Z, Z), X)) ;
 
 // This membership axiom isn't meant to make sense.
-membership f(X, h(Y, g(Z, Z), f(X))) :: NzNat -> NzNat -> NzNat if X := Y;
+membership f(X, h(Y, g(Z, Z), f(X))) : NzNat -> NzNat -> NzNat if X := Y;
 
 // Create a diamond-shaped Kind
 sort A < B;
@@ -18,15 +18,15 @@ sort B <D;
 sort C<D;
 
 mod NaturalNumbers {
-    // op _+_ :: NzNat NzNat -> NzNat [ctor assoc comm id: 0] .
+    // op _+_ : NzNat NzNat -> NzNat [ctor assoc comm id: 0] .
 
     symbol plus/2 [assoc, comm, ctor, id(h)];
-    symbol minus :: Nat NzNat -> Nat;
-    symbol z :: Nat;
-    symbol s :: Nat -> NzNat;
-    symbol v :: Nat -> Nat ; // Variadic
+    symbol minus : Nat NzNat -> Nat;
+    symbol z : Nat;
+    symbol s : Nat -> NzNat;
+    symbol v : Nat -> Nat ; // Variadic
 
-    variable X :: Any;
+    variable X : Any;
 
     rule plus(z, X) => X if z = X;
     rule plus(s(Y), X) => plus(Y, s(X));

@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
   core::{
-    allocator::acquire_storage_allocator
+    gc::acquire_storage_allocator
   }
 };
 use crate::api::dag_node::DagNodeVector;

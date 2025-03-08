@@ -1,15 +1,15 @@
 # mod2 - A "Mini Maude" Term Rewriting System
 
-Implements a small language similar to [Maude](https://maude.cs.illinois.edu/wiki/The_Maude_System)
-for order-sorted term rewriting. This is the front end. The algorithms for matching and rewriting are 
-implemented in mod2-lib.
+Implements a small OBJ-like language for order-sorted term rewriting. This is the
+front end. The algorithms for matching and rewriting are implemented in mod2-lib.
 
 ## The language
 
-The language resembles and borrows concepts from Maude but is much smaller and simpler.
-Items are organized into (possibly nested) namespaces called modules. There is an
-implicit global module (unlike Maude). Expressions are formed from _symbols_, which can
-be "nullary" constants, or _functors_ of specified or variadic arity, or _variables_.
+The language resembles and borrows concepts from
+[Maude](https://maude.cs.illinois.edu/wiki/The_Maude_System) but is much smaller and
+simpler. Items are organized into (possibly nested) namespaces called modules. There is
+an implicit global module (unlike Maude). Expressions are formed from _symbols_, which
+can be "nullary" constants, or _functors_ of specified or variadic arity, or _variables_.
 
 ```maude
 symbol f [assoc, comm, id(h)];

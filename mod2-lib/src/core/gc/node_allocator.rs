@@ -34,11 +34,11 @@ use crate::{
     DagNodeFlags,
   },
   core::{
-    allocator::{
+    gc::{
       arena::Arena,
-      storage_allocator::acquire_storage_allocator
+      storage_allocator::acquire_storage_allocator,
+      root_container::mark_roots,
     },
-    root_container::mark_roots,
   }
 };
 

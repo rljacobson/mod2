@@ -22,6 +22,7 @@ use crate::{
 pub type BxSortSpec = Box<SortSpec>;
 
 /// A generalization of a `Sort` that additionally permits functors.
+#[derive(Eq, PartialEq, Hash, Default)]
 pub enum SortSpec {
   Sort(SortPtr),
   // arg1_sort arg2_sort -> result_sort
@@ -30,6 +31,7 @@ pub enum SortSpec {
     sort_spec: BxSortSpec
   },
   Any,  // Shortcut for `SortSpec::Sort(Rc::new(Sort::any()))`
+  #[default]
   None, // Shortcut for `SortSpec::Sort(Rc::new(Sort::none()))`
 }
 

@@ -4,7 +4,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 pub mod api;
-mod core;
+pub mod core;
 
 // Configuration
 
