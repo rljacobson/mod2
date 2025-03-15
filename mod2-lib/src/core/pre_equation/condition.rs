@@ -7,8 +7,10 @@ apply. Conditions are like a "lite" version of `PreEquation`.
 */
 
 use std::fmt::Display;
-use crate::api::term::BxTerm;
-use crate::core::sort::sort_spec::BxSortSpec;
+use crate::{
+  api::term::BxTerm,
+  core::sort::SortPtr
+};
 
 pub type Conditions  = Vec<BxCondition>;
 pub type BxCondition = Box<Condition>;
@@ -25,7 +27,7 @@ pub enum Condition {
   /// Also called a sort test condition, `X :: Y`
   SortMembership {
     lhs_term: BxTerm,
-    sort    : BxSortSpec
+    sort    : SortPtr
   },
 
   /// Also called an assignment condition, `x := y`
@@ -50,7 +52,7 @@ impl Display for Condition {
       }
 
       Condition::SortMembership { lhs_term, sort } => {
-        write!(f, "{} :: {}", *lhs_term, *sort)
+        write!(f, "{} : {}", *lhs_term, unsafe{&**sort})
       }
 
       Condition::Match { lhs_term, rhs_term } => {

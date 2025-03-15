@@ -21,7 +21,7 @@ use crate::{
       BxTerm,
       Term
     },
-    symbol::SymbolPtr,
+    symbol_core::SymbolPtr,
     free_theory::free_dag_node::FreeDagNode
   },
   core::{
@@ -41,9 +41,8 @@ use crate::{
 
 pub struct FreeTerm{
   core                 : TermCore,
-  pub(crate) args      : Vec<BxTerm>,
+  pub args      : Vec<BxTerm>,
   pub(crate) slot_index: i32,
-  pub(crate) visited   : bool,
 }
 
 impl FreeTerm {
@@ -52,7 +51,6 @@ impl FreeTerm {
       core      : TermCore::new(symbol),
       args      : vec![],
       slot_index: 0,
-      visited   : false,
     }
   }
 }
@@ -68,15 +66,15 @@ impl Formattable for FreeTerm {
     let mut accumulator = String::new();
     match style {
       FormatStyle::Simple => {
-        accumulator.push_str(self.symbol_ref().repr(style).as_str());
+        accumulator.push_str(self.symbol().repr(style).as_str());
       }
 
       FormatStyle::Debug | _ => {
-        accumulator.push_str(format!("free<{}>", self.symbol_ref().repr(style)).as_str());
+        accumulator.push_str(format!("free<{}>", self.symbol().repr(style)).as_str());
       }
     }
 
-    accumulator.push_str(format!("free<{}>", self.symbol_ref().repr(style)).as_str());
+    accumulator.push_str(format!("free<{}>", self.symbol().repr(style)).as_str());
     if !self.args.is_empty() {
       accumulator.push('(');
       accumulator.push_str(
@@ -116,7 +114,7 @@ impl Term for FreeTerm {
 
   /// In sync with `normalize`.
   fn semantic_hash(&self) -> u32 {
-    let mut hash_value: u32 = self.symbol_ref().hash();
+    let mut hash_value: u32 = self.symbol().hash();
 
     for arg in &self.args {
       hash_value = term_hash(hash_value, arg.semantic_hash());
@@ -128,7 +126,7 @@ impl Term for FreeTerm {
   /// In sync with `semantic_hash`
   fn normalize(&mut self, full: bool) -> (u32, bool) {
     let mut changed: bool = false;
-    let mut hash_value: u32 = self.symbol_ref().hash();
+    let mut hash_value: u32 = self.symbol().hash();
 
     for arg in &mut self.args.iter_mut() {
       let (child_hash, child_changed): (u32, bool) = arg.normalize(full);
@@ -160,7 +158,7 @@ impl Term for FreeTerm {
   // region Comparison Methods
 
   fn compare_term_arguments(&self, other: &dyn Term) -> Ordering {
-    assert!(&self.symbol_ref() == &other.symbol_ref(), "symbols differ");
+    assert!(&self.symbol() == &other.symbol(), "symbols differ");
 
     if let Some(other) = other.as_any().downcast_ref::<FreeTerm>() {
       for (arg_self, arg_other) in self.args.iter().zip(other.args.iter()) {
@@ -169,7 +167,7 @@ impl Term for FreeTerm {
           return r;
         }
       }
-      return Ordering::Equal;
+      Ordering::Equal
     } else {
       unreachable!("Could not downcast Term to FreeTerm. This is a bug.")
     }
@@ -185,7 +183,6 @@ impl Term for FreeTerm {
           return r;
         }
       }
-
       Ordering::Equal
     } else {
       unreachable!("Could not downcast Term to FreeTerm. This is a bug.")
@@ -194,7 +191,7 @@ impl Term for FreeTerm {
 
   // ToDo: This method makes no use of partial_substitution except for `partial_compare_unstable` in `VariableTerm`.
   fn partial_compare_arguments(&self, partial_substitution: &mut Substitution, other: &dyn DagNode) -> Option<Ordering> {
-    assert!(self.symbol_ref().compare(other.symbol_ref()).is_eq(), "symbols differ");
+    assert!(self.symbol().compare(other.symbol()).is_eq(), "symbols differ");
 
     for (term_arg, dag_arg) in self.iter_args().zip(other.iter_args()) {
       let r = term_arg.partial_compare(partial_substitution, unsafe{ &*dag_arg });

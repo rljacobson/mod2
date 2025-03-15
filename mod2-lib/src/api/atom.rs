@@ -31,12 +31,13 @@ use mod2_abs::DynHash;
 
 use crate::{
   api::{
-    symbol::{
-      Symbol,
-      SymbolPtr
+    symbol_core::{
+      SymbolCore,
+      SymbolPtr,
     },
-    variable_theory::Variable
-  }
+    variable_theory::Variable,
+  },
+  core::sort::Sort,
 };
 
 
@@ -68,7 +69,7 @@ impl Display for Atom {
 
       Atom::Symbol(symbol) => {
         unsafe {
-          let symbol: &Symbol = &**symbol;
+          let symbol: &SymbolCore = &**symbol;
           write!(f, "{}", symbol)
         }
       }
@@ -153,29 +154,29 @@ When called, the macro expands into the following:
 ## Example Usage
 
 ```rust
-use std::any::Any;
-use once_cell::sync::Lazy;
-use mod2_lib::api::{
-  Arity,
-  atom::{
-    implement_data_atom, Atom, DataAtom
-  },
-  symbol::{Symbol, SymbolPtr, SymbolType, SymbolAttribute}
-};
-use mod2_abs::IString;
-
-implement_data_atom!(Integer, isize);
-
-fn main() {
-    let int_atom = IntegerAtom::new_atom(42isize);
-
-    // The Display implementation allows it to be printed
-    println!("The data atom is {}.", int_atom);
-    // Access the associated symbol for the new type. Use `unsafe` to dereference the pointer.
-    let int_symbol: &Symbol = unsafe { &*int_atom.symbol() };
-    println!("Its symbol is {}.", int_symbol);
-}
-```
+* use std::any::Any;
+* use once_cell::sync::Lazy;
+* use mod2_lib::api::{
+*   Arity,
+*   atom::{
+*     implement_data_atom, Atom, DataAtom
+*   },
+*   symbol::{SymbolCore, SymbolPtr, SymbolType, SymbolAttribute}
+* };
+* use mod2_abs::IString;
+*
+* implement_data_atom!(Integer, isize);
+*
+* fn main() {
+*     let int_atom = IntegerAtom::new_atom(42isize);
+*
+*     // The Display implementation allows it to be printed
+*     println!("The data atom is {}.", int_atom);
+*     // Access the associated symbol for the new type. Use `unsafe` to dereference the pointer.
+*     let int_symbol: &Symbol = unsafe { &*int_atom.symbol() };
+*     println!("Its symbol is {}.", int_symbol);
+* }
+* ```
 
 */
 
@@ -223,19 +224,18 @@ macro_rules! implement_data_atom {
 
     #[allow(non_upper_case_globals)]
     pub static [<$name:snake:upper _SYMBOL>]: Lazy<Symbol> = Lazy::new(|| {
-      Symbol {
-          name:        IString::from(stringify!($name)),  // Use the identifier as a string
-          // ToDo: What should the arity of a `DataAtom` have?
-          arity:       Arity::Unspecified,
-          attributes:  SymbolAttribute::Constructor.into(),
-          symbol_type: SymbolType::Data,
-          hash_value:  0
-        }
+
+      Symbol::new (
+        IString::from(stringify!($name)),  // Use the identifier as a string
+        // ToDo: What should the arity of a `DataAtom` have?
+        Arity::Unspecified,
+        SymbolAttribute::Constructor.into(),
+        SymbolType::Data,
+        Sort::none()
+      )
     });
 
     } // end paste!
   }; // end macro pattern
 }
 pub use implement_data_atom;
-
-

@@ -93,7 +93,7 @@ CommaList<T>: Vec<T> = {
 };
 
 SortList      = CommaList<Identifier>;
-TermList   = CommaList<Term>;
+TermList      = CommaList<Term>;
 AttributeList = CommaList<Attribute>;
 
 // Top-most rule.
@@ -138,15 +138,17 @@ Attribute: AttributeAST = {
 
 };
 
+// Ex:
+//      symbol f: Int -> Int -> Int;
 SymbolDeclaration: SymbolDeclarationAST = {
-    SymbolKeyword <name: Identifier> <arity: ("/" <NaturalNumber>)?> <sort_spec: (SortOp <SortSpec>)?> <attributes: AttributeSpec?> ";" => {
-        let arity: Integer = match arity {
+    SymbolKeyword <name: Identifier> <sort_spec: (SortOp <SortSpec>)?> <attributes: AttributeSpec?> ";" => {
+        let arity: Integer = match sort_spec {
           Some(n) => {
             // ToDo: Do better error handling in the parser. Right now if a number too large to be represented is
-            //       parsed, the parsed symbol is treated as generic.
-            n.try_into().unwrap_or(VARIADIC)
+            //       parsed, the parsed symbol is treated as `UNSPECIFIED`.
+            n.try_into().unwrap_or(UNSPECIFIED)
           }
-          None => VARIADIC
+          None => UNSPECIFIED
         };
         SymbolDeclarationAST {
           name,
@@ -157,19 +159,15 @@ SymbolDeclaration: SymbolDeclarationAST = {
     }
 };
 
+// Ex:
+//      variable X: Int;
 VariableDeclaration: VariableDeclarationAST = {
-    VariableKeyword <name: Identifier> <arity: ("/" <NaturalNumber>)?> <sort_spec: (SortOp <SortSpec>)?> <attributes: AttributeSpec?> ";" => {
-        let arity: Integer = match arity {
-          Some(v) => {
-            v.try_into().unwrap_or(UNSPECIFIED)
-          },
-          None => UNSPECIFIED
-        };
+    VariableKeyword <name: Identifier> <sort: (SortOp <SortId>)?> <attributes: AttributeSpec?> ";" => {
         VariableDeclarationAST {
           name,
           attributes: attributes.unwrap_or_default(),
           arity,
-          sort_spec
+          sort
         }
     }
 };
@@ -204,7 +202,7 @@ EquationDeclaration: EquationDeclarationAST = {
 };
 
 MembershipDeclaration: MembershipDeclarationAST = {
-    MembershipKeyword <lhs: Term> SortOp <rhs: SortSpec> <maybe_conditions: ConditionSpec?> ";" => {
+    MembershipKeyword <lhs: Term> SortOp <rhs: SortId> <maybe_conditions: ConditionSpec?> ";" => {
         MembershipDeclarationAST {
             lhs,
             rhs,
@@ -216,35 +214,31 @@ MembershipDeclaration: MembershipDeclarationAST = {
 // Term and Pattern definitions
 Term: BxTermAST = {
     <string_literal: StringLiteral> => Box::new(TermAST::StringLiteral(string_literal)),
+    <name: Identifier> "(" <tail: TermList> ")" => {
+        Box::new(TermAST::Application { name, tail })
+    },
     <name: Identifier> => Box::new(TermAST::Identifier(name)),
     <n: NaturalNumber> => Box::new(TermAST::NaturalNumber(n as NaturalNumber)),
-    <head: Term> "(" <tail: TermList> ")" => {
-        Box::new(TermAST::Application { head, tail })
-    },
     "(" <Term> ")"
 };
 
 SortSpec: BxSortSpecAST = {
-    <SortSpecLHS>,
-    <arg_sorts: SortSpecLHS+> ArrowOp <sort_spec: SortSpec> => {
+    <SortId> => {
+        Box::new(SortSpecAST::Sort(<>))
+    },
+    <arg_sorts: SortId+> ArrowOp <domain_sort: SortId> => {
         Box::new(
             SortSpecAST::Functor{
                 arg_sorts,
-                sort_spec
+                domain_sort
             }
         )
     }
 };
 
-SortSpecLHS: BxSortSpecAST = {
-    <name: Identifier> => Box::new(SortSpecAST::Sort(name)),
-    "(" <SortSpec> ")",
+SortId: BxSortIdAST = {
+    <name: Identifier> => Box::new(SortIdAST(name))
 };
-
-
-// SortSpecSequence: Vec<BxSortSpec> => {
-//     <v: SortSpec+> => {v}
-// };
 
 AttributeSpec: Vec<AttributeAST> = {
     "[" <AttributeList> "]"
@@ -284,7 +278,3 @@ Condition: ConditionAST = {
 //    <Term> EqualOp <Term> => {
 //    }
 //};
-
-
-
-

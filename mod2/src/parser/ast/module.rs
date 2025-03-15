@@ -14,13 +14,11 @@ use mod2_lib::{
     },
     sort::collection::SortCollection
   },
-  api::symbol::{Symbol, SymbolType},
+  api::symbol_core::{Symbol, SymbolType},
 };
 
 use crate::{
-  core::{
-    module::{BxModule, Module},
-  },
+  module::{BxModule, Module},
   parser::{
     ast::{
       BxEquationDeclarationAST,
@@ -30,7 +28,7 @@ use crate::{
       ItemAST,
       construct_symbol_from_decl,
       symbol_decl::{
-        BxSymbolDeclarationAST, 
+        BxSymbolDeclarationAST,
         BxVariableDeclarationAST
       }
     }
@@ -108,7 +106,7 @@ impl ModuleAST {
         &mut symbols,
         &mut sorts,
         var_decl.name,
-        var_decl.sort_spec,
+        var_decl.sort,
         var_decl.arity,
         var_decl.attributes,
         SymbolType::Variable

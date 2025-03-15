@@ -10,19 +10,19 @@ of structural sharing, the node instances themselves are not in 1-to-1 correspon
 
 use std::{
   cell::Cell,
-  collections::HashMap,
+  collections::hash_map::Entry,
   ptr::NonNull,
   sync::atomic::{
     Ordering::Relaxed,
     AtomicBool,
   },
-  collections::hash_map::Entry
+  ops::Deref
 };
 
 use enumflags2::{bitflags, BitFlags};
 use once_cell::sync::Lazy;
 
-use mod2_abs::NatSet;
+use mod2_abs::{NatSet, HashMap};
 
 use crate::{
   api::{
@@ -35,9 +35,7 @@ use crate::{
   },
 };
 
-// pub type BxTerm    = Box<TermCore>;
-// pub type RcTerm    = RcCell<TermCore>;
-// pub type MaybeTerm = Option<BxTerm>;
+
 pub type TermSet   = HashMap<u32, usize>;
 
 static mut CONVERTED_TERMS: Lazy<TermSet> =  Lazy::new(|| {
@@ -142,10 +140,7 @@ impl TermCore {
 
   #[inline(always)]
   pub fn is_variable(&self) -> bool {
-    unsafe {
-      let symbol: &Symbol = &*self.symbol;
-      symbol.is_variable()
-    }
+    self.symbol.is_variable()
   }
 
   #[inline(always)]
@@ -185,10 +180,8 @@ impl TermCore {
   }
 
   #[inline(always)]
-  pub fn symbol_ref(&self) -> &'static Symbol {
-    unsafe {
-      &*self.symbol
-    }
+  pub fn symbol_ref(&self) -> &dyn Symbol {
+    self.symbol.deref()
   }
 
   // endregion Accessors

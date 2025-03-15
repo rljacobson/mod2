@@ -1,6 +1,6 @@
 mod data_atoms;
 
-use mod2_lib::api::symbol::Symbol;
+use mod2_lib::api::symbol_core::Symbol;
 use crate::data_atoms::{FloatAtom, IntegerAtom};
 
 fn main() {

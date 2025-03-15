@@ -69,7 +69,7 @@ impl Display for SortSpec {
       }
 
       SortSpec::Any => {
-        write!(f, "any")
+        write!(f, "Any")
       }
 
       SortSpec::None => {

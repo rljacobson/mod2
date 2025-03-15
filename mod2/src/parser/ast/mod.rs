@@ -109,21 +109,22 @@ RewriteCondition := Term RuleOp Term ;
 
 */
 
-
-use mod2_abs::IString;
+use std::collections::hash_map::Entry;
+use mod2_abs::{heap_construct, HashMap, IString};
 
 mod module;
 mod term;
-mod sort_spec;
+mod sort;
 mod attribute;
 mod condition;
 mod symbol_decl;
 
 pub use module::*;
-pub use sort_spec::*;
+pub use sort::*;
 pub use term::*;
 pub use attribute::*;
 pub use condition::*;
+use mod2_lib::api::symbol_core::{Symbol, SymbolPtr};
 pub use symbol_decl::*;
 
 /// An item is anything that lives in a module.
@@ -170,6 +171,20 @@ pub(crate) struct EquationDeclarationAST {
 pub(crate) type BxMembershipDeclarationAST = Box<MembershipDeclarationAST>;
 pub(crate) struct MembershipDeclarationAST {
   pub lhs       : BxTermAST,
-  pub rhs       : BxSortSpecAST,
+  pub rhs       : SortIdAST,
   pub conditions: Option<Vec<ConditionAST>>
+}
+
+
+fn get_or_create_symbol<T:Into<IString>>(name: T, symbols: &mut HashMap<IString, SymbolPtr>) -> SymbolPtr {
+  let name = name.into();
+
+  match symbols.entry(name.clone()) {
+    Entry::Occupied(s) => *s.get(),
+    Entry::Vacant(v) => {
+      let s = heap_construct!(Symbol::with_name(name.clone()));
+      v.insert(s);
+      s
+    }
+  }
 }

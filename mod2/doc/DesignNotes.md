@@ -11,7 +11,7 @@ Issues to consider:
 
  1. Sorts cannot be functions.
  2. Sort specs cannot be named in general, though they can be just a single named sort.
- 3. Both sorts and sort specs lack native support for variadic list-like types. (We don't have a syntax for variadic 
+ 3. Both sorts and sort specs lack native support for variadic list-like types. (We don't have a syntax for variadic
     functors yet.) List-like types can still be defined, but it's not ergonomic.
 
 There is also what Maude calls a symbol's `SymbolType`, which stores the symbol's attributes (precedence, gather,
@@ -32,16 +32,16 @@ If `Kind`s have a use after the construction of the adjacency lists in the `Sort
 assignment of each `Sort`'s `Sort.kind` field, then we need to keep them around. But so far I
 don't see a use for them. I don't have a good understanding of how they are used during runtime.
 
-#### Are items in a parent module automatically available within a submodule? 
+#### Are items in a parent module automatically available within a submodule?
 
-If so: 
+If so:
 
  - outer namespaces need to be searched to resolve names before inner namespaces
  - implicitly created resolvents like sorts are created from outer namespaces inward
 
-If not: 
+If not:
 
- - how are names imported into the current scope? E.g. are all items of a module imported, or can one import just a 
+ - how are names imported into the current scope? E.g. are all items of a module imported, or can one import just a
    subset?
  - If only a subset of items is imported, are pre-equations automatically imported?
  - What happens when names collide?
@@ -49,13 +49,13 @@ If not:
 
 ## Object Ownership
 
-Module items are owned by the `Module` in which they are defined. References that can potentially create cycles, 
-such as the references within `Sort`s to other `Sort`s, are `Weak` references. Other references, like references 
+Module items are owned by the `Module` in which they are defined. References that can potentially create cycles,
+such as the references within `Sort`s to other `Sort`s, are `Weak` references. Other references, like references
 within `Term`s to `Symbols`, can be normal `Rc`s or `RcCell`s.
 
 | Struct     | Owner     | Weak Referents     | Strong Referents                  |
 |:-----------|:----------|:-------------------|:----------------------------------|
-| `Sort`     | `Module`  | `Sort`             | `SortSpec`, `ConnectedComponent`  |   
+| `Sort`     | `Module`  | `Sort`             | `SortSpec`, `ConnectedComponent`  |
 | `Symbol`   | `Module`  |                    | `Term`                            |
 | `Module`   | `Module`  | `Sort`, `Symbol`,  |                                   |
 
@@ -101,8 +101,8 @@ Some concepts in Maude are referred to in multiple ways, which can be confusing.
 
 [^strict]: I might introduce my own terms or syntax, so this is not strictly as found in Maude.
 
-Maude calls the entire conjunction of conjunctands the condition, while individual conjunctands it calls a 
-`ConditionFragment`. I just use the word `Condition` for a conjunctand and `Conditions` for the conjunction of all 
+Maude calls the entire conjunction of conjunctands the condition, while individual conjunctands it calls a
+`ConditionFragment`. I just use the word `Condition` for a conjunctand and `Conditions` for the conjunction of all
 conjunctands.
 
 | Concept            | Synonym                              | Relevant Syntax               |
@@ -114,6 +114,8 @@ conjunctands.
 | Match Condition    | Assignment Condition                 | `…if X := Y…`                 |
 | Rewrite Condition  | Rule Condition                       | `…if X => Y…`                 |
 
+A *kind* in Maude refers specifically to the error supersort of a connected component. I use the word to refer to the connected component itself.
+
 ### Concepts
 
 | Name               | Meaning                                                                                       |
@@ -124,7 +126,7 @@ conjunctands.
 
 ### Equational Theories
 
-_Unitary_ means _with identity_. An identity (a unit) can be a left identity or a right identity (or both). 
+_Unitary_ means _with identity_. An identity (a unit) can be a left identity or a right identity (or both).
 
 | Name           | Meaning                                              |
 |:---------------|:-----------------------------------------------------|

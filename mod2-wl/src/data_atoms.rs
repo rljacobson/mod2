@@ -25,7 +25,7 @@ use mod2_lib::{
       DataAtom,
       implement_data_atom
     },
-    symbol::{
+    symbol_core::{
       Symbol,
       SymbolPtr,
       SymbolAttribute,

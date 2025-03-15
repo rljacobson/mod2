@@ -1,3 +1,3 @@
-pub mod sort;
+// pub mod sort;
 pub mod module;
-pub mod pre_equation;
+// pub mod pre_equation;

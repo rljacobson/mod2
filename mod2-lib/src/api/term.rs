@@ -4,6 +4,9 @@ Every theory's term type must implement the `Term` trait. The concrete term type
 have a `TermCore` member that can be accessed through the trait method `Term::core()`
 and `Term::core_mut()`. This allows a lot of shared implementation in `TermCore`.
 
+Note that an implementer of `Term` must also implement `Formattable`. We do it this way rather than a blanket 
+implementation, because some terms have their own particular representation.
+
 */
 
 use std::{
@@ -15,42 +18,36 @@ use std::{
     HashMap,
     hash_map::Entry
   },
-  sync::atomic::Ordering::Relaxed
+  sync::atomic::Ordering::Relaxed,
+  ops::Deref
 };
 
-use mod2_abs::{
-  NatSet,
-  RcCell
-};
+use mod2_abs::{NatSet, RcCell};
 
 use crate::{
   api::{
     dag_node::{DagNodePtr, DagNode},
-    UNDEFINED,
     symbol::{
-      Symbol,
       SymbolPtr,
-      SymbolSet
-    }
+      SymbolSet,
+      Symbol,
+    },
+    UNDEFINED,
   },
   core::{
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlag,
-    },
-    format::{
-      FormatStyle,
-      Formattable
-    },
+    dag_node_core::{DagNodeCore, DagNodeFlag},
+    format::{FormatStyle, Formattable},
+    substitution::Substitution,
+    symbol_core::SymbolCore,
     term_core::{
       cache_node_for_term,
       clear_cache_and_set_sort_info,
       lookup_node_for_term,
       TermAttribute,
-      TermCore
+      TermCore,
     },
-    substitution::Substitution
-  }
+  },
+  impl_display_debug_for_formattable,
 };
 
 pub type BxTerm    = Box<dyn Term>;
@@ -59,22 +56,16 @@ pub type RcTerm    = RcCell<dyn Term>;
 pub type TermSet   = HashMap<u32, usize>;
 
 pub trait Term: Formattable {
-  fn as_any(&self) -> &dyn Any;
+  fn as_any(&self)         -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
-  fn as_ptr(&self) -> *const dyn Term;
-  fn semantic_hash(&self) -> u32;
+  fn as_ptr(&self)         -> *const dyn Term;
+  fn semantic_hash(&self)  -> u32;
   /// Normalizes the term, returning the computed hash and `true` if the normalization changed
   /// the term or `false` otherwise.
   fn normalize(&mut self, full: bool) -> (u32, bool);
-
-
-
-  fn core(&self) -> &TermCore;
+  
+  fn core(&self)         -> &TermCore;
   fn core_mut(&mut self) -> &mut TermCore;
-
-  /// This method should construct a new `Term` of the concrete implementing type,
-  /// including its `TermCore` member, and return it wrapped in an `Rc`.
-  // fn new(symbol: SymbolPtr) -> BxTerm;
 
   // region Accessors
 
@@ -143,13 +134,8 @@ pub trait Term: Formattable {
   //    Box::new(std::iter::empty::<&dyn Term>())
 
   #[inline(always)]
-  fn symbol_ref(&self) -> &'static Symbol {
-    self.core().symbol_ref()
-  }
-
-  #[inline(always)]
   fn symbol(&self) -> SymbolPtr {
-    self.core().symbol
+    self.core().symbol()
   }
 
   /// Compute the number of nodes in the term tree
@@ -180,10 +166,11 @@ pub trait Term: Formattable {
 
   #[inline(always)]
   fn compare_dag_node(&self, other: &dyn DagNode) -> Ordering {
-    if self.symbol_ref().hash() == other.symbol_ref().hash() {
+    if self.symbol().hash() == other.symbol().hash() {
       self.compare_dag_arguments(other)
     } else {
-      self.symbol_ref().compare(other.symbol_ref())
+      // We only get equality, not ordering, from comparing hashes, so when hashes are unequal, we defer to compare. 
+      self.symbol().compare(other.symbol().deref())
     }
   }
 
@@ -193,12 +180,12 @@ pub trait Term: Formattable {
       return self.partial_compare_unstable(partial_substitution, other);
     }
 
-    if std::ptr::addr_eq(self.symbol(), other.symbol()) {
+    if std::ptr::addr_eq(self.symbol().as_ptr(), other.symbol().as_ptr()) {
       // Only used for `FreeTerm`
       return self.partial_compare_arguments(partial_substitution, other);
     }
 
-    if self.symbol_ref().compare(other.symbol_ref()) == Ordering::Less {
+    if self.symbol().compare(other.symbol().deref()) == Ordering::Less {
       Some(Ordering::Less)
     } else {
       Some(Ordering::Greater)
@@ -207,7 +194,7 @@ pub trait Term: Formattable {
 
   #[inline(always)]
   fn compare(&self, other: &dyn Term) -> Ordering {
-    let r = self.symbol_ref().compare(other.symbol_ref());
+    let r = self.symbol().compare(other.symbol().deref());
     if r == Ordering::Equal {
       return self.compare_term_arguments(other);
     }
@@ -277,9 +264,4 @@ impl PartialEq for dyn Term {
 impl Eq for dyn Term {}
 // endregion
 
-
-impl Display for dyn Term {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "[{}]", self.symbol_ref())
-  }
-}
+impl_display_debug_for_formattable!(dyn Term);

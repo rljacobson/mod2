@@ -1,21 +1,28 @@
+use rand::Rng;
+
+use mod2_abs::IString;
+
 use crate::{
+  core::{
+    gc::{
+      allocate_dag_node,
+      root_container::RootContainer,
+      node_allocator::acquire_node_allocator
+    },
+    dag_node_core::{DagNodeCore, DagNodeTheory},
+    symbol_core::{SymbolAttributes, SymbolType},
+  },
   api::{
     dag_node::{DagNode, DagNodePtr},
     free_theory::FreeDagNode,
-    symbol::Symbol,
-    symbol::SymbolPtr,
+    symbol::{
+      Symbol,
+      SymbolPtr
+    },
     Arity
   },
-  core::{
-    gc::*,
-    dag_node_core::{DagNodeCore, DagNodeTheory}
-  }
 };
-use mod2_abs::IString;
-use rand::Rng;
-use crate::api::symbol::{SymbolAttributes, SymbolType};
-use crate::core::gc::root_container::RootContainer;
-use crate::core::sort::sort_spec::SortSpec;
+
 /*
 Recursively builds a random tree of `DagNode`s with a given height and arity rules.
 
@@ -235,4 +242,3 @@ fn test_arena_exhaustion() {
   }
 
 }
-

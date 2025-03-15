@@ -37,7 +37,7 @@ use mod2_lib::{
     sort::collection::SortCollection
   },
   api::{
-    symbol::SymbolPtr,
+    symbol_core::SymbolPtr,
     term::Term,
   },
 };
@@ -45,7 +45,7 @@ use mod2_lib::api::built_in::get_built_in_symbol;
 use mod2_lib::api::free_theory::FreeTerm;
 use crate::{
   parser::ast::{
-    BxSortSpecAST,
+    BxFunctorSortAST,
     BxTermAST
   },
 };
@@ -56,7 +56,7 @@ pub(crate) enum ConditionAST {
   /// though they are captured in the `ConditionAST::Boolean` variant.
   Equality       { lhs: BxTermAST, rhs : BxTermAST },
   /// Also called membership constraint or sort test conditions
-  SortMembership { lhs: BxTermAST, sort: BxSortSpecAST },
+  SortMembership { lhs: BxTermAST, sort: BxFunctorSortAST },
   /// Also called an assignment condition
   Match          { lhs: BxTermAST, rhs : BxTermAST },
   /// Also called a rule condition
