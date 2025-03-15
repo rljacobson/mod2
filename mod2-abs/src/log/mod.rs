@@ -9,7 +9,7 @@ _verbosity_ of the logger.
 Here is a simple example.
 
 ```
-use mod2lib::log::*;
+use mod2_abs::log::*;
 
 fn main() {
     // Set the global threshold to 1. Any messages logged with greater threshold
@@ -36,7 +36,7 @@ threshold less than or equal to the global threshold are emitted. A message with
 You can set and get the global logging threshold as follows:
 
 ```
-use mod2lib::log::{set_global_logging_threshold, get_global_logging_threshold};
+use mod2_abs::log::{set_global_logging_threshold, get_global_logging_threshold};
 
 // Set the verbosity to 3.
 set_global_logging_threshold(3);
@@ -81,7 +81,7 @@ level!("format string", args...);
 Examples:
 
 ```
-use mod2lib::log::{info, set_global_logging_threshold};
+use mod2_abs::log::{info, set_global_logging_threshold};
 
 fn main() {
     set_global_logging_threshold(3);

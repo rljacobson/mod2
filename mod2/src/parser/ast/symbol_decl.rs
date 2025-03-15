@@ -13,23 +13,27 @@ use mod2_abs::{
   heap_construct,
 };
 use mod2_lib::{
-  core::sort::collection::SortCollection,
   api::{
-    symbol::{
+    Arity,
+    symbol_core::{
       SymbolPtr,
       Symbol,
       SymbolType,
-    }
-  }
+    },
+    built_in::get_built_in_sort
+  },
+  core::sort::collection::SortCollection,
 };
-use mod2_lib::api::Arity;
-use mod2_lib::core::sort::sort_spec::SortSpec;
+
 use crate::{
-  parser::ast::{
-    attribute::AttributeAST,
-    BxSortSpecAST
-  }, 
-  Integer
+  parser::{
+    ast::{
+      attribute::AttributeAST,
+      BxFunctorSortAST,
+      BxSortIdAST
+    }
+  },
+  Integer,
 };
 
 pub(crate) type BxSymbolDeclarationAST = Box<SymbolDeclarationAST>;
@@ -38,7 +42,7 @@ pub(crate) struct SymbolDeclarationAST {
   pub name      : IString,
   pub attributes: Vec<AttributeAST>,
   pub arity     : Integer,               // -1 means variadic, -2 means unspecified
-  pub sort_spec : Option<BxSortSpecAST>, // Empty is the special "None" sort.
+  pub sort_spec : Option<BxFunctorSortAST>, // Empty is the special "None" sort.
 }
 
 pub(crate) type BxVariableDeclarationAST = Box<VariableDeclarationAST>;
@@ -46,8 +50,7 @@ pub(crate) type BxVariableDeclarationAST = Box<VariableDeclarationAST>;
 pub(crate) struct VariableDeclarationAST {
   pub name      : IString,
   pub attributes: Vec<AttributeAST>,
-  pub arity     : Integer,               // -1 means variadic, -2 means unspecified
-  pub sort_spec : Option<BxSortSpecAST>, // Empty is the special "Any" sort
+  pub sort      : Option<BxSortIdAST>, // Empty is the special "Any" sort
 }
 
 
@@ -56,7 +59,7 @@ pub fn construct_symbol_from_decl(
   symbols         : &mut HashMap<IString, Symbol>,
   sorts           : &mut SortCollection,
   name            : IString,
-  sort_spec       : Option<BxSortSpecAST>,
+  sort_spec       : Option<BxFunctorSortAST>,
   arity           : i16,
   attributes_ast  : Vec<AttributeAST>,
   symbol_type     : SymbolType,
@@ -72,8 +75,8 @@ pub fn construct_symbol_from_decl(
   };
 
   // Construct the symbol type.
-  let attributes  = AttributeAST::construct_attributes(&attributes_ast);
-  
+  let attributes = AttributeAST::construct_attributes(&attributes_ast);
+
 
   match symbols.entry(name.clone()) {
 
@@ -90,9 +93,9 @@ pub fn construct_symbol_from_decl(
         Arity::from(arity),
         attributes,
         symbol_type,
-        SortSpec::default(),
+        unsafe{ get_built_in_sort("Any").unwrap_unchecked() },
       );
-      
+
       v.insert(s);
     }
 

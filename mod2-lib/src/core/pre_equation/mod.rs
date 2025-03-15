@@ -13,12 +13,11 @@ use enumflags2::{bitflags, BitFlags};
 use mod2_abs::{join_string, IString};
 
 use crate::{
-  core::{
-    pre_equation::condition::Conditions,
-    sort::sort_spec::BxSortSpec
-  },
+  core::pre_equation::condition::Conditions,
   api::term::BxTerm,
 };
+
+use super::sort::SortPtr;
 
 
 #[bitflags]
@@ -71,7 +70,7 @@ pub enum PreEquationKind {
 
   // Membership Axiom ("Sort constraint")
   Membership {
-    sort_spec: BxSortSpec,
+    sort: SortPtr,
   },
 
   // StrategyDefinition
@@ -90,8 +89,8 @@ impl Display for PreEquation {
 
       }
 
-      PreEquationKind::Membership { sort_spec } => {
-        write!(f, "membership {} :: {}", self.lhs_term,  sort_spec)?;
+      PreEquationKind::Membership { sort } => {
+        write!(f, "membership {} : {}", self.lhs_term,  unsafe{&(**sort)})?;
 
       }
 

@@ -5,22 +5,14 @@
 // #![doc(include = "../doc/QuickStart.md")]
 
 mod parser;
-mod theory;
-mod core;
+// mod theory;
+// mod core;
 mod builtin;
+mod module;
 
 // Global Configuration
 /// Indentation amount for displayed structures.
 pub(crate) const DISPLAY_INDENT: usize = 2;
-
-// Numeric Types
-/// Nonnegative Integers
-pub type NaturalNumber = u64;
-/// Signed Integers
-pub type Integer       = i16;
-/// Floating Point Numbers
-pub type Float         = f64;
-
 
 pub fn add(left: usize, right: usize) -> usize {
   left + right

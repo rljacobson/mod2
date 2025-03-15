@@ -29,7 +29,7 @@ use mod2_abs::{
   heap_destroy,
 };
 use mod2_lib::{
-  api::symbol::SymbolPtr,
+  api::symbol_core::SymbolPtr,
   core::{
     pre_equation::PreEquation,
     sort::{

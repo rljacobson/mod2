@@ -20,9 +20,9 @@ The following compares Maude's `DagNode` to our implementation here.
 
 use std::{
   fmt::{Display, Formatter},
-  marker::PhantomPinned
+  marker::PhantomPinned,
+  ptr::null_mut
 };
-use std::ptr::null_mut;
 use enumflags2::{bitflags, make_bitflags, BitFlags};
 
 use crate::{
@@ -36,6 +36,7 @@ use crate::{
     free_theory::FreeDagNode,
   },
   core::{
+    format::Formattable,
     gc::{
       allocate_dag_node,
     }
@@ -60,10 +61,7 @@ pub enum DagNodeTheory {
   // AU,
   // CUI,
   Variable,
-  // NA,
-  Data,
-  // Integer,
-  // Float
+  NA,
 }
 
 
@@ -136,14 +134,13 @@ impl DagNodeCore {
   }
 
   pub fn with_theory(symbol: SymbolPtr, theory: DagNodeTheory) -> DagNodePtr {
-    assert!(!symbol.is_null());
     let node     = allocate_dag_node();
     let node_mut = unsafe { &mut *node };
 
     node_mut.args  = null_mut();
     node_mut.flags = DagNodeFlags::empty();
 
-    if let Arity::Value(arity) = unsafe{ &*symbol }.arity {
+    if let Arity::Value(arity) = symbol.arity() {
       if arity > 1 {
         let vec = DagNodeVector::with_capacity(arity as usize);
         node_mut.args = (vec as *mut DagNodeVector) as *mut u8;
@@ -168,15 +165,8 @@ impl DagNodeCore {
   }
 
   #[inline(always)]
-  pub fn symbol_ref(&self) -> &Symbol {
-    unsafe {
-      &*self.symbol
-    }
-  }
-
-  #[inline(always)]
   pub fn arity(&self) -> Arity {
-    self.symbol_ref().arity
+    self.symbol().arity()
   }
 
 
@@ -234,6 +224,6 @@ impl DagNodeCore {
 
 impl Display for DagNodeCore {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "node<{}>", self.symbol_ref())
+    write!(f, "node<{}>", self.symbol())
   }
 }

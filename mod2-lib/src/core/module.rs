@@ -25,10 +25,10 @@ use std::{
 };
 
 use mod2_abs::{
-  HashMap, 
-  IString, 
-  join_iter, 
-  warning, 
+  HashMap,
+  IString,
+  join_iter,
+  warning,
   heap_destroy
 };
 
@@ -180,7 +180,7 @@ impl Module {
 impl Drop for Module {
   fn drop(&mut self) {
     for (_, &symbol_ptr) in self.symbols.iter() {
-      heap_destroy!(symbol_ptr);
+      heap_destroy!(symbol_ptr.as_mut_ptr());
     }
   }
 }

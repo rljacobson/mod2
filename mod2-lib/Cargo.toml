@@ -12,8 +12,10 @@ keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-r
 categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
 
 [features]
-gc_debug = []
 default  = ["gc_debug"]
+
+gc_debug      = []
+multithreaded = []
 
 [dependencies]
 mod2-abs = { path = "../mod2-abs" }

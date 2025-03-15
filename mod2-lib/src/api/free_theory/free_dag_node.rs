@@ -21,7 +21,7 @@ use crate::{
     }
   },
   api::{
-    symbol::SymbolPtr,
+    symbol_core::SymbolPtr,
     dag_node::{
       DagNodeVector,
       DagNodeVectorRefMut,

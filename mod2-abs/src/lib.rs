@@ -37,14 +37,25 @@ mod heap;
 pub mod hash;
 mod erased;
 mod graph;
+mod unsafe_ptr;
 
+// region Hashing data structures
 use std::collections::HashSet as StdHashSet;
 use std::collections::HashMap as StdHashMap;
+pub use std::collections::HashSet;
+pub use std::collections::HashMap;
 
-pub use tracing;
+/// A `ThingSet` is a hash set of `*const dyn Things`. They are useful if you need to test membership but never need
+/// to access the original `Thing`.
+pub type Set<T> = StdHashSet<T>; // This replaces Maude's `PointerSet` in most situations.
+// endregion
 
 // Logging
+pub use tracing;
 pub mod log;
+
+pub use unsafe_ptr::UnsafePtr;
+
 
 // Interned string. Use `DefaultAtom` for a global cache that can be used across threads. Use `Atom` for a thread-local
 // string cache.
@@ -67,12 +78,6 @@ pub use rccell::{RcCell, WeakCell};
 // Join sequences with a separator
 pub use string_util::{join_string, join_iter, int_to_subscript};
 
-
-/// A `ThingSet` is a hash set of `*const dyn Things`. They are useful if you need to test membership but never need
-/// to access the original `Thing`.
-pub type Set<T> = StdHashSet<T>; // This replaces Maude's `PointerSet` in most situations.
-
-pub type HashMap<S, T> = StdHashMap<S, T>;
 
 pub use erased::DynHash;
 

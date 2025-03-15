@@ -1,6 +1,6 @@
 symbol f [assoc, comm, id(h)];
-symbol g/2;
-symbol h/3 : Int;
+symbol g;
+symbol h : Int;
 
 variable X;
 variable Y;
@@ -9,7 +9,7 @@ variable Z;
 rule f(X, h(Y, g(Z, Z), f(X))) => f(X, h(Y, g(Z, Z), X)) ;
 
 // This membership axiom isn't meant to make sense.
-membership f(X, h(Y, g(Z, Z), f(X))) : NzNat -> NzNat -> NzNat if X := Y;
+membership f(X, h(Y, g(Z, Z), f(X))) : NzNat if X := Y;
 
 // Create a diamond-shaped Kind
 sort A < B;

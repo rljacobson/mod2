@@ -29,7 +29,7 @@ section titled, "Optimizations for Computing a Subsort Relation at Runtime."
 use std::fmt::Display;
 use mod2_abs::{NatSet, IString};
 use crate::{
-  api::Arity,
+  api::{built_in::get_built_in_sort, Arity},
   core::sort::kind::KindPtr,
 };
 
@@ -104,6 +104,14 @@ impl Default for Sort {
 }
 
 impl Sort {
+  pub fn any() -> SortPtr {
+    unsafe{ get_built_in_sort("Any").unwrap_unchecked() }
+  }
+
+  pub fn none() -> SortPtr {
+    unsafe{ get_built_in_sort("None").unwrap_unchecked() }
+  }
+
   pub fn new(name: IString) -> Sort {
     Sort{
       name,

@@ -5,8 +5,10 @@ use std::{
 };
 
 use mod2_abs::{HashMap, IString, RcCell, rc_cell, heap_construct};
-use mod2_lib::api::symbol::{Symbol, SymbolPtr};
-use mod2_lib::api::term::Term;
+use mod2_lib::api::free_theory::FreeTerm;
+use mod2_lib::api::symbol_core;
+use mod2_lib::api::symbol_core::{Symbol, SymbolPtr};
+use mod2_lib::api::term::{BxTerm, Term};
 use crate::{
   builtin::{
     integer_symbol::IntegerSymbol,
@@ -14,6 +16,7 @@ use crate::{
   },
   NaturalNumber
 };
+use crate::parser::ast::get_or_create_symbol;
 
 pub(crate) type BxTermAST = Box<TermAST>;
 pub(crate) enum TermAST {
@@ -22,7 +25,7 @@ pub(crate) enum TermAST {
 
   /// Function Application: `head(tail).
   Application{
-    head: BxTermAST,
+    name: IString,
     tail: Vec<BxTermAST>
   },
 
@@ -32,35 +35,24 @@ pub(crate) enum TermAST {
 }
 
 impl TermAST {
-  pub fn construct(&self, symbols: &mut HashMap<IString, SymbolPtr>) -> Term {
+  pub fn construct(&self, symbols: &mut HashMap<IString, SymbolPtr>) -> BxTerm {
     // ToDo: How do we construct term attributes.
 
     match self {
 
       TermAST::Identifier(name) => {
-        let symbol: SymbolPtr = match symbols.entry(name.clone()) {
-          Entry::Occupied(s) => *s.get(),
-          Entry::Vacant(v) => {
-            let s = heap_construct!(Symbol::with_name(name.clone()));
-            v.insert(s);
-            s
-          }
-        };
-        Term {
-          term_node : TermNode::Symbol(symbol),
-          attributes: TermAttributes::default()
-        }
+        let symbol = get_or_create_symbol(name, symbols);
+        Box::new(FreeTerm::new(symbol))
       }
 
-      TermAST::Application { head, tail } => {
+      TermAST::Application { name, tail } => {
+        let symbol = get_or_create_symbol(name, symbols);
 
-        Term {
-          term_node: TermNode::Application {
-            head: Box::new(head.construct(symbols)),
-            tail: tail.into_iter().map(|t| Box::new(t.construct(symbols))).collect(),
-          },
-          attributes: TermAttributes::default()
-        }
+        let mut term = FreeTerm::new(symbol);
+        let args = tail.into_iter().map(|t| Box::new(t.construct(symbols))).collect();
+        term.args = args;
+
+        Box::new(term)
       }
 
       TermAST::StringLiteral(string_literal) => {

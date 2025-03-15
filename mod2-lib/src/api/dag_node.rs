@@ -17,10 +17,10 @@ use std::{
   iter::Iterator
 };
 use std::cmp::max;
+use std::ops::Deref;
 use crate::{
   api::{
     Arity,
-    symbol::{Symbol, SymbolPtr}
   },
   core::{
     gc::{
@@ -33,9 +33,11 @@ use crate::{
       DagNodeFlags,
       ThinDagNodePtr
     },
-    sort::{SortPtr, SpecialSort}
+    sort::{SortPtr, SpecialSort},
+    symbol_core::SymbolCore
   }
 };
+use crate::api::symbol::SymbolPtr;
 use crate::core::format::{FormatStyle, Formattable};
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
@@ -78,10 +80,7 @@ pub trait DagNode {
 
   #[inline(always)]
   fn arity(&self) -> Arity {
-    if self.symbol().is_null() {
-      panic!("symbol is null")
-    }
-    self.symbol_ref().arity
+    self.symbol().arity()
   }
 
 
@@ -153,22 +152,7 @@ pub trait DagNode {
   fn symbol(&self) -> SymbolPtr {
     self.core().symbol
   }
-
-
-  /// Convenience method that gets and dereferences the symbol
-  #[inline(always)]
-  fn symbol_ref(&self) -> &Symbol {
-    unsafe{ &*self.core().symbol }
-  }
-
-
-  // Todo: Is this needed?
-  #[inline(always)]
-  fn symbol_ref_mut(&mut self) -> &mut Symbol {
-    unsafe{ &mut *self.core().symbol }
-  }
-
-
+  
   // ToDo: Implement DagNodeCore::get_sort() when `SortTable` is implemented.
   #[inline(always)]
   fn get_sort(&self) -> Option<SortPtr> {
@@ -265,7 +249,7 @@ pub trait DagNode {
   /// Defines a partial order on `DagNode`s by comparing the symbols and the arguments recursively.
   fn compare(&self, other: DagNodePtr) -> Ordering {
     let other_ref = unsafe{ &*other };
-    let symbol_order = self.symbol_ref().compare(other_ref.symbol_ref());
+    let symbol_order = self.symbol().compare(other_ref.symbol());
 
     match symbol_order {
       Ordering::Equal => self.compare_arguments(other),
@@ -276,14 +260,14 @@ pub trait DagNode {
   /// MUST be overridden is `Self::args` something other than a `DagNodeVector`.
   fn compare_arguments(&self, other: DagNodePtr) -> Ordering {
     let other  = unsafe { &*other };
-    let symbol = self.symbol_ref();
+    let symbol = self.symbol();
 
-    assert!(symbol == other.symbol_ref(), "symbols differ");
+    assert!(symbol == other.symbol(), "symbols differ");
 
     if other.core().theory_tag != self.core().theory_tag {
       // if let None = other.as_any().downcast_ref::<FreeDagNode>() {
       // Not even the same theory. It's not clear what to return in this case, so just compare symbols.
-      return symbol.compare(other.symbol_ref());
+      return symbol.compare(other.symbol());
     };
 
     if (true, true) == (self.core().args.is_null(), other.core().args.is_null()) {
@@ -351,7 +335,7 @@ pub trait DagNode {
     let other_ref = unsafe{ &*other };
     std::ptr::addr_eq(self, other)
       || (
-      self.symbol_ref() == other_ref.symbol_ref()
+      self.symbol() == other_ref.symbol()
           && self.compare_arguments(other) == Ordering::Equal
       )
   }
@@ -404,7 +388,7 @@ impl Formattable for &dyn DagNode {
       "null".to_string()
     }
     else {
-      format!("<{}>", self.symbol_ref())
+      format!("<{}>", self.symbol())
     }
   }
 }

@@ -25,10 +25,10 @@ pub type BxSortSpec = Box<SortSpec>;
 #[derive(Eq, PartialEq, Hash, Default)]
 pub enum SortSpec {
   Sort(SortPtr),
-  // arg1_sort arg2_sort -> result_sort
+  // arg1_sort arg2_sort -> target_sort
   Functor{
-    arg_sorts: Vec<BxSortSpec>,
-    sort_spec: BxSortSpec
+    arg_sorts: Vec<SortPtr>,
+    target_sort: SortPtr
   },
   Any,  // Shortcut for `SortSpec::Sort(Rc::new(Sort::any()))`
   #[default]
@@ -66,12 +66,13 @@ impl Display for SortSpec {
         write!(f, "{}", unsafe{ &*(*sort) })
       }
 
-      SortSpec::Functor { arg_sorts, sort_spec } => {
-        write!(f, "{} -> {}", join_string(arg_sorts.iter(), " "), sort_spec)
+      SortSpec::Functor { arg_sorts, target_sort} => {
+        let arg_string = join_string(arg_sorts.iter().map(|p| unsafe{&*(*p)}), " ");
+        write!(f, "{} -> {}", arg_string, unsafe{ &*(*target_sort) })
       }
 
       SortSpec::Any => {
-        write!(f, "any")
+        write!(f, "Any")
       }
 
       SortSpec::None => {
