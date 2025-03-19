@@ -26,7 +26,7 @@ impl SortCollection {
     match self.sorts.entry(name.clone()) {
       Entry::Occupied(s) => s.get().clone(),
       Entry::Vacant(v) => {
-        let s = heap_construct!(Sort::new(name));
+        let s = SortPtr::new(heap_construct!(Sort::new(name)));
         v.insert(s);
         s
       }
@@ -38,6 +38,11 @@ impl SortCollection {
     for sort_name in sort_names.drain() {
       self.get_or_create_sort(sort_name);
     }
+  }
+  
+  /// Do not use this method directly. This is only used to insert the error sort.
+  pub fn insert(&mut self, sort: SortPtr) {
+    self.sorts.insert(sort.name.clone(), sort);
   }
 
   #[inline(always)]

@@ -19,7 +19,6 @@ The following compares Maude's `DagNode` to our implementation here.
 */
 
 pub mod format;
-pub mod module;
 pub mod pre_equation;
 pub mod sort;
 pub mod symbol_core;
@@ -60,9 +59,9 @@ mod tests {
   #[test]
   fn size_of_dag_node() {
     println!("size of SymbolPtr: {}", size_of::<SymbolPtr>());
-    println!("size of DagNodeKind: {}", size_of::<DagNodeTheory>());
+    println!("size of DagNodeTheory: {}", size_of::<DagNodeTheory>());
     println!("size of DagNodeFlags: {}", size_of::<DagNodeFlags>());
     println!("size of DagNode: {}", size_of::<DagNodeCore>());
-    assert_eq!(size_of::<DagNodeCore>(), 3 * size_of::<usize>());
+    assert_eq!(size_of::<DagNodeCore>(), 4 * size_of::<usize>());
   }
 }

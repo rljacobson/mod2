@@ -21,7 +21,7 @@ The following compares Maude's `DagNode` to our implementation here.
 use std::{
   fmt::{Display, Formatter},
   marker::PhantomPinned,
-  ptr::null_mut
+  ptr::DynMetadata
 };
 use enumflags2::{bitflags, make_bitflags, BitFlags};
 
@@ -30,29 +30,29 @@ use crate::{
     Arity,
     dag_node::{
       DagNode,
-      DagNodePtr
+      DagNodePtr,
+      DagNodeVector
     },
-    symbol::{Symbol, SymbolPtr},
+    symbol::SymbolPtr,
     free_theory::FreeDagNode,
   },
-  core::{
-    format::Formattable,
-    gc::{
-      allocate_dag_node,
-    }
-  },
+  core::gc::allocate_dag_node,
 };
-use crate::api::dag_node::DagNodeVector;
+
+static FREE_DAG_NODE_VTABLE: DynMetadata<dyn DagNode> = {
+  // Create a fake pointer of type `*mut FreeDagNode` (which is concrete)
+  let fake_ptr: *mut FreeDagNode = std::ptr::null_mut();
+  // Cast it to a trait object pointer; this creates a fat pointer with the vtable for `FreeDagNode`
+  let fake_trait_object: *mut dyn DagNode = fake_ptr as *mut dyn DagNode;
+  // This prevents the compiler from optimizing the vtable away
+  _ = fake_trait_object.is_null();
+  // Extract the metadata (the vtable pointer)
+  std::ptr::metadata(fake_trait_object)
+};
+
 
 pub type ThinDagNodePtr = *mut DagNodeCore; // A thin pointer to a `DagNodeCore` object.
 
-// ToDo: Isn't this just a tag for what concrete type of the `dyn Trait` that the `DagNodeCore` was created as?
-//       If so, can we have a map from `DagNodeKind` to the concrete type?
-// ```
-// let node: *mut DagNodeCore;
-// let dyn_node: *mut dyn DagNode = (&*node).to_dyn_trait();
-// let free_node: *mut FreeDagNode = match dyn_node.as_any().downcast_ref::<FreeDagNode>() { Some(n) => n ...}
-// ```
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
 pub enum DagNodeTheory {
   #[default]
@@ -137,7 +137,7 @@ impl DagNodeCore {
     let node     = allocate_dag_node();
     let node_mut = unsafe { &mut *node };
 
-    node_mut.args  = null_mut();
+    node_mut.args  = std::ptr::null_mut();
     node_mut.flags = DagNodeFlags::empty();
 
     if let Arity::Value(arity) = symbol.arity() {
@@ -202,15 +202,19 @@ impl DagNodeCore {
     match unsafe { thin_dag_node_ptr.as_ref_unchecked().theory_tag } {
       DagNodeTheory::Free => {
         // Step 1: Create a fake reference to MyStruct
-        let fake_ptr: *mut FreeDagNode = std::ptr::null_mut();
-        // Step 2: Cast the fake reference to a trait object pointer
-        let fake_trait_object: DagNodePtr = fake_ptr as DagNodePtr;
-        // Step 3: Extract the vtable from the trait object pointer
-        let vtable = std::ptr::metadata(fake_trait_object);
+        // let fake_ptr: *mut FreeDagNode = std::ptr::null_mut();
+        // // Step 2: Cast the fake reference to a trait object pointer
+        // let fake_trait_object: *mut dyn DagNode = fake_ptr as *mut dyn DagNode;
+        // // Step 3: Extract the vtable from the trait object pointer
+        // let vtable = std::ptr::metadata(fake_trait_object);
         // Step 4: Combine the thin pointer and vtable pointer into a fat pointer
-        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, vtable);
-
-        fat_ptr
+        // let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, vtable);
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, FREE_DAG_NODE_VTABLE);
+        if fat_ptr.is_null() {
+          panic!("FreeDagNodePtr could not be created from ThinDagNodePtr");
+        }
+        
+        DagNodePtr::new(fat_ptr)
       }
       // DagNodeTheory::Variable => {}
       // DagNodeTheory::Data => {}

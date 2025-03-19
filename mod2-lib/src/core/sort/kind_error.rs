@@ -31,7 +31,7 @@ impl Display for KindError {
         write!(
           f,
           "the connected component in the sort graph that contains sort {} could not be linearly ordered due to a cycle.",
-          unsafe{ &(**problem_sort).name }
+          problem_sort.name
         )
       } // end `KindError::CycleDetected` branch
 
@@ -39,7 +39,7 @@ impl Display for KindError {
         write!(
           f,
           "the connected component in the sort graph that contains sort \"{}\" has no maximal sorts due to a cycle.",
-          unsafe{ &(**problem_sort).name }
+          problem_sort.name
         )
       }
 

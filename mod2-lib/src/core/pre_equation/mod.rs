@@ -86,12 +86,10 @@ impl Display for PreEquation {
 
       PreEquationKind::Rule { rhs_term } => {
         write!(f, "rule {} => {}", self.lhs_term,  rhs_term)?;
-
       }
 
       PreEquationKind::Membership { sort } => {
-        write!(f, "membership {} : {}", self.lhs_term,  unsafe{&(**sort)})?;
-
+        write!(f, "membership {} : {}", self.lhs_term,  sort)?;
       }
 
     }

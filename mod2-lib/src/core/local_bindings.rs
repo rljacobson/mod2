@@ -41,10 +41,8 @@ impl LocalBindings {
   pub fn assert(&mut self, substitution: &mut Substitution) -> bool {
     for i in self.bindings.iter() {
       if let Some(d) = substitution.get(i.variable_index) {
-        unsafe{
-          if d.as_ref_unchecked().equals(i.value) {
-            return false;
-          }
+        if d.equals(i.value) {
+          return false;
         }
       }
     }

@@ -15,16 +15,22 @@ use mod2_abs::{
 use mod2_lib::{
   api::{
     Arity,
-    symbol_core::{
+    symbol::{
       SymbolPtr,
       Symbol,
-      SymbolType,
     },
-    built_in::get_built_in_sort
+    built_in::{
+      get_built_in_sort, 
+      Integer, 
+      StringBuiltIn, 
+      Float, 
+      NaturalNumber, 
+      Bool
+    }
   },
   core::sort::collection::SortCollection,
 };
-
+use mod2_lib::core::symbol_core::SymbolType;
 use crate::{
   parser::{
     ast::{
@@ -33,7 +39,6 @@ use crate::{
       BxSortIdAST
     }
   },
-  Integer,
 };
 
 pub(crate) type BxSymbolDeclarationAST = Box<SymbolDeclarationAST>;
@@ -56,11 +61,10 @@ pub(crate) struct VariableDeclarationAST {
 
 /// Common code for VariableDeclarationAST and SymbolDeclarationAST
 pub fn construct_symbol_from_decl(
-  symbols         : &mut HashMap<IString, Symbol>,
+  symbols         : &mut HashMap<IString, SymbolPtr>,
   sorts           : &mut SortCollection,
   name            : IString,
-  sort_spec       : Option<BxFunctorSortAST>,
-  arity           : i16,
+  sort_spec       : Option<BxSortIdAST>,
   attributes_ast  : Vec<AttributeAST>,
   symbol_type     : SymbolType,
 )
@@ -68,9 +72,9 @@ pub fn construct_symbol_from_decl(
   let sort_spec = sort_spec.map(|s| s.construct(sorts));
   // If an explicit arity is given, use it.
   let arity = match &sort_spec {
-    None => arity,
+    None => 0,
     Some(sort_spec) => {
-      max(arity, sort_spec.arity().into())
+      sort_spec.arity().into()
     }
   };
 

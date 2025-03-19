@@ -27,14 +27,14 @@ section titled, "Optimizations for Computing a Subsort Relation at Runtime."
 */
 
 use std::fmt::Display;
-use mod2_abs::{NatSet, IString};
+use mod2_abs::{NatSet, IString, UnsafePtr};
 use crate::{
   api::{built_in::get_built_in_sort, Arity},
   core::sort::kind::KindPtr,
 };
 
 /// A pointer to a sort. No ownership is assumed.
-pub type SortPtr  = *mut Sort;
+pub type SortPtr  = UnsafePtr<Sort>;
 /// A vector of pointers to `Sort`s. No ownership is assumed.
 pub type SortPtrs = Vec<SortPtr>;
 
@@ -81,8 +81,8 @@ pub struct Sort {
   //       `supersorts` is not but `subsorts` might be.
   pub leq_sorts :  NatSet,
 
-  // The connected component this sort belongs to.
-  pub kind: KindPtr, // This should be a weak reference
+  /// The connected component this sort belongs to.
+  pub kind: Option<KindPtr>,
 }
 
 // This is an abomination. See `api/built_in/mod.rs`.
@@ -98,7 +98,7 @@ impl Default for Sort {
       subsorts                  : SortPtrs::default(),
       supersorts                : SortPtrs::default(),
       leq_sorts                 : NatSet::default(),
-      kind                      : std::ptr::null_mut(),
+      kind                      : None,
     }
   }
 }
@@ -130,12 +130,9 @@ impl Sort {
 
 
   /// Antisymmetrically inserts `other` as a subsort of `self` and `self` as a supersort of `other`.
-  pub fn insert_subsort(&mut self, other: SortPtr) {
-    assert!(!other.is_null(), "other sort is null pointer");
+  pub fn insert_subsort(&mut self, mut other: SortPtr) {
     self.subsorts.push(other);
-    unsafe {
-      (*other).supersorts.push(self);
-    }
+    other.supersorts.push(UnsafePtr::new(self));
   }
 
   /// Compute the transitive closure of the subsort relation as stored in `self.leq_sorts`.
@@ -146,13 +143,13 @@ impl Sort {
   pub fn compute_leq_sorts(&mut self) {
     self.leq_sorts.insert(self.index_within_kind as usize);
     for subsort in self.subsorts.iter() {
-      let subsort_leq_sorts: &NatSet = unsafe { &(**subsort).leq_sorts };
+      let subsort_leq_sorts: &NatSet = &subsort.leq_sorts;
       self.leq_sorts.union_in_place(subsort_leq_sorts);
     }
 
     // Now determine `fast_compare_index`, the index for which all sorts with `index >= fast_compare_index` are subsorts.
     self.fast_compare_index = self.index_within_kind;
-    let total_sort_count    = unsafe {(*self.kind).sorts.len() as u32};
+    let total_sort_count    = unsafe {self.kind.unwrap_unchecked().sorts.len() as u32};
     for i in (self.index_within_kind..total_sort_count).rev() {
       if !self.leq_sorts.contains(i as usize) {
         self.fast_compare_index = i + 1;

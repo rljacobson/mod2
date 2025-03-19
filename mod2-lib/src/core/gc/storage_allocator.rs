@@ -21,7 +21,7 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use mod2_abs::{debug, info};
+use mod2_abs::{debug, heap_construct, info};
 use crate::{
   core::{
     gc::bucket::Bucket,
@@ -158,7 +158,7 @@ impl StorageAllocator {
 
     // Put it at the head of the bucket linked list
     new_bucket.next_bucket = self.bucket_list;
-    self.bucket_list       = Some(NonNull::new_unchecked(Box::into_raw(Box::new(new_bucket))));
+    self.bucket_list       = Some(NonNull::new_unchecked(heap_construct!(new_bucket)));
 
     t
   }

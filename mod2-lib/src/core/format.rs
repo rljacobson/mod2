@@ -23,7 +23,7 @@ impl_display_debug_for_formattable!(MyStruct)
 
 */
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 pub enum FormatStyle {

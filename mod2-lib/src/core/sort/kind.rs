@@ -57,7 +57,7 @@ use std::{
   ops::Deref
 };
 
-use mod2_abs::join_iter;
+use mod2_abs::{heap_construct, join_iter, UnsafePtr};
 
 use crate::{
   core::{
@@ -70,15 +70,15 @@ use crate::{
     }
   }
 };
+use crate::core::sort::Sort;
 
 // Convenience types
 /// Each `Sort` holds a `KindPtr` to its `Kind`. However, it isn't clear if the `KindPtr` is ever dereferenced,
 /// especially once the subsort relation is closed. Rather, `KindPtr` is just used as an identifier for the `Kind`.
-pub type KindPtr = *mut Kind;
+pub type KindPtr = UnsafePtr<Kind>;
 /// A Boxed kind to indicate owned heap-allocated memory.
 pub type BxKind  = Box<Kind>;
 
-#[derive(Debug)]
 pub struct Kind {
   /// The count of sorts that are maximal.
   pub maximal_sort_count: u32,
@@ -91,8 +91,7 @@ pub struct Kind {
 
 impl Kind {
   /// Returns a boxed Kind.
-  pub unsafe fn new(initial_sort: SortPtr) -> Result<BxKind, KindError> {
-
+  pub fn new(initial_sort: SortPtr) -> Result<BxKind, KindError> {
     let mut kind: BxKind = Box::new(
       Kind {
         error_free        : true,
@@ -101,34 +100,30 @@ impl Kind {
         sorts             : vec![],
       }
     );
-    /*
-    It's not clear how error sorts are used. They have the same name as `initial_sort`,
-    and there is one for each Kind. They are registered as a sort in the `Kind`. It does
-    increment `Kind.sort_count`. It is a supersort of every sort in the kind.
 
-    The `ERROR_SORT` is a `SpecialSorts` enum variant, not a `Sort`.
-
-      // Save initial sort so that we have a name for the component and its error sort.
-      // The error sort of each component is added to the module.
-      let error_sort = Sort::new((*sort).name);
-
-    */
 
     /*
     We walk the sorts graph, as determined by the adjacency lists in the sorts,
     adding any new sorts we visit to the kind.
     */
-
-
     // Keep count of sorts in kind to detect cycles
     let mut visited_sort_count: u32 = 0;
 
+    // Save initial sort so that we have a name for the component and its error sort.
+    // The error sort of each component is added to the module.
+    
+    let mut error_sort = SortPtr::new(heap_construct!(Sort::new(initial_sort.name.clone())));
+
     // Recursively call `register_connected_sorts` on sub- and supersorts.
+    kind.register_connected_sorts(error_sort, &mut visited_sort_count);
     kind.register_connected_sorts(initial_sort, &mut visited_sort_count);
 
-    if visited_sort_count == 0 {
-      // ToDo: Recording the error here might not be necessary considering we are returning the `Kind` wrapped in an error.
-      // The error is that the connected component in the sort graph that contains `initial_sort` has no maximal sorts due to a cycle.
+    if visited_sort_count == 1 {
+      // ToDo: Recording the error here might not be necessary considering we are returning the `Kind` wrapped in an 
+      //       error.
+      
+      // The error is that the connected component in the sort graph that contains `initial_sort` has no maximal sorts 
+      // due to a cycle.
       kind.error_free = false;
       // Instead of marking the `Module` bad here, we return the constructed `Kind` wrapped in an error. The caller can
       // log the error.
@@ -143,16 +138,16 @@ impl Kind {
     }
 
     // Make every sort in the kind a subsort of the error sort.
-    // for i in 1..=kind.maximal_sort_count as usize {
-    //   error_sort.insert_subsort(kind.sorts[i]);
-    // }
+    for i in 1..=kind.maximal_sort_count as usize {
+      error_sort.insert_subsort(kind.sorts[i]);
+    }
 
     // Process subsorts. Length of `kind.sorts` may increase.
     {
       let mut i = 0;
       loop {
         if i >= kind.sorts.len() { break; }
-        (*kind).process_subsorts((*kind).sorts[i]);
+        kind.process_subsorts(kind.sorts[i]);
         i += 1
       }
     }
@@ -170,36 +165,36 @@ impl Kind {
     // Now that the entire connected component is included in the Kind, complete the
     // transitive closure of the subsort relation.
     for i in (0..visited_sort_count).rev() {
-      (*kind.sorts[i as usize]).compute_leq_sorts();
+      kind.sorts[i as usize].compute_leq_sorts();
     }
 
     Ok(kind)
   }
 
   /// A helper function for computing the closure of the kind. The `visited_sort_count` is for cycle detection. If we visit more nodes (sorts) than we have, one of the nodes must have been visited twice.
-  unsafe fn register_connected_sorts(&mut self, sort: SortPtr, visited_sort_count: &mut u32) {
-    (*sort).kind = self;
+  fn register_connected_sorts(&mut self, mut sort: SortPtr, visited_sort_count: &mut u32) {
+    sort.kind = Some(KindPtr::new(self));
     *visited_sort_count += 1;
 
     { // Visit subsorts
-      let subsort_count = (*sort).subsorts.len();
+      let subsort_count = sort.subsorts.len();
       for i in 0..subsort_count {
-        let s = (*sort).subsorts[i];
-        if (*s).kind.is_null() {
+        let s = sort.subsorts[i];
+        if s.kind.is_none() {
           self.register_connected_sorts(s, visited_sort_count);
         }
       }
     }
 
     { // Visit supersorts
-      let supersort_count = (*sort).supersorts.len();
+      let supersort_count = sort.supersorts.len();
       if supersort_count == 0 {
-        (*sort).index_within_kind = self.append_sort(sort);
+        sort.index_within_kind = self.append_sort(sort);
       } else {
-        (*sort).index_within_kind = supersort_count as u32;
+        sort.index_within_kind = supersort_count as u32;
         // ToDo: I think sort.supersorts is not mutated, so this should be an iterator.
-        for &s in (*sort).supersorts.iter() {
-          if (*s).kind.is_null() {
+        for &s in sort.supersorts.iter() {
+          if s.kind.is_none() {
             self.register_connected_sorts(s, visited_sort_count);
           }
         }
@@ -208,15 +203,17 @@ impl Kind {
   }
 
   /// Auxiliary method to construct the sort lattice
-  unsafe fn process_subsorts(&mut self, sort: SortPtr) {
-    assert!(!sort.is_null(), "tried to process subsorts of a null porter to a sort");
-    for subsort in (*sort).subsorts.iter() {
-      assert!(!subsort.is_null(), "discovered a null subsort pointer");
-      // We "resolve" `self` as a supersort for each of `self`'s subsorts. If `self` is the last unresolved supersort for the subsort, it is finally time to add the subsort to its kind. This ensures all supersorts of that subsort have been "resolved" before the subsort is added.
-      (**subsort).index_within_kind -= 1;
-      if (**subsort).index_within_kind == 0 {
-        // All supersorts resolved, so add to kind. There is a symmetric statement for subsorts in `Kind::register_connected_sorts`
-        (**subsort).index_within_kind = self.append_sort(*subsort);
+  fn process_subsorts(&mut self, mut sort: SortPtr) {
+    for subsort in sort.subsorts.iter_mut() {
+      // We "resolve" `self` as a supersort for each of `self`'s subsorts. If
+      // `self` is the last unresolved supersort for the subsort, it is finally
+      // time to add the subsort to its kind. This ensures all supersorts
+      // of that subsort have been "resolved" before the subsort is added.
+      subsort.index_within_kind -= 1;
+      if subsort.index_within_kind == 0 {
+        // All supersorts resolved, so add to kind. There is a symmetric statement 
+        // for subsorts in `Kind::register_connected_sorts`
+        subsort.index_within_kind = self.append_sort(*subsort);
       }
     }
   }
@@ -231,7 +228,14 @@ impl Kind {
 
 impl Display for Kind {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let iter = self.sorts.iter().map(|s_ptr| unsafe{ (**s_ptr).name.deref() });
+    let iter = self.sorts.iter().map(|sort_ptr| sort_ptr.name.deref());
     write!(f, "{{{}}}", join_iter(iter, |_| ", ").collect::<String>())
+  }
+}
+
+impl Debug for Kind {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    let iter = self.sorts.iter().map(|sort_ptr| sort_ptr.name.deref());
+    write!(f, "Kind{{{}}}", join_iter(iter, |_| ", ").collect::<String>())
   }
 }

@@ -12,11 +12,6 @@ use std::{
 };
 
 use crate::{
-  core::{
-    symbol_core::SymbolCore,
-    format::{FormatStyle, Formattable},
-    term_core::TermCore
-  },
   api::{
     dag_node::{DagNode, DagNodePtr},
     symbol::Symbol,
@@ -26,6 +21,11 @@ use crate::{
       Float,
       Integer
     }
+  },
+  core::{
+    symbol_core::SymbolCore,
+    format::{FormatStyle, Formattable},
+    term_core::TermCore
   },
 };
 
@@ -73,7 +73,7 @@ impl<T: Any + Display> Term for NATerm<T> {
     todo!()
   }
 
-  fn normalize(&mut self, full: bool) -> (u32, bool) {
+  fn normalize(&mut self, _full: bool) -> (u32, bool) {
     todo!()
   }
 

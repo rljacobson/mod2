@@ -31,16 +31,15 @@ pub fn acquire_root_list() -> MutexGuard<'static, AtomicPtr<RootContainer>> {
 pub struct RootContainer {
   next: Option<NonNull<RootContainer>>,
   prev: Option<NonNull<RootContainer>>,
-  node: NonNull<dyn DagNode>
+  node: DagNodePtr
 }
 
 unsafe impl Send for RootContainer {}
 
 impl RootContainer {
   pub fn new(node: DagNodePtr) -> Box<RootContainer> {
-    assert!(!node.is_null());
 
-    let node: NonNull<dyn DagNode> = NonNull::new(node).unwrap();
+    // let node: NonNull<dyn DagNode> = NonNull::new(node).unwrap();
     let mut container = Box::new(RootContainer {
       next: None,
       prev: None,
@@ -51,9 +50,7 @@ impl RootContainer {
   }
 
   pub fn mark(&mut self) {
-    unsafe {
-      self.node.as_mut().mark();
-    }
+    self.node.mark();
   }
 
   pub fn link(&mut self){

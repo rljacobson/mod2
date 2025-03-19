@@ -29,7 +29,7 @@ use mod2_abs::{
   heap_destroy,
 };
 use mod2_lib::{
-  api::symbol_core::SymbolPtr,
+  api::symbol::SymbolPtr,
   core::{
     pre_equation::PreEquation,
     sort::{
@@ -90,15 +90,15 @@ impl Module {
 
   ToDo: It would be nice if this method were idempotent. Low priority.
   */
-  pub unsafe fn compute_kind_closures(&mut self) {
+  pub fn compute_kind_closures(&mut self) {
     assert_eq!(self.status, ModuleStatus::Open, "tried to compute kind closure when module status is not open");
 
     for (_, sort) in
         self.sorts
             .iter()
-            .filter(|(_, sort_ptr)| unsafe{ (**sort_ptr).kind.is_null() })
+            .filter(|(_, sort_ptr)| sort_ptr.kind.is_none())
     {
-      let kind = unsafe { Kind::new(sort) };
+      let kind = Kind::new(sort);
       let mut kind = kind.unwrap_or_else(
         | kind_error | {
           // Maude sets the "is_bad" flag of a module in the case of a cycle in the Sort graph.
@@ -115,6 +115,8 @@ impl Module {
           }
         }
       );
+      // The kind creates a maximal error sort as its first element that we have to add to the module.
+      self.sorts.insert(kind[0]);
 
       // Maude sets the index_in_parent of the kind here.
       self.kinds.push(kind);
@@ -170,12 +172,12 @@ impl Module {
 }
 
 impl Drop for Module {
-  /// A module owns its symbols, which are raw pointers to allocated memory. The module must reclaim this owned memory
-  /// when it is dropped.
+  /// A module owns its symbols and kinds, which are raw pointers to allocated memory. The module must reclaim this 
+  /// owned memory when it is dropped.
   fn drop(&mut self) {
     for (_, symbol_ptr) in self.symbols.iter() {
       unsafe {
-        heap_destroy!(*symbol_ptr);
+        heap_destroy!(symbol_ptr.as_mut_ptr());
       }
     }
   }

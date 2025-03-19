@@ -22,7 +22,7 @@ use crate::{
 pub type BxSortSpec = Box<SortSpec>;
 
 /// A generalization of a `Sort` that additionally permits functors.
-#[derive(Eq, PartialEq, Hash, Default)]
+#[derive(Eq, PartialEq, Default)]
 pub enum SortSpec {
   Sort(SortPtr),
   // arg1_sort arg2_sort -> target_sort
@@ -40,10 +40,7 @@ impl SortSpec {
     match self {
 
       SortSpec::Sort(sort) => {
-        assert!(!sort.is_null());
-        unsafe {
-          (**sort).arity()
-        }
+        sort.arity()
       },
 
       SortSpec::Functor { arg_sorts, ..} => Arity::Value(arg_sorts.len() as u16),
@@ -62,13 +59,12 @@ impl Display for SortSpec {
     match self {
 
       SortSpec::Sort(sort) => {
-        assert!(!sort.is_null());
-        write!(f, "{}", unsafe{ &*(*sort) })
+        write!(f, "{}", sort)
       }
 
       SortSpec::Functor { arg_sorts, target_sort} => {
-        let arg_string = join_string(arg_sorts.iter().map(|p| unsafe{&*(*p)}), " ");
-        write!(f, "{} -> {}", arg_string, unsafe{ &*(*target_sort) })
+        let arg_string = join_string(arg_sorts.iter(), " ");
+        write!(f, "{} -> {}", arg_string, target_sort)
       }
 
       SortSpec::Any => {

@@ -9,15 +9,21 @@ mod nonalgebraic_symbol;
 
 use std::{
   collections::HashMap,
-  sync::Arc
+  sync::Arc,
+  marker::PhantomData
 };
-use std::marker::PhantomData;
 use once_cell::sync::Lazy;
 use mod2_abs::IString;
 
 use crate::{
   api::{
+    built_in::nonalgebraic_symbol::{
+      BoolSymbol, 
+      NASymbol, 
+      StringSymbol
+    },
     Arity,
+    symbol::SymbolPtr
   },
   core::{
     sort::{
@@ -27,13 +33,11 @@ use crate::{
     symbol_core::{
       SymbolAttribute,
       SymbolAttributes,
-      SymbolType
+      SymbolType,
+      SymbolCore
     }
   }
 };
-use crate::api::built_in::nonalgebraic_symbol::{BoolSymbol, NASymbol, StringSymbol};
-use crate::api::symbol::SymbolPtr;
-use crate::core::symbol_core::SymbolCore;
 
 
 // Built-in Types
@@ -149,11 +153,12 @@ static BUILT_IN_SYMBOLS: Lazy<Arc<HashMap<IString, SymbolPtr>>> = Lazy::new(|| {
 pub fn get_built_in_sort(name: &str) -> Option<SortPtr> {
   let name = IString::from(name);
   let sort: &Sort = BUILT_IN_SORTS.get(&name)?;
-  Some((sort as *const Sort) as *mut Sort)
+  
+  Some(SortPtr::new((sort as *const Sort) as *mut Sort))
 }
 
 pub fn get_built_in_symbol(name: &str) -> Option<SymbolPtr> {
   let name = IString::from(name);
-  let symbol: SymbolPtr = BUILT_IN_SYMBOLS.get(&name)?;
+  let symbol: SymbolPtr = *BUILT_IN_SYMBOLS.get(&name)?;
   Some(symbol)
 }
