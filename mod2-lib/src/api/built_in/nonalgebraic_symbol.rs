@@ -1,10 +1,23 @@
-use std::fmt::{Debug, Display};
-use std::marker::PhantomData;
-use crate::api::built_in::{Bool, Float, Integer};
-use crate::api::built_in::nonalgebraic_term::NATerm;
-use crate::api::symbol::Symbol;
-use crate::core::sort::SortPtr;
-use crate::core::symbol_core::{SymbolAttribute, SymbolCore, SymbolType};
+use std::{
+  fmt::{Debug, Display},
+  marker::PhantomData
+};
+
+use crate::{
+  api::{
+    built_in::{
+      nonalgebraic_term::NATerm,
+      Bool,
+      Float,
+      Integer
+    },
+    symbol::Symbol,
+  },
+  core::{
+    sort::SortPtr,
+    symbol_core::{SymbolAttribute, SymbolCore, SymbolType}
+  },
+};
 
 pub type StringSymbol  = NASymbol<String>;
 pub type FloatSymbol   = NASymbol<Float>;

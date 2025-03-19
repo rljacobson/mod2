@@ -1,9 +1,17 @@
 /*!
 
-An `UnsafeRef` is a smart pointer type that subverts Rust's borrowing and safety rules. It wraps a
+An `UnsafePtr<T>` is a smart pointer type that subverts Rust's borrowing and safety rules. It wraps a
 raw pointer to memory that it does not manage. This type is fundamentally unsafe and should only be
 used in circumstances where the programmer can guarantee that the memory pointed to by the raw
-pointer is valid for the lifetime of the `UnsafeRef`.
+pointer is valid for the lifetime of the `UnsafePtr<T>`.
+
+Equality semantics of `UnsafePtr<T>` are semantics of fat pointer equality: Two `UnsafePtr<T>`s are
+equal if they point to the same address *and* have the same vtable pointer. Rust pointers are in general
+fat pointers, which consist of a pointer to a vtable and an address pointer. An `UnsafePtr<dyn Symbol>`
+and an `UnsafePtr<dyn Formattable>` can point to the same address but have different bit patterns,
+because they have different vtables.
+
+For address equality semantics, use `UnsafePtr<T>::add_eq`.
 
 */
 
@@ -11,13 +19,22 @@ use std::{
   fmt::{Display, Formatter, Debug},
   ops::{Deref, DerefMut}
 };
+use std::ptr::NonNull;
 
-
-#[derive(Eq, PartialEq)]
 pub struct UnsafePtr<T: ?Sized> {
-  ptr: *mut T,
+  ptr: NonNull<T>,
 }
 
+// For some reason the compiler can't tell the type is `PartialEq` and `Eq` when they are derived.
+/// Equality semantics of `UnsafePtr<T>` are semantics of fat pointer equality.
+impl<T: ?Sized> PartialEq for UnsafePtr<T> {
+  fn eq(&self, other: &Self) -> bool {
+    std::ptr::eq(self.ptr.as_ptr(),  other.ptr.as_ptr())
+  }
+}
+impl<T: ?Sized> Eq for UnsafePtr<T> {}
+
+// For some reason the compiler can't tell the type is `Copy` and `Clone` when they are derived.
 impl<T: ?Sized> Clone for UnsafePtr<T> {
   fn clone(&self) -> Self {
     Self{
@@ -26,27 +43,33 @@ impl<T: ?Sized> Clone for UnsafePtr<T> {
   }
 }
 impl<T: ?Sized> Copy for UnsafePtr<T> {}
+
+// ToDo: Audit usages for thread safety.
 unsafe impl<T: ?Sized> Sync for UnsafePtr<T> {}
 unsafe impl<T: ?Sized> Send for UnsafePtr<T> {}
 
 impl<T: ?Sized> UnsafePtr<T> {
   pub fn new(ptr: *mut T) -> Self {
     assert!(!ptr.is_null());
-    Self { ptr }
+    Self { ptr: unsafe{ NonNull::new_unchecked(ptr) } }
   }
 
   pub fn as_ptr(&self) -> *const T {
-    self.ptr
+    self.ptr.as_ptr()
   }
 
   pub fn as_mut_ptr(&self) -> *mut T {
-    self.ptr
+    self.ptr.as_ptr()
   }
-  
-  pub fn addr_eq<U>(&self, rhs: &Self) -> bool
-      where U: Deref<Target=T>
-  {
-    std::ptr::addr_eq(self.ptr, rhs.ptr)
+
+  pub fn addr_eq(&self, rhs: UnsafePtr<T>) -> bool {
+    std::ptr::addr_eq(self.ptr.as_ptr(), rhs.ptr.as_ptr())
+  }
+
+  /// If `self` and `rhs` are both pointers to the same dyn trait type, this method can tell you if they have the same
+  /// concrete type. Warning: This is not reliable for determining if the concrete types are different. 
+  pub fn vtable_eq(&self, rhs: UnsafePtr<T>) -> bool {
+    std::ptr::metadata(self.ptr.as_ptr()) == std::ptr::metadata(rhs.ptr.as_ptr())
   }
 }
 
@@ -54,25 +77,25 @@ impl<T: ?Sized> Deref for UnsafePtr<T> {
   type Target = T;
 
   fn deref(&self) -> &Self::Target {
-    unsafe { &*self.ptr }
+    unsafe { self.ptr.as_ref() }
   }
 }
 
 impl<T: ?Sized> DerefMut for UnsafePtr<T> {
   fn deref_mut(&mut self) -> &mut Self::Target {
-    unsafe { &mut *self.ptr }
+    unsafe { self.ptr.as_mut() }
   }
 }
 
 impl<T: Display + ?Sized> Display for UnsafePtr<T> {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    Display::fmt(unsafe { &*self.ptr }, f)
+    Display::fmt(unsafe { self.ptr.as_ref() }, f)
   }
 }
 
 impl<T: Debug + ?Sized> Debug for UnsafePtr<T> {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    Debug::fmt(unsafe { &*self.ptr }, f)
+    Debug::fmt(unsafe { self.ptr.as_ref() }, f)
   }
 }
 
@@ -90,6 +113,11 @@ mod test {
     let mut x_ref = UnsafePtr::new(&mut x as *mut i32);
     let mut y_ref = UnsafePtr::new(&mut y as *mut i32);
     let mut z_ref = UnsafePtr::new(&mut z as *mut i32);
+
+    let maybe_x: Option<UnsafePtr<i32>> = None;
+
+    println!("size of UnsafePtr<i32>: {}", size_of::<UnsafePtr<i32>>());
+    println!("size of Option<UnsafePtr<i32>>: {}", size_of::<Option<UnsafePtr<i32>>>());
 
     assert_eq!(*x_ref, 10);
     assert_eq!(*y_ref, 20);

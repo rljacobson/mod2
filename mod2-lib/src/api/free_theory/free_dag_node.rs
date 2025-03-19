@@ -5,7 +5,7 @@ use std::{
     Ordering
   }
 };
-
+use std::ops::DerefMut;
 use crate::{
   core::{
     gc::{
@@ -21,7 +21,7 @@ use crate::{
     }
   },
   api::{
-    symbol_core::SymbolPtr,
+    symbol::SymbolPtr,
     dag_node::{
       DagNodeVector,
       DagNodeVectorRefMut,
@@ -39,17 +39,14 @@ pub struct FreeDagNode(DagNodeCore);
 impl FreeDagNode {
 
   pub fn new(symbol: SymbolPtr) -> DagNodePtr {
-    assert!(!symbol.is_null());
     DagNodeCore::with_theory(symbol, DagNodeTheory::Free)
   }
 
   pub fn with_args(symbol: SymbolPtr, args: &mut Vec<DagNodePtr>) -> DagNodePtr {
-    assert!(!symbol.is_null());
-    let node     = DagNodeCore::with_theory(symbol, DagNodeTheory::Free);
-    let node_mut = unsafe{ &mut *node };
+    let mut node = DagNodeCore::with_theory(symbol, DagNodeTheory::Free);
 
-    node_mut.set_flags(DagNodeFlag::NeedsDestruction.into());
-    node_mut.core_mut().args = (DagNodeVector::from_slice(args) as *mut DagNodeVector) as *mut u8;
+    node.set_flags(DagNodeFlag::NeedsDestruction.into());
+    node.core_mut().args = (DagNodeVector::from_slice(args) as *mut DagNodeVector) as *mut u8;
 
     node
   }

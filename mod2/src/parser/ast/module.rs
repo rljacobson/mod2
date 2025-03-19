@@ -14,9 +14,9 @@ use mod2_lib::{
     },
     sort::collection::SortCollection
   },
-  api::symbol_core::{Symbol, SymbolType},
+  api::symbol::Symbol,
 };
-
+use mod2_lib::core::symbol_core::SymbolType;
 use crate::{
   module::{BxModule, Module},
   parser::{
@@ -107,7 +107,6 @@ impl ModuleAST {
         &mut sorts,
         var_decl.name,
         var_decl.sort,
-        var_decl.arity,
         var_decl.attributes,
         SymbolType::Variable
       );

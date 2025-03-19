@@ -1,6 +1,7 @@
+use std::sync::{LazyLock, Mutex};
 use rand::Rng;
 
-use mod2_abs::IString;
+use mod2_abs::{heap_construct, IString};
 
 use crate::{
   core::{
@@ -9,12 +10,12 @@ use crate::{
       root_container::RootContainer,
       node_allocator::acquire_node_allocator
     },
-    dag_node_core::{DagNodeCore, DagNodeTheory},
+    dag_node_core::{DagNodeCore, DagNodeTheory, ThinDagNodePtr},
     symbol_core::{SymbolAttributes, SymbolType},
   },
   api::{
     dag_node::{DagNode, DagNodePtr},
-    free_theory::FreeDagNode,
+    free_theory::{FreeDagNode, FreeSymbol},
     symbol::{
       Symbol,
       SymbolPtr
@@ -22,6 +23,10 @@ use crate::{
     Arity
   },
 };
+
+// ToDo: Figure out why multithreading breaks the tests.
+// Force GC tests to run serially for consistent behavior.
+static TEST_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
 
 /*
 Recursively builds a random tree of `DagNode`s with a given height and arity rules.
@@ -34,7 +39,7 @@ the building of the tree. Run the GC before or after.
  - `max_height`: Maximum allowed height for the tree.
 */
 pub fn build_random_tree(
-  symbols   : &mut [Symbol],
+  symbols   : &mut [SymbolPtr],
   parent    : DagNodePtr,
   max_height: usize,
   max_width : usize,
@@ -51,7 +56,7 @@ pub fn build_random_tree(
   let mut rng   = rand::rng();
 
   // Get the parent node's arity from its symbol
-  let parent_arity = if let Arity::Value(v) = unsafe { (*parent).arity() } { v as usize } else { 0 };
+  let parent_arity = if let Arity::Value(v) = parent.arity() { v as usize } else { 0 };
 
   // For each child based on the parent's arity, create a new node
   for i in 0..parent_arity as usize {
@@ -63,18 +68,15 @@ pub fn build_random_tree(
     };
 
     // Create the child node with the symbol corresponding to its arity
-    let child_symbol: SymbolPtr = &mut symbols[child_arity];
+    let child_symbol: SymbolPtr = symbols[child_arity];
     let child_node   = FreeDagNode::new(child_symbol);
 
     // Insert the child into the parent node
-    let parent_mut = unsafe{ parent.as_mut_unchecked() };
+    let mut parent_mut = parent;
     if let Arity::Value(v) = parent_mut.arity(){
       if i > v as usize {
         panic!("Incorrect arity");
       }
-
-
-
     }
     parent_mut.insert_child(child_node);
 
@@ -89,11 +91,7 @@ pub fn build_random_tree(
 /// - `prefix`: The string prefix to apply to the current node's line.
 /// - `is_tail`: Whether the current node is the last child of its parent.
 pub fn print_tree(node: DagNodePtr, prefix: String, is_tail: bool) {
-  assert!(!node.is_null());
-
   let is_head = prefix.is_empty();
-  let node: &dyn DagNode = unsafe{ &*node };
-
   let arity = if let Arity::Value(v) = node.arity() {
     v
   } else {
@@ -137,12 +135,20 @@ pub fn print_tree(node: DagNodePtr, prefix: String, is_tail: bool) {
   }
 }
 
-
+fn make_symbols() -> Vec<SymbolPtr> {
+  (0..=10).map(|x| {
+            // let name = IString::from(format!("sym({})", x).as_str());
+            let name = IString::from("sym");
+            SymbolPtr::new(heap_construct!(FreeSymbol::with_arity(name, Arity::Value(x))))
+          })
+      .collect::<Vec<_>>()
+}
 
 #[test]
 fn test_allocate_dag_node() {
-  let node_ptr = allocate_dag_node();
-  let node_mut = match unsafe { node_ptr.as_mut() } {
+  let _guard = TEST_MUTEX.lock();
+  let node_ptr: ThinDagNodePtr   = allocate_dag_node();
+  let node_mut: &mut DagNodeCore = match unsafe { node_ptr.as_mut() } {
     None => {
       panic!("allocate_dag_node returned None");
     }
@@ -155,15 +161,10 @@ fn test_allocate_dag_node() {
 
 #[test]
 fn test_dag_creation() {
-  let mut symbols = (0..=10)
-      .map(|x| {
-        // let name = IString::from(format!("sym({})", x).as_str());
-        let name = IString::from("sym");
-        Symbol::with_arity(name, Arity::Value(x))
-      })
-      .collect::<Vec<_>>();
+  let _guard = TEST_MUTEX.lock();
+  let mut symbols = make_symbols();
 
-  let root = FreeDagNode::new(&mut symbols[3]);
+  let root = FreeDagNode::new(symbols[3]);
   let _root_container = RootContainer::new(root);
 
   // Maximum tree height
@@ -181,18 +182,14 @@ fn test_dag_creation() {
 
 #[test]
 fn test_garbage_collection() {
-  let mut symbols = (0..=10)
-      .map(|x| {
-        let name = IString::from(format!("sym({})", x).as_str());
-        Symbol::with_arity(name, Arity::Value(x))
-      })
-      .collect::<Vec<_>>();
+  let _guard = TEST_MUTEX.lock();
+  let mut symbols = make_symbols();
 
   for _ in 0..100 {
     let mut root_vec = Vec::with_capacity(10);
 
     for _ in 0..10 {
-      let root: DagNodePtr = DagNodeCore::new(&mut symbols[4]);
+      let root: DagNodePtr = DagNodeCore::new(symbols[4]);
       let root_container = RootContainer::new(root);
       root_vec.push(root_container);
 
@@ -214,10 +211,11 @@ fn test_garbage_collection() {
 
 #[test]
 fn test_arena_exhaustion() {
-  let mut symbol = Symbol::with_arity(IString::from("mysymbol"), Arity::Value(1));
-  let symbol_ptr = &mut symbol;
+  let _guard = TEST_MUTEX.lock();
+  let symbol = FreeSymbol::with_arity(IString::from("mysymbol"), Arity::Value(1));
+  let symbol_ptr = SymbolPtr::new(heap_construct!(symbol));
   let root: DagNodePtr = DagNodeCore::new(symbol_ptr);
-  println!("root: {:p}", root);
+  println!("root: {}", root);
 
   let _root_container = RootContainer::new(root);
 
@@ -235,10 +233,8 @@ fn test_arena_exhaustion() {
     };
     node_mut.theory_tag = DagNodeTheory::Free;
     let node_ptr = DagNodeCore::upgrade(node_ptr);
-    unsafe {
-      (&mut*last_node).insert_child(node_ptr);
-    }
-    last_node     = node_ptr;
+    last_node.insert_child(node_ptr);
+    last_node    = node_ptr;
   }
 
 }

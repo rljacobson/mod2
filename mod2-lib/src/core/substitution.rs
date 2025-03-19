@@ -112,7 +112,7 @@ impl Substitution {
     for (idx, (i, j)) in self.bindings.iter().zip(original.iter()).enumerate() {
       assert!(j.is_none() || i == j, "substitution inconsistency at index {}", idx);
       if let (Some(a), Some(b)) = (i, j) {
-        if !std::ptr::addr_eq(*a, *b) {
+        if !a.addr_eq(*b) {
           local_bindings.add_binding(idx as i32, *a);
         }
       }
@@ -172,8 +172,7 @@ impl Substitution {
 
 pub fn print_substitution_dag(substitution: &[DagNodePtr], variable_info: &NarrowingVariableInfo) {
   for (i, var) in variable_info.iter() {
-    let binding = unsafe { &*substitution[i] };
-    let var     = unsafe { &*var };
+    let binding = substitution[i];
 
     println!("{} --> {}", var, binding);
   }
@@ -183,10 +182,10 @@ pub fn print_substitution_narrowing(substitution: &Substitution, variable_info: 
   let variable_count = substitution.fragile_binding_count();
 
   for i in 0..variable_count {
-    let var = unsafe{ &*variable_info.index_to_variable(i).unwrap() };
+    let var = variable_info.index_to_variable(i).unwrap();
     let binding = substitution.value(i);
     assert!(binding.is_some(), "A variable is bound to None. This is a bug.");
-    let binding = unsafe{ &*binding.unwrap() };
+    let binding = binding.unwrap();
     println!("{} --> {}", var, binding);
   }
 }
@@ -212,8 +211,7 @@ pub fn print_substitution_with_ignored(substitution: &Substitution, var_info: &V
         println!("(unbound)");
       }
       Some(binding) => {
-        let binding_ref = unsafe{ &*binding };
-        println!("{}", binding_ref);
+        println!("{}", binding);
         printed_variable = true;
       }
     }

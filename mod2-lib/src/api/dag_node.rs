@@ -10,38 +10,36 @@ Requirements of implementers of `DagNode`:
 */
 
 use std::{
-  rc::Rc,
-  fmt::{Display, Formatter},
-  cmp::Ordering,
   any::Any,
-  iter::Iterator
+  cmp::{max, Ordering},
+  fmt::{Display, Formatter},
+  iter::Iterator,
+  ops::Deref,
+  rc::Rc,
 };
-use std::cmp::max;
-use std::ops::Deref;
-use crate::{
-  api::{
-    Arity,
+use std::ops::DerefMut;
+use mod2_abs::UnsafePtr;
+use crate::{api::{
+  Arity,
+  symbol::SymbolPtr
+}, core::{
+  gc::{
+    gc_vector::{GCVector, GCVectorRefMut},
+    increment_active_node_count
   },
-  core::{
-    gc::{
-      gc_vector::{GCVector, GCVectorRefMut},
-      increment_active_node_count
-    },
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlag,
-      DagNodeFlags,
-      ThinDagNodePtr
-    },
-    sort::{SortPtr, SpecialSort},
-    symbol_core::SymbolCore
-  }
-};
-use crate::api::symbol::SymbolPtr;
-use crate::core::format::{FormatStyle, Formattable};
+  dag_node_core::{
+    DagNodeCore,
+    DagNodeFlag,
+    DagNodeFlags,
+    ThinDagNodePtr
+  },
+  sort::{SortPtr, SpecialSort},
+  symbol_core::SymbolCore,
+  format::{FormatStyle, Formattable}
+}, impl_display_debug_for_formattable};
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
-pub type DagNodePtr    = *mut dyn DagNode;
+pub type DagNodePtr    = UnsafePtr<dyn DagNode + 'static>;
 pub type DagNodeVector = GCVector<DagNodePtr>;
 pub type DagNodeVectorRefMut = GCVectorRefMut<DagNodePtr>;
 
@@ -80,7 +78,7 @@ pub trait DagNode {
 
   #[inline(always)]
   fn arity(&self) -> Arity {
-    self.symbol().arity()
+    self.core().arity()
   }
 
 
@@ -117,12 +115,11 @@ pub trait DagNode {
 
   /// MUST override if Self::args is not a `DagNodeVector`
   fn insert_child(&mut self, new_child: DagNodePtr){
-    assert!(!new_child.is_null());
     // ToDo: Should we signal if arity is exceeded and/or DagNodeVector needs to reallocate?
 
     // Empty case
     if self.core().args.is_null() {
-      self.core_mut().args = new_child as *mut u8;
+      self.core_mut().args = new_child.as_mut_ptr() as *mut u8;
     } // Vector case
     else if self.core().needs_destruction() {
       let node_vec: DagNodeVectorRefMut = arg_to_node_vec(self.core_mut().args);
@@ -193,7 +190,6 @@ pub trait DagNode {
   /// Set the sort to best of original and other sorts
   #[inline(always)]
   fn upgrade_sort_index(&mut self, other: DagNodePtr) {
-    let other = unsafe{ &*other };
     //  We set the sort to best of original and other sorts; that is:
     //    SORT_UNKNOWN, SORT_UNKNOWN -> SORT_UNKNOWN
     //    SORT_UNKNOWN, valid-sort -> valid-sort
@@ -248,8 +244,7 @@ pub trait DagNode {
 
   /// Defines a partial order on `DagNode`s by comparing the symbols and the arguments recursively.
   fn compare(&self, other: DagNodePtr) -> Ordering {
-    let other_ref = unsafe{ &*other };
-    let symbol_order = self.symbol().compare(other_ref.symbol());
+    let symbol_order = self.symbol().compare(&*other.symbol());
 
     match symbol_order {
       Ordering::Equal => self.compare_arguments(other),
@@ -259,15 +254,14 @@ pub trait DagNode {
 
   /// MUST be overridden is `Self::args` something other than a `DagNodeVector`.
   fn compare_arguments(&self, other: DagNodePtr) -> Ordering {
-    let other  = unsafe { &*other };
     let symbol = self.symbol();
 
-    assert!(symbol == other.symbol(), "symbols differ");
+    assert_eq!(symbol, other.symbol(), "symbols differ");
 
     if other.core().theory_tag != self.core().theory_tag {
-      // if let None = other.as_any().downcast_ref::<FreeDagNode>() {
+      // if let None = other.as_any().downcast_ref::<FreeDagNode>() {}
       // Not even the same theory. It's not clear what to return in this case, so just compare symbols.
-      return symbol.compare(other.symbol());
+      return symbol.compare(&*other.symbol());
     };
 
     if (true, true) == (self.core().args.is_null(), other.core().args.is_null()) {
@@ -280,10 +274,9 @@ pub trait DagNode {
         let other_child_ptr: DagNodePtr = arg_to_dag_node(other.core().args);
 
         // Fast bail on equal pointers.
-        if std::ptr::addr_eq(self_child, other_child_ptr) {
+        if self_child.addr_eq(other_child_ptr){
           return Ordering::Equal; // Points to same node
         }
-        let self_child = unsafe{ &*self_child };
 
         return self_child.compare(other_child_ptr);
       }
@@ -305,12 +298,11 @@ pub trait DagNode {
         // Maude structures this so that it's tail call optimized, but we don't have that guarantee.
         for (&p, &q) in self_arg_vec.iter().zip(other_arg_vec.iter()) {
           // Fast bail on equal pointers.
-          if std::ptr::addr_eq(p, q) {
+          if p.addr_eq(q) {
             continue; // Points to same node
           }
 
-          let p_child: &dyn DagNode = unsafe { &*p };
-          let result = p_child.compare(q);
+          let result = p.compare(q);
 
           if result.is_ne() {
             return result;
@@ -332,10 +324,9 @@ pub trait DagNode {
   }
 
   fn equals(&self, other: DagNodePtr) -> bool {
-    let other_ref = unsafe{ &*other };
-    std::ptr::addr_eq(self, other)
+    std::ptr::addr_eq(self, other.as_ptr())
       || (
-      self.symbol() == other_ref.symbol()
+      self.symbol() == other.symbol()
           && self.compare_arguments(other) == Ordering::Equal
       )
   }
@@ -345,7 +336,7 @@ pub trait DagNode {
   // region GC related methods
 
   /// MUST override if `Self::args` is not a `DagNodeVector`.
-  fn mark(&'static mut self) {
+  fn mark(&mut self) {
     if self.core().is_marked() {
       return;
     }
@@ -361,9 +352,7 @@ pub trait DagNode {
       {
         let node_vector: DagNodeVectorRefMut = arg_to_node_vec(self.core().args);
 
-        for node_ptr in node_vector.iter_mut() {
-          assert!(!node_ptr.is_null());
-          let node: &mut dyn DagNode = unsafe { node_ptr.as_mut_unchecked() };
+        for node in node_vector.iter_mut() {
           node.mark();
         }
       }
@@ -374,7 +363,7 @@ pub trait DagNode {
     } // The singleton case
     else {
       // Guaranteed to be non-null.
-      let node: &mut dyn DagNode = unsafe{ arg_to_dag_node(self.core().args).as_mut_unchecked() };
+      let mut node: DagNodePtr = arg_to_dag_node(self.core().args);
       node.mark();
     }
   } // end fn mark
@@ -382,22 +371,23 @@ pub trait DagNode {
   // endregion GC related methods
 }
 
-impl Formattable for &dyn DagNode {
-  fn repr(&self, _style: FormatStyle) -> String {
-    if self.symbol().is_null() {
-      "null".to_string()
+impl Formattable for dyn DagNode {
+  fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
+    match style {
+      FormatStyle::Debug => {
+        write!(f, "DagNode<{}>", self.symbol())
+      }
+      
+      _ => {
+        write!(f, "<{}>", self.symbol())
+      }
     }
-    else {
-      format!("<{}>", self.symbol())
-    }
+    
   }
 }
 
-impl Display for dyn DagNode {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.repr(FormatStyle::default()))
-  }
-}
+impl_display_debug_for_formattable!(dyn DagNode);
+
 
 
 // Unsafe private free functions

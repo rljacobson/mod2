@@ -1,33 +1,34 @@
 use std::{
   cmp::Ordering,
   any::Any,
-  fmt::{Display, Formatter, Pointer}
+  fmt::{Display, Formatter, Pointer},
+  ops::Deref
 };
 
 use mod2_abs::{
   hash::hash2 as term_hash,
   NatSet
-}
-;
+};
+
 use crate::{
   api::{
     dag_node::{
       DagNode,
       DagNodeVector,
       DagNodePtr,
-      arg_to_node_vec
+      arg_to_node_vec,
     },
     term::{
       BxTerm,
-      Term
+      Term,
     },
-    symbol_core::SymbolPtr,
-    free_theory::free_dag_node::FreeDagNode
+    symbol::SymbolPtr,
+    free_theory::free_dag_node::FreeDagNode,
   },
   core::{
     format::{
       FormatStyle,
-      Formattable
+      Formattable,
     },
     term_core::TermCore,
     dag_node_core::{
@@ -35,13 +36,14 @@ use crate::{
       DagNodeFlag,
     },
     substitution::Substitution,
-    VariableInfo
-  }
+    VariableInfo,
+  },
+  impl_display_debug_for_formattable,
 };
 
 pub struct FreeTerm{
   core                 : TermCore,
-  pub args      : Vec<BxTerm>,
+  pub args             : Vec<BxTerm>,
   pub(crate) slot_index: i32,
 }
 
@@ -55,48 +57,37 @@ impl FreeTerm {
   }
 }
 
-impl Display for FreeTerm {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    (self as &dyn Term).fmt(f)
-  }
-}
-
 impl Formattable for FreeTerm {
-  fn repr(&self, style: FormatStyle) -> String {
-    let mut accumulator = String::new();
+  fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
     match style {
       FormatStyle::Simple => {
-        accumulator.push_str(self.symbol().repr(style).as_str());
+        self.symbol().repr(f, style)?;
       }
 
       FormatStyle::Debug | _ => {
-        accumulator.push_str(format!("free<{}>", self.symbol().repr(style)).as_str());
+        write!(f, "free<")?;
+        self.symbol().repr(f, style)?;
+        write!(f, ">")?;
       }
     }
 
-    accumulator.push_str(format!("free<{}>", self.symbol().repr(style)).as_str());
     if !self.args.is_empty() {
-      accumulator.push('(');
-      accumulator.push_str(
-        self
-            .args
-            .iter()
-            .map(|arg| arg.repr(style))
-            .collect::<Vec<String>>()
-            .join(", ").as_str()
-      );
-      accumulator.push(')');
+      let mut args = self.args.iter();
+      write!(f, "(")?;
+      args.next().unwrap().repr(f, style)?;
+      for arg in args {
+        write!(f, ", ")?;
+        arg.repr(f, style)?;
+      }
+      write!(f, ")")?;
     }
 
-    accumulator
+    Ok(())
   }
 }
 
-// impl Display for FreeTerm {
-//   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//     todo!()
-//   }
-// }
+impl_display_debug_for_formattable!(FreeTerm);
+
 
 impl Term for FreeTerm {
   //region Representation and Reduction Methods
@@ -158,7 +149,7 @@ impl Term for FreeTerm {
   // region Comparison Methods
 
   fn compare_term_arguments(&self, other: &dyn Term) -> Ordering {
-    assert!(&self.symbol() == &other.symbol(), "symbols differ");
+    assert_eq!(&self.symbol(), &other.symbol(), "symbols differ");
 
     if let Some(other) = other.as_any().downcast_ref::<FreeTerm>() {
       for (arg_self, arg_other) in self.args.iter().zip(other.args.iter()) {
@@ -174,11 +165,10 @@ impl Term for FreeTerm {
   }
 
   fn compare_dag_arguments(&self, other: &dyn DagNode) -> Ordering {
-    // assert_eq!(self.symbol(), other.symbol(), "symbols differ");
+    assert_eq!(self.symbol(), other.symbol(), "symbols differ");
     if let Some(other) = other.as_any().downcast_ref::<FreeDagNode>() {
       for (arg_self, arg_other) in self.args.iter().zip(other.iter_args()) {
-        let arg_other: &dyn DagNode = unsafe { &*arg_other };
-        let r = arg_self.compare_dag_node(arg_other);
+        let r = arg_self.compare_dag_node(arg_other.deref());
         if r.is_ne() {
           return r;
         }
@@ -191,10 +181,10 @@ impl Term for FreeTerm {
 
   // ToDo: This method makes no use of partial_substitution except for `partial_compare_unstable` in `VariableTerm`.
   fn partial_compare_arguments(&self, partial_substitution: &mut Substitution, other: &dyn DagNode) -> Option<Ordering> {
-    assert!(self.symbol().compare(other.symbol()).is_eq(), "symbols differ");
+    assert!(self.symbol().compare(other.symbol().deref()).is_eq(), "symbols differ");
 
     for (term_arg, dag_arg) in self.iter_args().zip(other.iter_args()) {
-      let r = term_arg.partial_compare(partial_substitution, unsafe{ &*dag_arg });
+      let r = term_arg.partial_compare(partial_substitution, dag_arg.deref());
       if r?.is_ne() {
         return r;
       }
@@ -207,8 +197,7 @@ impl Term for FreeTerm {
 
   fn dagify_aux(&self) -> DagNodePtr {
     let new_node = FreeDagNode::new(self.symbol());
-    let new_node_ref = unsafe{ &mut *new_node };
-    let args = arg_to_node_vec(new_node_ref.core().args);
+    let args = arg_to_node_vec(new_node.core().args);
 
     for arg in self.args.iter() {
       let node = arg.dagify();

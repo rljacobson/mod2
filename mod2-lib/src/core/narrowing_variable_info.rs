@@ -49,8 +49,8 @@ impl NarrowingVariableInfo {
     self.variables
         .iter()
         .position(|v| {
-          if let Some(v) = v {
-            let var = unsafe { &**v };
+          if let Some(var) = v {
+            // let var = unsafe { &**v };
             var.compare(variable).is_eq()
           } else {
             false

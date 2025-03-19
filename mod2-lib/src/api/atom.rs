@@ -31,17 +31,19 @@ use mod2_abs::DynHash;
 
 use crate::{
   api::{
-    symbol_core::{
-      SymbolCore,
+    symbol::{
       SymbolPtr,
     },
     variable_theory::Variable,
   },
-  core::sort::Sort,
+  core::{
+    sort::Sort,
+    symbol_core::SymbolCore
+  }
 };
 
 
-#[derive(Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq)]
 pub enum Atom {
   Variable(Variable),
   Symbol(SymbolPtr),
@@ -68,10 +70,7 @@ impl Display for Atom {
       }
 
       Atom::Symbol(symbol) => {
-        unsafe {
-          let symbol: &SymbolCore = &**symbol;
-          write!(f, "{}", symbol)
-        }
+        write!(f, "{}", symbol)
       }
 
       Atom::Data(data_atom) => {
@@ -154,32 +153,28 @@ When called, the macro expands into the following:
 ## Example Usage
 
 ```rust
-* use std::any::Any;
-* use once_cell::sync::Lazy;
-* use mod2_lib::api::{
-*   Arity,
-*   atom::{
-*     implement_data_atom, Atom, DataAtom
-*   },
-*   symbol::{SymbolCore, SymbolPtr, SymbolType, SymbolAttribute}
-* };
-* use mod2_abs::IString;
-*
-* implement_data_atom!(Integer, isize);
-*
-* fn main() {
-*     let int_atom = IntegerAtom::new_atom(42isize);
-*
-*     // The Display implementation allows it to be printed
-*     println!("The data atom is {}.", int_atom);
-*     // Access the associated symbol for the new type. Use `unsafe` to dereference the pointer.
-*     let int_symbol: &Symbol = unsafe { &*int_atom.symbol() };
-*     println!("Its symbol is {}.", int_symbol);
-* }
-* ```
+use mod2_lib::api::{
+  atom::{
+    implement_data_atom, Atom, DataAtom,
+  },
+  symbol::SymbolPtr,
+};
+
+implement_data_atom!(Integer, isize);
+
+fn main() {
+    let int_atom = IntegerAtom::new_atom(42isize);
+
+    // The Display implementation allows it to be printed
+    println!("The data atom is {}.", int_atom);
+    // Access the associated symbol for the new type. Use `unsafe` to dereference the pointer.
+    let int_symbol: SymbolPtr = int_atom.symbol();
+    println!("Its symbol is {}.", int_symbol);
+}
+```
 
 */
-
+// ToDo: This macro has issues. It needs its types to be fully qualified.
 #[macro_export]
 macro_rules! implement_data_atom {
   ($name:ident, $type:ty) => {
@@ -191,8 +186,8 @@ macro_rules! implement_data_atom {
 
     impl [<$name Atom>] {
       /// Creates a new `Atom::Data` containing a boxed `DataAtom` wrapping `data`
-      pub fn new_atom(data: $type) -> Atom {
-        Atom::Data(Box::new([<$name Atom>](data)))
+      pub fn new_atom(data: $type) -> $crate::api::atom::Atom {
+        $crate::api::atom::Atom::Data(Box::new([<$name Atom>](data)))
       }
     }
 
@@ -204,7 +199,7 @@ macro_rules! implement_data_atom {
 
     impl DataAtom for [<$name Atom>] {
 
-      fn as_any(&self) -> &dyn Any {
+      fn as_any(&self) -> &dyn std::any::Any {
         self
       }
 

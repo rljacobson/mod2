@@ -22,7 +22,7 @@ use std::{
   },
   ptr::drop_in_place,
 };
-
+use std::ptr::null_mut;
 use once_cell::sync::Lazy;
 use mod2_abs::{debug, info};
 
@@ -87,7 +87,7 @@ pub(crate) struct NodeAllocator {
   need_to_collect_garbage        : bool,
 
   // Arena management variables
-  arena_count: u32,
+  arena_count                    : u32,
   current_arena_past_active_arena: bool,
   first_arena                    : *mut Arena,
   last_arena                     : *mut Arena,
@@ -168,8 +168,9 @@ impl NodeAllocator {
         }
 
         current_node = current_node.add(1);
-      }
+      } // end loop
 
+      current_node.as_mut_unchecked().args = null_mut();
       self.next_node = current_node.add(1);
     } // end of unsafe block
 
