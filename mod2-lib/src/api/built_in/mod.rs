@@ -9,36 +9,32 @@ mod nonalgebraic_symbol;
 
 use std::{
   collections::HashMap,
-  sync::Arc,
-  marker::PhantomData
+  sync::Arc
 };
 use once_cell::sync::Lazy;
-use mod2_abs::IString;
+use mod2_abs::{smallvec, IString};
 
 use crate::{
   api::{
-    built_in::nonalgebraic_symbol::{
-      BoolSymbol, 
-      NASymbol, 
-      StringSymbol
-    },
-    Arity,
-    symbol::SymbolPtr
+    symbol::SymbolPtr,
+    Arity
   },
   core::{
     sort::{
       Sort,
       SortPtr
     },
-    symbol_core::{
+    symbol::{
       SymbolAttribute,
-      SymbolAttributes,
-      SymbolType,
-      SymbolCore
+      SymbolCore,
+      SymbolType
     }
   }
 };
 
+pub use nonalgebraic_term::*;
+pub use nonalgebraic_symbol::*;
+use crate::core::symbol::OpDeclaration;
 
 // Built-in Types
 pub type Bool    = bool;
@@ -96,17 +92,20 @@ static BUILT_IN_SORTS: Lazy<Arc<HashMap<IString, Sort>>> = Lazy::new(|| {
 macro_rules! make_symbol {
     ($sort_name:expr, $symbol_name:expr, $symbol_type:expr) => {
         {
-          let sort_name = IString::from($sort_name);
-          let sort = get_built_in_sort(&sort_name).unwrap();
-          let symbol_name: IString = IString::from($symbol_name);
-          let symbol_core = SymbolCore::new(
+          let sort_name   = IString::from($sort_name);
+          let sort        = get_built_in_sort(&sort_name).unwrap();
+          let symbol_name = IString::from($symbol_name);
+          let mut symbol_core = SymbolCore::new(
             symbol_name.clone(),
             Arity::Value(0),
             SymbolAttribute::Constructor.into(),
             $symbol_type,
-            sort,
+            // sort,
           );
-          let symbol = Box::new(BoolSymbol::new(symbol_core));
+          let op_declaration = OpDeclaration::new(smallvec![sort], true.into());
+          symbol_core.add_op_declaration(op_declaration);
+          
+          let symbol     = Box::new(BoolSymbol::new(symbol_core));
           let symbol_ptr = SymbolPtr::new(Box::into_raw(symbol));
           (symbol_name, symbol_ptr)
         }

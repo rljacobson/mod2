@@ -36,7 +36,10 @@ use crate::{
     symbol::SymbolPtr,
     free_theory::FreeDagNode,
   },
-  core::gc::allocate_dag_node,
+  core::{
+    gc::allocate_dag_node,
+    theory::EquationalTheory
+  }
 };
 
 static FREE_DAG_NODE_VTABLE: DynMetadata<dyn DagNode> = {
@@ -52,17 +55,6 @@ static FREE_DAG_NODE_VTABLE: DynMetadata<dyn DagNode> = {
 
 
 pub type ThinDagNodePtr = *mut DagNodeCore; // A thin pointer to a `DagNodeCore` object.
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
-pub enum DagNodeTheory {
-  #[default]
-  Free = 0,
-  // ACU,
-  // AU,
-  // CUI,
-  Variable,
-  NA,
-}
 
 
 #[bitflags]
@@ -118,7 +110,7 @@ pub struct DagNodeCore {
   /// the destructor.
   pub(crate) args      : *mut u8,
   pub(crate) sort_index: i8, // sort index within kind
-  pub(crate) theory_tag: DagNodeTheory,
+  pub(crate) theory_tag: EquationalTheory,
   pub(crate) flags     : DagNodeFlags,
 
   // Opt out of `Unpin`
@@ -130,10 +122,10 @@ impl DagNodeCore {
   // region Constructors
 
   pub fn new(symbol: SymbolPtr) -> DagNodePtr {
-    DagNodeCore::with_theory(symbol, DagNodeTheory::default())
+    DagNodeCore::with_theory(symbol, EquationalTheory::default())
   }
 
-  pub fn with_theory(symbol: SymbolPtr, theory: DagNodeTheory) -> DagNodePtr {
+  pub fn with_theory(symbol: SymbolPtr, theory: EquationalTheory) -> DagNodePtr {
     let node     = allocate_dag_node();
     let node_mut = unsafe { &mut *node };
 
@@ -200,7 +192,7 @@ impl DagNodeCore {
   pub fn upgrade(thin_dag_node_ptr: ThinDagNodePtr) -> DagNodePtr {
     assert!(!thin_dag_node_ptr.is_null());
     match unsafe { thin_dag_node_ptr.as_ref_unchecked().theory_tag } {
-      DagNodeTheory::Free => {
+      EquationalTheory::Free => {
         // Step 1: Create a fake reference to MyStruct
         // let fake_ptr: *mut FreeDagNode = std::ptr::null_mut();
         // // Step 2: Cast the fake reference to a trait object pointer
@@ -213,11 +205,11 @@ impl DagNodeCore {
         if fat_ptr.is_null() {
           panic!("FreeDagNodePtr could not be created from ThinDagNodePtr");
         }
-        
+
         DagNodePtr::new(fat_ptr)
       }
-      // DagNodeTheory::Variable => {}
-      // DagNodeTheory::Data => {}
+      // EquationalTheory::Variable => {}
+      // EquationalTheory::Data => {}
       _ => {
         panic!("Thin DagNode has invalid theory tag")
       }

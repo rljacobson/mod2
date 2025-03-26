@@ -21,7 +21,7 @@ use crate::{
 };
 
 use mod2_lib::{
-  api::symbol_core::{
+  core::symbol::{
     SymbolAttribute,
     SymbolAttributes
   }

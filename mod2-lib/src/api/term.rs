@@ -11,14 +11,11 @@ implementation, because some terms have their own particular representation.
 
 use std::{
   any::Any,
-  fmt::{Display, Formatter},
-  hash::{Hash, Hasher},
   cmp::Ordering,
-  collections::{
-    HashMap,
-    hash_map::Entry
-  },
-  sync::atomic::Ordering::Relaxed,
+  collections::HashMap,
+  fmt::Display,
+  hash::{Hash, Hasher}
+  ,
   ops::Deref
 };
 
@@ -26,30 +23,27 @@ use mod2_abs::{NatSet, RcCell};
 
 use crate::{
   api::{
-    dag_node::{DagNodePtr, DagNode},
+    dag_node::{DagNode, DagNodePtr},
     symbol::{
+      Symbol,
       SymbolPtr,
       SymbolSet,
-      Symbol,
     },
     UNDEFINED,
   },
   core::{
-    dag_node_core::{DagNodeCore, DagNodeFlag},
-    format::{FormatStyle, Formattable},
+    format::Formattable,
     substitution::Substitution,
-    symbol_core::SymbolCore,
     term_core::{
       cache_node_for_term,
       clear_cache_and_set_sort_info,
-      lookup_node_for_term,
-      TermAttribute,
+      lookup_node_for_term
+      ,
       TermCore,
     },
   },
   impl_display_debug_for_formattable,
 };
-
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<&'static dyn Term>;
 pub type RcTerm    = RcCell<dyn Term>;

@@ -3,9 +3,10 @@ use std::{
   cmp::{
     max,
     Ordering
-  }
+  },
+  ops::DerefMut
 };
-use std::ops::DerefMut;
+
 use crate::{
   core::{
     gc::{
@@ -16,9 +17,9 @@ use crate::{
       DagNodeCore,
       DagNodeFlags,
       DagNodeFlag,
-      DagNodeTheory,
       ThinDagNodePtr
-    }
+    },
+    EquationalTheory
   },
   api::{
     symbol::SymbolPtr,
@@ -31,7 +32,7 @@ use crate::{
       arg_to_node_vec
     },
     Arity
-  }
+  },
 };
 
 pub struct FreeDagNode(DagNodeCore);
@@ -39,11 +40,11 @@ pub struct FreeDagNode(DagNodeCore);
 impl FreeDagNode {
 
   pub fn new(symbol: SymbolPtr) -> DagNodePtr {
-    DagNodeCore::with_theory(symbol, DagNodeTheory::Free)
+    DagNodeCore::with_theory(symbol, EquationalTheory::Free)
   }
 
   pub fn with_args(symbol: SymbolPtr, args: &mut Vec<DagNodePtr>) -> DagNodePtr {
-    let mut node = DagNodeCore::with_theory(symbol, DagNodeTheory::Free);
+    let mut node = DagNodeCore::with_theory(symbol, EquationalTheory::Free);
 
     node.set_flags(DagNodeFlag::NeedsDestruction.into());
     node.core_mut().args = (DagNodeVector::from_slice(args) as *mut DagNodeVector) as *mut u8;
@@ -73,5 +74,4 @@ impl DagNode for FreeDagNode {
   fn core_mut(&mut self) -> &mut DagNodeCore {
     &mut self.0
   }
-
 }

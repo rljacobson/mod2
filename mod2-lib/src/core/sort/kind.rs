@@ -62,10 +62,7 @@ use mod2_abs::{heap_construct, join_iter, UnsafePtr};
 use crate::{
   core::{
     sort::{
-      sort::{
-        SortPtr,
-        SortPtrs
-      },
+      sort::SortPtr,
       kind_error::KindError
     }
   }
@@ -82,11 +79,9 @@ pub type BxKind  = Box<Kind>;
 pub struct Kind {
   /// The count of sorts that are maximal.
   pub maximal_sort_count: u32,
-  /// Used during construction to detect cycles.
-  pub visited_sort_count: u32,
   /// Is the `Kind` well-formed (acyclic)?
   pub error_free        : bool,
-  pub sorts             : SortPtrs, // Sorts are owned by their parent module, not by their `Kind`.
+  pub sorts             : Vec<SortPtr>, // Sorts are owned by their parent module, not by their `Kind`.
 }
 
 impl Kind {
@@ -96,7 +91,6 @@ impl Kind {
       Kind {
         error_free        : true,
         maximal_sort_count: 0,
-        visited_sort_count: 0,
         sorts             : vec![],
       }
     );
@@ -223,7 +217,18 @@ impl Kind {
     self.sorts.push(sort);
     (self.sorts.len() - 1) as u32
   }
+  
+  // region Accessors
+  
+  pub fn sort_count(&self) -> usize {
+    self.sorts.len()
+  }
 
+  pub fn sort(&self, idx: usize) -> SortPtr {
+    self.sorts[idx]
+  }
+  
+  // endregion Accessors
 }
 
 impl Display for Kind {

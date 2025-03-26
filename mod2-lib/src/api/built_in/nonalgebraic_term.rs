@@ -5,38 +5,79 @@ Built-in data constants are in the "nonalgebraic" theory.
 */
 
 use std::{
-  fmt::Display,
-  cmp::Ordering,
   any::Any,
+  cmp::Ordering,
+  fmt::Display,
   ops::Deref
 };
 
 use crate::{
   api::{
+    built_in::{
+      Float,
+      Integer,
+      NaturalNumber,
+      StringBuiltIn,
+      get_built_in_symbol, 
+    },
     dag_node::{DagNode, DagNodePtr},
     symbol::Symbol,
-    term::{BxTerm, Term},
-    built_in::{
-      nonalgebraic_symbol::NASymbol,
-      Float,
-      Integer
-    }
+    term::Term
   },
   core::{
-    symbol_core::SymbolCore,
     format::{FormatStyle, Formattable},
     term_core::TermCore
   },
 };
 
-
-pub type StringTerm  = NATerm<String>;
+pub type StringTerm  = NATerm<StringBuiltIn>;
 pub type FloatTerm   = NATerm<Float>;
 pub type IntegerTerm = NATerm<Integer>;
+pub type NaturalNumberTerm = NATerm<NaturalNumber>;
 
 pub struct NATerm<T: Any>{
   core     : TermCore,
   pub value: T,
+}
+
+impl StringTerm {
+  pub fn new(value: &str) -> StringTerm {
+    let core = TermCore::new(unsafe{get_built_in_symbol("String").unwrap_unchecked()});
+    StringTerm {
+      core,
+      value: value.into(),
+    }
+  }
+}
+
+impl FloatTerm {
+  pub fn new(value: Float) -> FloatTerm {
+    let core = TermCore::new(unsafe{get_built_in_symbol("Float").unwrap_unchecked()});
+    FloatTerm {
+      core,
+      value: value.into(),
+    }
+  }
+}
+
+impl IntegerTerm {
+  pub fn new(value: Integer) -> IntegerTerm {
+    let core = TermCore::new(unsafe{get_built_in_symbol("Integer").unwrap_unchecked()});
+    IntegerTerm {
+      core,
+      value: value.into(),
+    }
+  }
+}
+
+impl NaturalNumberTerm {
+  pub fn new(value: NaturalNumber) -> NaturalNumberTerm {
+    let core = TermCore::new(unsafe{get_built_in_symbol("NaturalNumber").unwrap_unchecked()});
+    NaturalNumberTerm {
+      core,
+      value: value.into(),
+    }
+  }
 }
 
 impl<T: Any + Display> Formattable for NATerm<T> {

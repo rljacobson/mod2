@@ -1,5 +1,8 @@
-use std::fmt::{Display, Formatter};
-use crate::api::symbol::{Symbol, SymbolPtr};
+mod variable_symbol;
+mod variable_term;
+
+pub use variable_term::*;
+pub use variable_symbol::*;
 
 /// The `VariableType` of a variable determines what the variable is able to bind to. A `Blank` variable binds to a
 /// single `Term`, a `Sequence` variable binds to a sequence of one or more `Term`s, and a `NullSequence` binds to a
@@ -11,20 +14,3 @@ pub enum VariableType {
   NullSequence,   // Zero-or-more wildcard (a blank null sequence)
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Variable {
-  pub symbol:        SymbolPtr,
-  pub variable_type: VariableType,
-}
-
-impl Display for Variable {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let symbol: SymbolPtr = self.symbol;
-
-    match self.variable_type {
-      VariableType::Blank        => write!(f, "{}_",   symbol),
-      VariableType::Sequence     => write!(f, "{}__",  symbol),
-      VariableType::NullSequence => write!(f, "{}___", symbol),
-    }
-  }
-}

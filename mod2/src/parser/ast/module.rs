@@ -6,31 +6,32 @@ use std::{
 use mod2_abs::IString;
 
 use mod2_lib::{
+  api::symbol::{
+    Symbol,
+    SymbolPtr
+  },
   core::{
     pre_equation::{
       PreEquation,
       PreEquationKind,
       condition::Conditions
     },
-    sort::collection::SortCollection
+    sort::collection::SortCollection,
+    symbol::SymbolType
   },
-  api::symbol::Symbol,
 };
-use mod2_lib::core::symbol_core::SymbolType;
 use crate::{
   module::{BxModule, Module},
-  parser::{
-    ast::{
-      BxEquationDeclarationAST,
-      BxMembershipDeclarationAST,
-      BxRuleDeclarationAST,
-      BxSortDeclarationAST,
-      ItemAST,
-      construct_symbol_from_decl,
-      symbol_decl::{
-        BxSymbolDeclarationAST,
-        BxVariableDeclarationAST
-      }
+  parser::ast::{
+    BxEquationDeclarationAST,
+    BxMembershipDeclarationAST,
+    BxRuleDeclarationAST,
+    BxSortDeclarationAST,
+    ItemAST,
+    construct_symbol_from_decl,
+    symbol_decl::{
+      BxSymbolDeclarationAST,
+      BxVariableDeclarationAST
     }
   },
 };
@@ -77,24 +78,24 @@ impl ModuleAST {
     Every sort that is encountered is checked to see if it has already been created. If it has, the existing sort
     object is fetched. Otherwise, the sort is created.
     */
-    let mut sorts  : SortCollection           = SortCollection::new();
-    let mut symbols: HashMap<IString, Symbol> = HashMap::new();
+    let mut sorts  : SortCollection              = SortCollection::new();
+    let mut symbols: HashMap<IString, SymbolPtr> = HashMap::new();
 
     // Sort Declarations
     for sort_decl in sort_decls.iter() {
       for subsort_name in sort_decl.sorts_lt.iter() {
         // Get or insert new subsort.
-        let subsort = sorts.get_or_create_sort(subsort_name.clone());
+        let mut subsort = sorts.get_or_create_sort(subsort_name.clone());
         for supersort_name in sort_decl.sorts_gt.iter() {
           assert_ne!(*subsort_name, *supersort_name, "sort declared as a subsort of itself");
 
           // Get or insert new supersort.
-          let supersort = sorts.get_or_create_sort(supersort_name.clone());
+          let mut supersort = sorts.get_or_create_sort(supersort_name.clone());
           // ToDo: Check that this constraint has not already been declared by checking that `subsort.supersorts` does
           //       not already contain `supersort` (and vice versa).
           unsafe {
-            (*subsort).supersorts.push(supersort);
-            (*supersort).subsorts.push(subsort);
+            subsort.supersorts.push(supersort);
+            supersort.subsorts.push(subsort);
           }
         }
       }
@@ -102,27 +103,12 @@ impl ModuleAST {
 
     // Variable Declarations
     for var_decl in var_decls {
-      construct_symbol_from_decl(
-        &mut symbols,
-        &mut sorts,
-        var_decl.name,
-        var_decl.sort,
-        var_decl.attributes,
-        SymbolType::Variable
-      );
+      var_decl.construct(&mut symbols, &mut sorts);
     }
 
     // Symbol Declarations
     for sym_decl in sym_decls {
-      construct_symbol_from_decl(
-        &mut symbols,
-        &mut sorts,
-        sym_decl.name,
-        sym_decl.sort_spec,
-        sym_decl.arity,
-        sym_decl.attributes,
-        SymbolType::Standard
-      );
+      sym_decl.construct(&mut symbols, &mut sorts);
     }
 
 
@@ -132,7 +118,7 @@ impl ModuleAST {
       let lhs  = rule_decl.lhs.construct(&mut symbols);
       let rhs  = rule_decl.rhs.construct(&mut symbols);
       let rule = PreEquationKind::Rule{
-        rhs_term: Box::new(rhs),
+        rhs_term: rhs,
       };
       let conditions: Conditions
           = rule_decl.conditions
@@ -145,7 +131,7 @@ impl ModuleAST {
         name      : None,
         attributes: Default::default(),
         conditions,
-        lhs_term  : Box::new(lhs),
+        lhs_term  : lhs,
         kind      : rule,
       };
 
@@ -159,7 +145,7 @@ impl ModuleAST {
       let lhs      = eq_decl.lhs.construct(&mut symbols);
       let rhs      = eq_decl.rhs.construct(&mut symbols);
       let equation = PreEquationKind::Equation{
-        rhs_term: Box::new(rhs),
+        rhs_term: rhs,
       };
       let conditions: Conditions
           = eq_decl.conditions
@@ -172,7 +158,7 @@ impl ModuleAST {
         name      : None,
         attributes: Default::default(),
         conditions,
-        lhs_term  : Box::new(lhs),
+        lhs_term  : lhs,
         kind      : equation,
       };
 
@@ -186,7 +172,7 @@ impl ModuleAST {
       let lhs        = mb_decl.lhs.construct(&mut symbols);
       let rhs        = mb_decl.rhs.construct(&mut sorts);
       let membership = PreEquationKind::Membership{
-        sort_spec: rhs,
+        sort: rhs,
       };
       let conditions: Conditions
           = mb_decl.conditions
@@ -199,7 +185,7 @@ impl ModuleAST {
         name      : None,
         attributes: Default::default(),
         conditions,
-        lhs_term  : Box::new(lhs),
+        lhs_term  : lhs,
         kind      : membership,
       };
 

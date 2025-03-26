@@ -35,8 +35,6 @@ use crate::{
 
 /// A pointer to a sort. No ownership is assumed.
 pub type SortPtr  = UnsafePtr<Sort>;
-/// A vector of pointers to `Sort`s. No ownership is assumed.
-pub type SortPtrs = Vec<SortPtr>;
 
 /// A `SpecialSort` is just a more user-friendly way to represent special values of `sort_index_within_kind`.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -74,8 +72,8 @@ pub struct Sort {
   /// are subsorts (resp supersorts) via transitivity, there may be sorts within the
   /// connected component that are incomparable to this one and thus neither a super- nor
   /// sub-sort. The transitive closure of `<=` is computed and stored in `leq_sorts`.
-  pub subsorts  : SortPtrs,
-  pub supersorts: SortPtrs,
+  pub subsorts  : Vec<SortPtr>,
+  pub supersorts: Vec<SortPtr>,
   /// Holds the indices within kind of sorts that are subsorts of this sort, including transitively.
   // ToDo: If `subsorts`/`supersorts` aren't used after construction, don't store them in `Sort`. It looks like
   //       `supersorts` is not but `subsorts` might be.
@@ -95,8 +93,8 @@ impl Default for Sort {
       name                      : IString::default(),
       index_within_kind         : 0, // Also used for `unresolved_supersort_count` during kind construction
       fast_compare_index        : 0,
-      subsorts                  : SortPtrs::default(),
-      supersorts                : SortPtrs::default(),
+      subsorts                  : Vec::<SortPtr>::default(),
+      supersorts                : Vec::<SortPtr>::default(),
       leq_sorts                 : NatSet::default(),
       kind                      : None,
     }
@@ -156,6 +154,12 @@ impl Sort {
         break;
       }
     }
+  }
+  
+  /// Determines if self <= other. 
+  #[inline(always)]
+  pub fn leq(&self, other: SortPtr) -> bool {
+    other.leq_sorts.contains(self.index_within_kind as usize)
   }
 }
 

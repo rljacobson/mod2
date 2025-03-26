@@ -18,24 +18,25 @@ The following compares Maude's `DagNode` to our implementation here.
 
 */
 
+mod local_bindings;
+mod narrowing_variable_info;
+mod theory;
+mod variable_info;
+pub(crate) mod dag_node_core;
+pub(crate) mod gc;
+pub(crate) mod strategy;
+pub(crate) mod substitution;
 pub mod format;
 pub mod pre_equation;
 pub mod sort;
-pub mod symbol_core;
+pub mod symbol;
 pub mod term_core;
-pub(crate) mod dag_node_core;
-pub(crate) mod gc;
-pub(crate) mod local_bindings;
-pub(crate) mod narrowing_variable_info;
-pub(crate) mod substitution;
-pub(crate) mod variable_info;
-pub(crate) mod strategy;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
 pub(crate) use narrowing_variable_info::NarrowingVariableInfo;
 pub(crate) use variable_info::VariableInfo;
-
+pub use theory::*;
 
 
 #[allow(unused_imports)]
@@ -48,18 +49,20 @@ pub type Void = u8;
 #[cfg(test)]
 mod tests {
   use crate::{
-    core::dag_node_core::{
-      DagNodeTheory,
-      DagNodeFlags,
-      DagNodeCore
+    api::symbol::SymbolPtr,
+    core::{
+      dag_node_core::{
+        DagNodeFlags,
+        DagNodeCore
+      },
+      EquationalTheory
     },
-    api::symbol::SymbolPtr
   };
 
   #[test]
   fn size_of_dag_node() {
     println!("size of SymbolPtr: {}", size_of::<SymbolPtr>());
-    println!("size of DagNodeTheory: {}", size_of::<DagNodeTheory>());
+    println!("size of EquationalTheory: {}", size_of::<EquationalTheory>());
     println!("size of DagNodeFlags: {}", size_of::<DagNodeFlags>());
     println!("size of DagNode: {}", size_of::<DagNodeCore>());
     assert_eq!(size_of::<DagNodeCore>(), 4 * size_of::<usize>());

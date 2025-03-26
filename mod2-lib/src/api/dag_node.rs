@@ -12,32 +12,29 @@ Requirements of implementers of `DagNode`:
 use std::{
   any::Any,
   cmp::{max, Ordering},
-  fmt::{Display, Formatter},
-  iter::Iterator,
-  ops::Deref,
-  rc::Rc,
+  fmt::Display,
+  iter::Iterator
+
+  ,
 };
-use std::ops::DerefMut;
 use mod2_abs::UnsafePtr;
 use crate::{api::{
-  Arity,
-  symbol::SymbolPtr
+  symbol::SymbolPtr,
+  Arity
 }, core::{
-  gc::{
-    gc_vector::{GCVector, GCVectorRefMut},
-    increment_active_node_count
-  },
   dag_node_core::{
     DagNodeCore,
     DagNodeFlag,
     DagNodeFlags,
     ThinDagNodePtr
   },
-  sort::{SortPtr, SpecialSort},
-  symbol_core::SymbolCore,
-  format::{FormatStyle, Formattable}
+  format::{FormatStyle, Formattable},
+  gc::{
+    gc_vector::{GCVector, GCVectorRefMut},
+    increment_active_node_count
+  },
+  sort::SortPtr
 }, impl_display_debug_for_formattable};
-
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr    = UnsafePtr<dyn DagNode + 'static>;
 pub type DagNodeVector = GCVector<DagNodePtr>;
