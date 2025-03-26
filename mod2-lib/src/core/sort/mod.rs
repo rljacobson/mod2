@@ -84,9 +84,7 @@ To compare two sorts `A` and `B` during runtime:
 
 pub mod kind;
 pub mod sort;
-pub mod sort_spec;
 pub mod collection;
 pub mod kind_error;
-pub(crate) mod sort_table;
 
 pub use sort::*;

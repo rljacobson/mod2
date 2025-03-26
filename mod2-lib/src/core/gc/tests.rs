@@ -10,8 +10,8 @@ use crate::{
       root_container::RootContainer,
       node_allocator::acquire_node_allocator
     },
-    dag_node_core::{DagNodeCore, DagNodeTheory, ThinDagNodePtr},
-    symbol_core::{SymbolAttributes, SymbolType},
+    dag_node_core::{DagNodeCore, ThinDagNodePtr},
+    symbol::{SymbolAttributes, SymbolType},
   },
   api::{
     dag_node::{DagNode, DagNodePtr},
@@ -23,6 +23,7 @@ use crate::{
     Arity
   },
 };
+use crate::core::EquationalTheory;
 
 // ToDo: Figure out why multithreading breaks the tests.
 // Force GC tests to run serially for consistent behavior.
@@ -155,7 +156,7 @@ fn test_allocate_dag_node() {
     Some(node) => { node }
   };
 
-  node_mut.theory_tag = DagNodeTheory::Free;
+  node_mut.theory_tag = EquationalTheory::Free;
 }
 
 
@@ -231,7 +232,7 @@ fn test_arena_exhaustion() {
         node
       }
     };
-    node_mut.theory_tag = DagNodeTheory::Free;
+    node_mut.theory_tag = EquationalTheory::Free;
     let node_ptr = DagNodeCore::upgrade(node_ptr);
     last_node.insert_child(node_ptr);
     last_node    = node_ptr;

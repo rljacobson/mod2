@@ -20,7 +20,7 @@ sort C<D;
 mod NaturalNumbers {
     // op _+_ : NzNat NzNat -> NzNat [ctor assoc comm id: 0] .
 
-    symbol plus/2 [assoc, comm, ctor, id(h)];
+    symbol plus: Nat Nat -> Nat [assoc, comm, ctor, id(h)];
     symbol minus : Nat NzNat -> Nat;
     symbol z : Nat;
     symbol s : Nat -> NzNat;

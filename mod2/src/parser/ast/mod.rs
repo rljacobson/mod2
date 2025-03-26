@@ -111,6 +111,7 @@ RewriteCondition := Term RuleOp Term ;
 
 use std::collections::hash_map::Entry;
 use mod2_abs::{heap_construct, HashMap, IString};
+use mod2_lib::api::symbol::{Symbol, SymbolPtr};
 
 mod module;
 mod term;
@@ -124,7 +125,7 @@ pub use sort::*;
 pub use term::*;
 pub use attribute::*;
 pub use condition::*;
-use mod2_lib::api::symbol_core::{Symbol, SymbolPtr};
+use mod2_lib::api::free_theory::FreeSymbol;
 pub use symbol_decl::*;
 
 /// An item is anything that lives in a module.
@@ -171,18 +172,20 @@ pub(crate) struct EquationDeclarationAST {
 pub(crate) type BxMembershipDeclarationAST = Box<MembershipDeclarationAST>;
 pub(crate) struct MembershipDeclarationAST {
   pub lhs       : BxTermAST,
-  pub rhs       : SortIdAST,
+  pub rhs       : BxSortIdAST,
   pub conditions: Option<Vec<ConditionAST>>
 }
 
-
+/// This method is intended for implicitly defined symbols, that is, symbols that are used without being declared. 
+/// By default, we make such symbols free symbols. 
 fn get_or_create_symbol<T:Into<IString>>(name: T, symbols: &mut HashMap<IString, SymbolPtr>) -> SymbolPtr {
   let name = name.into();
 
   match symbols.entry(name.clone()) {
     Entry::Occupied(s) => *s.get(),
     Entry::Vacant(v) => {
-      let s = heap_construct!(Symbol::with_name(name.clone()));
+      let s = heap_construct!(FreeSymbol::with_arity(name.clone(), 0.into()));
+      let s = SymbolPtr::new(s);
       v.insert(s);
       s
     }

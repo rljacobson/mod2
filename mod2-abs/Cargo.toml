@@ -11,8 +11,8 @@ readme  = "README.md"
 
 [dependencies]
 string_cache.workspace = true
-#ustr.workspace        = true
 bit-set.workspace      = true
+smallvec.workspace     = true
 
 tracing.workspace            = true
 tracing-subscriber.workspace = true

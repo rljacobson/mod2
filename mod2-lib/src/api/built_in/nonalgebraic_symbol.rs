@@ -3,21 +3,15 @@ use std::{
   marker::PhantomData
 };
 
-use crate::{
-  api::{
-    built_in::{
-      nonalgebraic_term::NATerm,
-      Bool,
-      Float,
-      Integer
-    },
-    symbol::Symbol,
+use crate::api::{
+  built_in::{
+    Bool,
+    Float,
+    Integer
   },
-  core::{
-    sort::SortPtr,
-    symbol_core::{SymbolAttribute, SymbolCore, SymbolType}
-  },
+  symbol::Symbol,
 };
+use crate::core::symbol::SymbolCore;
 
 pub type StringSymbol  = NASymbol<String>;
 pub type FloatSymbol   = NASymbol<Float>;

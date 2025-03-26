@@ -92,11 +92,13 @@ impl Module {
   */
   pub fn compute_kind_closures(&mut self) {
     assert_eq!(self.status, ModuleStatus::Open, "tried to compute kind closure when module status is not open");
+    // Make a temporary dummy sort collection
+    let mut sorts = SortCollection::new();
+    std::mem::swap(&mut self.sorts, &mut sorts);
 
     for (_, sort) in
-        self.sorts
-            .iter()
-            .filter(|(_, sort_ptr)| sort_ptr.kind.is_none())
+        sorts.iter()
+             .filter(|(_, sort_ptr)| sort_ptr.kind.is_none())
     {
       let kind = Kind::new(sort);
       let mut kind = kind.unwrap_or_else(
@@ -116,11 +118,15 @@ impl Module {
         }
       );
       // The kind creates a maximal error sort as its first element that we have to add to the module.
-      self.sorts.insert(kind[0]);
+      self.sorts.insert(kind.sorts[0]);
 
       // Maude sets the index_in_parent of the kind here.
       self.kinds.push(kind);
     }
+    // Return the sort collection to self…
+    std::mem::swap(&mut self.sorts, &mut sorts);
+    // …and add the error sorts to the collection.
+    self.sorts.append(sorts);
     self.status = ModuleStatus::SortSetClosed
   }
 

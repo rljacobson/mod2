@@ -14,12 +14,11 @@ use crate::{
   api::Arity,
   core::{
     format::{FormatStyle, Formattable},
-    symbol_core::SymbolCore,
-    sort::sort_table::SortTable
+    symbol::{SortTable, SymbolCore}
   },
   impl_display_debug_for_formattable,
 };
-
+use crate::core::symbol::OpDeclaration;
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;
@@ -50,7 +49,7 @@ pub trait Symbol {
 
   #[inline(always)]
   fn arity(&self) -> Arity {
-    self.core().arity
+    self.core().arity()
   }
 
   #[inline(always)]
@@ -67,6 +66,10 @@ pub trait Symbol {
   
   fn compare(&self, other: &dyn Symbol) -> Ordering {
     self.hash().cmp(&other.hash())
+  }
+  
+  fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
+    self.core_mut().add_op_declaration(op_declaration);
   }
 }
 

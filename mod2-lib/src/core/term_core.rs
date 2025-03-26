@@ -11,7 +11,6 @@ of structural sharing, the node instances themselves are not in 1-to-1 correspon
 use std::{
   cell::Cell,
   collections::hash_map::Entry,
-  ptr::NonNull,
   sync::atomic::{
     Ordering::Relaxed,
     AtomicBool,
@@ -79,7 +78,7 @@ pub type TermAttributes = BitFlags<TermAttribute, u8>;
 pub struct TermCore {
   /// The top symbol of the term
   pub(crate) symbol: SymbolPtr,
-  pub(crate) sort  : Option<NonNull<SortPtr>>,
+  pub(crate) sort  : Option<SortPtr>,
   /// The handles (indices) for the variable terms that occur in this term or its descendants
   pub(crate) occurs_set      : NatSet,
   pub(crate) context_set     : NatSet,

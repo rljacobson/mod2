@@ -39,10 +39,15 @@ impl SortCollection {
       self.get_or_create_sort(sort_name);
     }
   }
-  
+
   /// Do not use this method directly. This is only used to insert the error sort.
   pub fn insert(&mut self, sort: SortPtr) {
     self.sorts.insert(sort.name.clone(), sort);
+  }
+
+  /// Do not use this method directly. This is only used to insert the error sort.
+  pub fn append(&mut self, other: Self) {
+    self.sorts.extend(other.iter().into_iter())
   }
 
   #[inline(always)]

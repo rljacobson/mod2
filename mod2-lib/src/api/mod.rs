@@ -5,7 +5,6 @@ The public API of the library.
 
 */
 
-pub mod atom;
 pub mod symbol;
 pub mod term;
 pub(crate) mod dag_node;
@@ -15,9 +14,9 @@ pub mod built_in;
 
 // Special Values
 // ToDo: Do UNDEFINED the right way. Is this great? No. But it's convenient.
-pub(crate) const UNDEFINED: i32 = -1;
-const NONE:      i32 = -1;
-const ROOT_OK:   i32 = -2;
+pub const UNDEFINED: i32 = -1;
+pub const NONE:      i32 = -1;
+pub const ROOT_OK:   i32 = -2;
 
 // Small utility types used throughout
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -28,6 +27,17 @@ pub enum Arity {
 
   Variadic,
   Value(u16)
+}
+
+impl Arity {
+  #[inline(always)]
+  pub fn as_numeric(&self) -> u32 {
+    if let Arity::Value(v) = self {
+      *v as u32
+    } else {
+      0
+    }
+  }
 }
 
 impl From<Arity> for i16 {

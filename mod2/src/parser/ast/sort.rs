@@ -1,32 +1,43 @@
-use mod2_abs::IString;
+use mod2_abs::{smallvec, IString, SmallVec};
 use mod2_lib::{
   core::{
     sort::{
       collection::SortCollection,
       SortPtr,
-      sort_spec::{BxSortSpec, SortSpec}
     }
   }
 };
+use mod2_lib::api::Arity;
+use mod2_lib::api::built_in::Integer;
 
 pub(crate) type BxFunctorSortAST = Box<FunctorSortAST>;
-pub(crate) type BxSortIdAST = Box<SortIdAST>;
-pub(crate) type BxSortSpecAST = Box<SortSpecAST>;
+pub(crate) type BxSortIdAST      = Box<SortIdAST>;
+pub(crate) type BxSortSpecAST    = Box<SortSpecAST>;
+
+type TypeSignature = SmallVec<[SortPtr; 1]>;
 
 pub(crate) enum SortSpecAST {
   Sort(BxSortIdAST),
   Functor(BxFunctorSortAST)
 }
 
+impl SortSpecAST {
+  pub fn construct(&self, sorts: &mut SortCollection) -> TypeSignature {
+    match self {
+      SortSpecAST::Sort(sort_id) => {
+        smallvec![sort_id.construct(sorts)]
+      }
+      SortSpecAST::Functor(functor) => {
+        functor.construct(sorts)
+      }
+    }
+  }
+}
+
 pub(crate) struct SortIdAST (pub IString);
 
 impl SortIdAST {
-  pub fn construct_sort_spec(&self, sorts: &mut SortCollection) -> BxSortSpec {
-    let sort = self.construct_sort_ptr(sorts);
-    Box::new(SortSpec::Sort(sort))
-  }
-
-  pub fn construct_sort_ptr(&self, sorts: &mut SortCollection) -> SortPtr {
+  pub fn construct(&self, sorts: &mut SortCollection) -> SortPtr {
     sorts.get_or_create_sort(self.0.clone())
   }
 
@@ -46,29 +57,22 @@ impl SortIdAST {
 }
 
 pub(crate) struct FunctorSortAST {
-  arg_sorts: Vec<BxSortIdAST>,
-  target_sort: BxSortIdAST
+  pub(crate) arg_sorts  : Vec<BxSortIdAST>,
+  pub(crate) target_sort: BxSortIdAST
 }
 
 impl FunctorSortAST {
 
-  /// Constructs a `SortSpec` from a `SortSpecAST` using sort objects from the given `SortCollection`.
-  pub fn construct(&self, sorts: &mut SortCollection) -> BxSortSpec {
-    let constructed_arg_sorts: Vec<SortPtr> =
+  /// Constructs a `TypeSignature` from a `SortSpecAST` using sort objects from the given `SortCollection`.
+  pub fn construct(&self, sorts: &mut SortCollection) -> TypeSignature {
+    let mut constructed_arg_sorts: TypeSignature =
             self.arg_sorts
                 .iter()
-                .map(|sort_id| sort_id.construct_sort_ptr(sorts))
+                .map(|sort_id| sort_id.construct(sorts))
                 .collect();
-    let rhs_sort = self.target_sort.construct_sort_ptr(sorts);
-    Box::new(
-      SortSpec::Functor {
-        arg_sorts: constructed_arg_sorts,
-        target_sort: rhs_sort
-      }
-    )
+    let rhs_sort = self.target_sort.construct(sorts);
+    constructed_arg_sorts.push(rhs_sort);
+    constructed_arg_sorts
   }
 
-  pub fn arity(&mut self) -> i16 {
-    self.arg_sorts.len() as i16
-  }
 }

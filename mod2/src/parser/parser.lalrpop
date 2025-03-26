@@ -1,27 +1,28 @@
 use mod2_abs::IString;
+use mod2_lib::api::built_in::{
+    NaturalNumber,
+    Integer,
+};
 use crate::{
-  NaturalNumber,
-  Integer,
   parser::ast::{
-    ItemAST,
-    ModuleAST,
-    SymbolDeclarationAST,
-    VariableDeclarationAST,
-    SortDeclarationAST,
-    RuleDeclarationAST,
-    EquationDeclarationAST,
-    MembershipDeclarationAST,
-    TermAST,
-    BxTermAST,
-    SortSpecAST,
-    BxSortSpecAST,
     AttributeAST,
-    ConditionAST
+    BxSortIdAST,
+    BxSortSpecAST,
+    BxTermAST,
+    ConditionAST,
+    EquationDeclarationAST,
+    FunctorSortAST,
+    ItemAST,
+    MembershipDeclarationAST,
+    ModuleAST,
+    RuleDeclarationAST,
+    SortDeclarationAST,
+    SortIdAST,
+    SortSpecAST,
+    SymbolDeclarationAST,
+    TermAST,
+    VariableDeclarationAST,
   },
-  theory::symbol::{
-      VARIADIC,
-      UNSPECIFIED
-  }
 };
 
 grammar;
@@ -142,18 +143,9 @@ Attribute: AttributeAST = {
 //      symbol f: Int -> Int -> Int;
 SymbolDeclaration: SymbolDeclarationAST = {
     SymbolKeyword <name: Identifier> <sort_spec: (SortOp <SortSpec>)?> <attributes: AttributeSpec?> ";" => {
-        let arity: Integer = match sort_spec {
-          Some(n) => {
-            // ToDo: Do better error handling in the parser. Right now if a number too large to be represented is
-            //       parsed, the parsed symbol is treated as `UNSPECIFIED`.
-            n.try_into().unwrap_or(UNSPECIFIED)
-          }
-          None => UNSPECIFIED
-        };
         SymbolDeclarationAST {
           name,
           attributes: attributes.unwrap_or_default(),
-          arity,
           sort_spec
         }
     }
@@ -166,7 +158,6 @@ VariableDeclaration: VariableDeclarationAST = {
         VariableDeclarationAST {
           name,
           attributes: attributes.unwrap_or_default(),
-          arity,
           sort
         }
     }
@@ -226,12 +217,13 @@ SortSpec: BxSortSpecAST = {
     <SortId> => {
         Box::new(SortSpecAST::Sort(<>))
     },
-    <arg_sorts: SortId+> ArrowOp <domain_sort: SortId> => {
+    <arg_sorts: SortId*> ArrowOp <target_sort: SortId> => {
+        let functor = FunctorSortAST {
+            arg_sorts,
+            target_sort
+        };
         Box::new(
-            SortSpecAST::Functor{
-                arg_sorts,
-                domain_sort
-            }
+            SortSpecAST::Functor(Box::new(functor))
         )
     }
 };
@@ -260,7 +252,7 @@ Condition: ConditionAST = {
         ConditionAST::Match { lhs, rhs }
     },
 
-    <lhs: Term> SortOp <sort: SortSpec> => {
+    <lhs: Term> SortOp <sort: SortId> => {
         ConditionAST::SortMembership { lhs, sort }
     },
 

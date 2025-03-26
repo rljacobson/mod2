@@ -1,22 +1,32 @@
 use mod2_abs::IString;
 use crate::{
-  core::{
-    symbol_core::SymbolCore,
-    format::{FormatStyle, Formattable}
-  },
   api::{
     symbol::Symbol,
     Arity
   },
+  core::format::{FormatStyle, Formattable},
   impl_display_debug_for_formattable
 };
+use crate::core::sort::SortPtr;
+use crate::core::symbol::{SymbolAttributes, SymbolType};
+use crate::core::symbol::SymbolCore;
 
 pub struct FreeSymbol {
   core: SymbolCore
 }
 
 impl FreeSymbol {
-  pub(crate) fn with_arity(name: IString, arity: Arity) -> FreeSymbol {
+  pub fn new(
+    name: IString,
+    arity: Arity,
+    attributes : SymbolAttributes,
+    symbol_type: SymbolType,
+  ) -> FreeSymbol {
+    let core = SymbolCore::new(name, arity, attributes, symbol_type);
+    FreeSymbol{ core }
+  }
+  
+  pub fn with_arity(name: IString, arity: Arity) -> FreeSymbol {
     let core = SymbolCore::with_arity(name, arity);
     FreeSymbol { core }
   }

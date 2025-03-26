@@ -46,6 +46,9 @@ use std::collections::HashMap as StdHashMap;
 pub use std::collections::HashSet;
 pub use std::collections::HashMap;
 
+// For vectors that are expected to have few or zero elements.
+pub use smallvec::{SmallVec, smallvec};
+
 /// A `ThingSet` is a hash set of `*const dyn Things`. They are useful if you need to test membership but never need
 /// to access the original `Thing`.
 pub type Set<T> = StdHashSet<T>; // This replaces Maude's `PointerSet` in most situations.
