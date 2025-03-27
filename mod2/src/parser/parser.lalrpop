@@ -2,6 +2,8 @@ use mod2_abs::IString;
 use mod2_lib::api::built_in::{
     NaturalNumber,
     Integer,
+    Float,
+    StringBuiltIn
 };
 use crate::{
   parser::ast::{
@@ -41,12 +43,18 @@ match {
     r"//[^\n\r]*[\n\r]*" => { },
 
     // Skip `/* comments */`
-    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => { },
+    r"/\*[^*]*\*+(?:[^/*][^*]*\*+)\*/" => { },
     _
 }
 
 Identifier: IString = {
     <id: r#"[a-zA-Z][a-zA-Z_]*"#> => IString::from(id)
+};
+
+Float: Float = {
+    <x: r#"(\d+\.\d*|\d*\.\d+)([eE][+-]?\d+)?"#> => {
+            x.parse().unwrap()
+        }
 };
 
 NaturalNumber: NaturalNumber = {
@@ -210,6 +218,7 @@ Term: BxTermAST = {
     },
     <name: Identifier> => Box::new(TermAST::Identifier(name)),
     <n: NaturalNumber> => Box::new(TermAST::NaturalNumber(n as NaturalNumber)),
+    <x: Float> => Box::new(TermAST::Float(x)),
     "(" <Term> ")"
 };
 

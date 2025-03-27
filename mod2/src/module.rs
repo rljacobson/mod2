@@ -242,11 +242,11 @@ mod tests {
     match result {
       Ok(ast) => {
         println!("SUCCESS!");
-        return Ok(ast);
+        Ok(ast)
       },
       Err(e) => {
         eprintln!("Parse error: {}", e);
-        return Err(());
+        Err(())
       }
     }
   }
