@@ -82,16 +82,21 @@ impl NaturalNumberTerm {
 
 impl<T: Any + Display> Formattable for NATerm<T> {
   fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
-    let name = self.core.symbol.deref().name();
+    let name = self.core.symbol.name();
+    let value_str = if *name == *"String" {
+      format!("\"{}\"", self.value)
+    } else { 
+      self.value.to_string()
+    };
     match  style {
       FormatStyle::Debug => {
-        write!(f, "{}Term<{}>", name, self.value)
+        write!(f, "{}Term<{}>", name, value_str)
       }
       
       FormatStyle::Simple
       | FormatStyle::Input
       | FormatStyle::Default => {
-        write!(f, "{}", self.value)
+        write!(f, "{}", value_str)
       }
     }
   }

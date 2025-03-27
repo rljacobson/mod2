@@ -105,7 +105,7 @@ impl Kind {
 
     // Save initial sort so that we have a name for the component and its error sort.
     // The error sort of each component is added to the module.
-    
+
     let mut error_sort = SortPtr::new(heap_construct!(Sort::new(initial_sort.name.clone())));
 
     // Recursively call `register_connected_sorts` on sub- and supersorts.
@@ -113,10 +113,10 @@ impl Kind {
     kind.register_connected_sorts(initial_sort, &mut visited_sort_count);
 
     if visited_sort_count == 1 {
-      // ToDo: Recording the error here might not be necessary considering we are returning the `Kind` wrapped in an 
+      // ToDo: Recording the error here might not be necessary considering we are returning the `Kind` wrapped in an
       //       error.
-      
-      // The error is that the connected component in the sort graph that contains `initial_sort` has no maximal sorts 
+
+      // The error is that the connected component in the sort graph that contains `initial_sort` has no maximal sorts
       // due to a cycle.
       kind.error_free = false;
       // Instead of marking the `Module` bad here, we return the constructed `Kind` wrapped in an error. The caller can
@@ -205,7 +205,7 @@ impl Kind {
       // of that subsort have been "resolved" before the subsort is added.
       subsort.index_within_kind -= 1;
       if subsort.index_within_kind == 0 {
-        // All supersorts resolved, so add to kind. There is a symmetric statement 
+        // All supersorts resolved, so add to kind. There is a symmetric statement
         // for subsorts in `Kind::register_connected_sorts`
         subsort.index_within_kind = self.append_sort(*subsort);
       }
@@ -217,9 +217,9 @@ impl Kind {
     self.sorts.push(sort);
     (self.sorts.len() - 1) as u32
   }
-  
+
   // region Accessors
-  
+
   pub fn sort_count(&self) -> usize {
     self.sorts.len()
   }
@@ -227,14 +227,14 @@ impl Kind {
   pub fn sort(&self, idx: usize) -> SortPtr {
     self.sorts[idx]
   }
-  
+
   // endregion Accessors
 }
 
 impl Display for Kind {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    let iter = self.sorts.iter().map(|sort_ptr| sort_ptr.name.deref());
-    write!(f, "{{{}}}", join_iter(iter, |_| ", ").collect::<String>())
+    let iter = self.sorts.iter().map(|sort_ptr| sort_ptr.to_string());
+    write!(f, "{{{}}}", join_iter(iter, |_| ", ".to_string()).collect::<String>())
   }
 }
 

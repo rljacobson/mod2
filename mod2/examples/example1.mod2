@@ -17,6 +17,9 @@ sort A< C;
 sort B <D;
 sort C<D;
 
+rule f(X) => g(X) if X = 1;
+rule f(X) => "string lit" if X = 1.04;
+
 mod NaturalNumbers {
     // op _+_ : NzNat NzNat -> NzNat [ctor assoc comm id: 0] .
 

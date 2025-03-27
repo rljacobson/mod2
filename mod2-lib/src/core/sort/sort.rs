@@ -26,12 +26,10 @@ section titled, "Optimizations for Computing a Subsort Relation at Runtime."
 
 */
 
-use std::fmt::Display;
+use std::fmt::Write;
 use mod2_abs::{NatSet, IString, UnsafePtr};
-use crate::{
-  api::{built_in::get_built_in_sort, Arity},
-  core::sort::kind::KindPtr,
-};
+use crate::{api::{built_in::get_built_in_sort, Arity}, core::sort::kind::KindPtr, impl_display_debug_for_formattable};
+use crate::core::format::{FormatStyle, Formattable};
 
 /// A pointer to a sort. No ownership is assumed.
 pub type SortPtr  = UnsafePtr<Sort>;
@@ -163,8 +161,15 @@ impl Sort {
   }
 }
 
-impl Display for Sort {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.name)
+
+impl Formattable for Sort {
+  fn repr(&self, out: &mut dyn Write, _style: FormatStyle) -> std::fmt::Result {
+    if self.index_within_kind == 0 {
+      write!(out, "[{}]", self.name)
+    } else { 
+      write!(out, "{}", self.name)
+    }
   }
 }
+
+impl_display_debug_for_formattable!(Sort);
