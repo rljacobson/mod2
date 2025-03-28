@@ -1,24 +1,70 @@
-use mod2_abs::NatSet;
-use crate::api::Arity;
-use crate::core::sort::kind::KindPtr;
-use crate::core::sort::SortPtr;
-use crate::core::symbol::op_declaration::{ConstructorStatus, OpDeclaration};
+use std::{
+  collections::{HashMap, HashSet},
+  fmt::Write
+};
+
+use mod2_abs::{
+  numeric::{
+    traits::{One, Zero},
+    BigInt,
+  },
+  debug, NatSet, tracing::warn, error,
+};
+
+use crate::{
+  core::{
+    sort::{
+      SortPtr,
+      SpecialSort,
+      kind::KindPtr
+    },
+    symbol::op_declaration::{ConstructorStatus, OpDeclaration}
+  },
+  api::{
+    symbol::SymbolPtr,
+    Arity
+  },
+};
 
 // ToDo: Most of these vectors are likely to be small. Benchmark with tiny_vec.
-#[derive(PartialEq, Eq, Default)]
+#[derive(PartialEq, Eq)]
 pub struct SortTable {
-  arg_count:                 i16,
-  op_declarations:           Vec<OpDeclaration>,
-  arg_kinds:                 Vec<KindPtr>,      // "component vector"
-  sort_diagram:              Vec<i32>,
-  single_non_error_sort:     Option<SortPtr>,   // if we can only generate one non-error sort
-  constructor_diagram:       Vec<i32>,
-  maximal_op_decl_set_table: Vec<NatSet>,       // indices of maximal op decls with range <= each sort
+  symbol                   : Option<SymbolPtr>,
+  arg_count                : i16,
+  op_declarations          : Vec<OpDeclaration>,
+  arg_kinds                : Vec<KindPtr>,       // "component vector"
+  pub sort_diagram             : Vec<i32>,
+  single_non_error_sort    : Option<SortPtr>,    // if we can only generate one non-error sort
+  constructor_diagram      : Vec<i32>,
+  maximal_op_decl_set_table: Vec<NatSet>,        // indices of maximal op decls with range <= each sort
+}
+
+impl Default for SortTable {
+  fn default() -> Self {
+    Self {
+      symbol                   : None,
+      arg_count                : 0,
+      op_declarations          : Vec::new(),
+      arg_kinds                : Vec::new(),
+      sort_diagram             : Vec::new(),
+      single_non_error_sort    : None,
+      constructor_diagram      : Vec::new(),
+      maximal_op_decl_set_table: Vec::new(),
+    }
+  }
 }
 
 impl SortTable {
+  pub fn new(parent_symbol: SymbolPtr) -> Self {
+    Self {
+      symbol: Some(parent_symbol),
+      ..SortTable::default()
+    }
+  }
+
+
   /// Is the symbol strictly a constructor (non constructor)? Used to determine if
-  /// every member of the kind can share a single constructor. 
+  /// every member of the kind can share a single constructor.
   #[inline(always)]
   pub fn constructor_status(&self) -> ConstructorStatus {
     let mut constructor_status = ConstructorStatus::Unspecified;
@@ -27,7 +73,7 @@ impl SortTable {
     }
     constructor_status
   }
-  
+
   #[inline(always)]
   pub fn arity(&self) -> Arity {
     self.arg_count.into()
@@ -50,7 +96,7 @@ impl SortTable {
   pub fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
     if self.op_declarations.is_empty() {
       self.arg_count = op_declaration.arity();
-    } else { 
+    } else {
       assert_eq!(
         (op_declaration.len() - 1) as i16,
         self.arg_count,
@@ -69,7 +115,7 @@ impl SortTable {
   }
 
   #[inline(always)]
-  pub fn range_component(&self) -> KindPtr {
+  pub fn range_kind(&self) -> KindPtr {
     // ToDo: Is this function fallible? Should it return `Option<KindPtr>`?
     //       If this is only ever called after `Module::compute_kind_closures()`, this is safe.
     unsafe { (&self.op_declarations[0])[self.arg_count as usize].kind.unwrap_unchecked() }
@@ -101,7 +147,7 @@ impl SortTable {
   pub fn get_single_non_error_sort(&self) -> Option<SortPtr> {
     self.single_non_error_sort.clone()
   }
-  
+
   #[inline(always)]
   pub fn traverse(&self, position: usize, sort_index: usize) -> i32 {
     // ToDo: Do we need a bounds check?
@@ -127,7 +173,7 @@ impl SortTable {
   }
 
   pub fn compute_maximal_op_decl_set_table(&mut self) {
-    let range             = self.range_component();
+    let range             = self.range_kind();
     let sort_count        = range.sort_count();
     let declaration_count = self.op_declarations.len();
 
@@ -154,14 +200,405 @@ impl SortTable {
       }
     }
   }
-  
-  /// The sort diagram is a data structure used to efficiently determine the result sort
-  /// of an operator application in Maude, based on the sorts of its arguments. It encodes
-  /// all valid combinations of argument sorts and their corresponding result sorts,
-  /// allowing for fast, table-driven lookup at runtime. This eliminates the need to search
-  /// through all operator declarations, supports polymorphic operators, and ensures that
-  /// sort constraints are enforced consistently and efficiently during term rewriting.
+
+  /// Called from `Module::close_theory()`
+  pub fn compile_op_declaration(&mut self) {
+    debug_assert!(self.op_declarations.len() > 0);
+    self.arg_kinds.reserve((self.arg_count + 1) as usize);
+
+    for (i, arg) in self.op_declarations[0].sort_spec.iter().enumerate() {
+      let kind = unsafe{ arg.kind.unwrap_unchecked() };
+
+      // Check that components really do agree for subsort overloaded operator declarations
+      for other_op_decl in self.op_declarations.iter().skip(1){
+        let other_op_kind = unsafe{ other_op_decl.sort_spec[i].kind.unwrap_unchecked() };
+        if kind != other_op_kind {
+          error!(0, 
+            "Sort declarations for operator {} disagree on the sort component for argument {}",
+            self.symbol.unwrap(),
+            i + 1
+          );
+        }
+      }
+      
+      self.arg_kinds.push(kind);
+    }
+    
+    self.build_sort_diagram();
+    if self.constructor_status() == ConstructorStatus::Complex {
+      // self.build_constructor_diagram();
+    }
+  }
+
+  /// Builds the sort diagram for this operator, encoding all valid combinations of argument
+  /// sorts and their corresponding result sorts. This precomputes a table used at runtime for
+  /// efficient sort checking and inference during term rewriting. Handles both polymorphic
+  /// and overloaded operator declarations, and detects sort ambiguities when they arise.
   fn build_sort_diagram(&mut self) {
-    todo!()
+    let nr_declarations    = self.op_declarations.len();
+    let mut current_states = vec![NatSet::new()];
+    let all                = &mut current_states[0];
+
+    // Initialize with all declarations in reverse order
+    for i in (0..nr_declarations).rev() {
+      all.insert(i);
+    }
+
+    if self.arg_count == 0 {
+      let (sort_index, unique) = self.find_min_sort_index(all);
+      assert!(unique, "sort declarations for constant do not have a unique least sort.");
+      self.sort_diagram.push(sort_index as i32);
+      self.single_non_error_sort = Some(self.arg_kinds[0].sort(sort_index as usize));
+      return;
+    }
+
+    const UNINITIALIZED: i32            = 0;
+    const IMPOSSIBLE   : i32            = -1;
+    let mut single_non_error_sort_index = UNINITIALIZED;
+    let mut next_states                 = Vec::new();
+    let mut current_base                = 0;
+    let mut bad_terminals               = std::collections::HashSet::new();
+
+    for i in 0..self.arg_count as usize {
+      let component         = self.arg_kinds[i];
+      let nr_sorts          = component.sort_count();
+      let nr_current_states = current_states.len();
+
+      let next_base = current_base + nr_sorts * nr_current_states;
+      self.sort_diagram.resize(next_base, 0);
+
+      let nr_next_sorts = if i == (self.arg_count - 1) as  usize {
+        0
+      } else {
+        self.arg_kinds[i + 1].sort_count()
+      };
+
+      for j in 0..nr_sorts {
+        let s = component.sort(j);
+        let mut viable = NatSet::new();
+
+        for (k, decl) in self.op_declarations.iter().enumerate() {
+          if s.leq(decl.sort_spec[i]) {
+            viable.insert(k);
+          }
+        }
+
+        for k in 0..nr_current_states {
+          let mut next_state = viable.intersection(&current_states[k]);
+          let index          = current_base + k * nr_sorts + j;
+
+          if nr_next_sorts == 0 {
+            let (sort_index, unique) = self.find_min_sort_index(&next_state);
+            let sort_index           = sort_index as i32;
+            self.sort_diagram[index] = sort_index;
+            if !unique {
+              bad_terminals.insert(index);
+            }
+            if sort_index > 0 {
+              if single_non_error_sort_index == UNINITIALIZED {
+                single_non_error_sort_index = sort_index;
+              } else if single_non_error_sort_index != sort_index {
+                single_non_error_sort_index = IMPOSSIBLE;
+              }
+            }
+          } else {
+            self.minimize(&mut next_state, i + 1);
+            let state_num            = SortTable::find_state_number(&mut next_states, next_state);
+            self.sort_diagram[index] = (next_base + nr_next_sorts * state_num) as i32;
+          }
+        }
+      }
+
+      std::mem::swap(&mut current_states, &mut next_states);
+      next_states.clear();
+      current_base = next_base;
+    }
+
+    if single_non_error_sort_index > 0 {
+      self.single_non_error_sort = Some(
+        self.arg_kinds[self.arg_count as usize].sort(single_non_error_sort_index as usize),
+      );
+    }
+
+    if !bad_terminals.is_empty() {
+      self.sort_error_analysis(true, &bad_terminals);
+    }
+
+    debug!(4, "sort table for {} has {} entries", self.symbol.unwrap(), self.sort_diagram.len());
+  }
+
+
+  /// Given a set of operator declarations, finds the minimal (most specific) result sort
+  /// that is consistent with all declarations in the set. The index of the minimal sort
+  /// and a bool to indicate whether the minimal sort is unambiguous. Used to determine
+  /// the result sort for a given combination of argument sorts in the sort diagram.
+  fn find_min_sort_index(&self, state: &NatSet) -> (u32, bool) {
+    let arg_count = self.arg_count as usize;
+
+    // Start with the error sort
+    let mut min_sort   = self.arg_kinds[arg_count].sort(SpecialSort::ErrorSort.into());
+    let mut inf_so_far = min_sort.leq_sorts.clone();
+
+    for i in state.iter() {
+      let range_sort      = self.op_declarations[i].sort_spec[arg_count];
+      let range_leq_sorts = &range_sort.leq_sorts;
+      inf_so_far          = inf_so_far.intersection(range_leq_sorts);
+
+      // If the intersection is exactly equal to the current range's leq
+      // sorts, it means the current range sort is ≤ all seen so far.
+      //
+      // This test only succeeds if rangeSort is less than or equal to the range
+      // sorts of the previous declarations in the state. Thus, in the case of
+      // a non-preregular operator we break in favor of the earlier declaration.
+      if inf_so_far == *range_leq_sorts {
+        min_sort = range_sort;
+      }
+    }
+
+    let unique = inf_so_far == min_sort.leq_sorts;
+    (min_sort.index_within_kind, unique)
+  }
+
+  /// Removes redundant operator declarations from the given set by eliminating any
+  /// declaration that is partially subsumed by an earlier one, relative to the specified
+  /// argument position. This reduces the number of states needed in the sort diagram
+  /// by collapsing equivalent or more general cases during diagram construction.
+  fn minimize(&self, alive: &mut NatSet, arg_nr: usize) {
+    // Skip if the set is empty
+    if alive.is_empty() {
+      return;
+    }
+
+    let min = alive.min_value().unwrap();
+    let max = alive.max_value().unwrap();
+
+    for i in min..=max {
+      if alive.contains(i) {
+        for j in min..=max {
+          if j != i && alive.contains(j) && self.partially_subsumes(i, j, arg_nr) {
+            alive.remove(j);
+          }
+        }
+      }
+    }
+  }
+
+  /// Determines whether one operator declaration (`subsumer`) partially subsumes
+  /// another (`victim`) at or beyond the given argument position (`arg_nr`). A declaration
+  /// subsumes another if its result sort is less than or equal to the other's, and each
+  /// corresponding argument sort from `arg_nr` onward is greater than or equal to the
+  /// other's. Used in minimization to eliminate redundant declarations.
+  fn partially_subsumes(&self, subsumer: usize, victim: usize, arg_idx: usize) -> bool {
+    let arg_count      = self.arg_count as usize;
+    let subsumer_sorts = &self.op_declarations[subsumer].sort_spec;
+    let victim_sorts   = &self.op_declarations[victim].sort_spec;
+
+    // Check the range sort
+    if !subsumer_sorts[arg_count].leq(victim_sorts[arg_count]) {
+      return false;
+    }
+    // Check the domain sorts
+    for i in arg_idx..arg_count {
+      if !victim_sorts[i].leq(subsumer_sorts[i]) {
+        return false;
+      }
+    }
+
+    true
+  }
+
+  /// Finds the index of a given state (`state`) in the existing set of states (`state_set`).
+  /// If the state is already present, returns its index. Otherwise, appends it to the set
+  /// and returns the new index. This is used during sort diagram construction to assign
+  /// unique indices to distinct sort state combinations.
+  fn find_state_number(state_set: &mut Vec<NatSet>, state: NatSet) -> usize {
+    for (i, existing) in state_set.iter().enumerate() {
+      if *existing == state {
+        return i;
+      }
+    }
+    state_set.push(state);
+    state_set.len() - 1
+  }
+
+
+  /// Performs consistency error analysis on the sort or constructor diagram after detecting
+  /// ambiguous or conflicting sort declarations. It builds a spanning tree from the sort
+  /// diagram to trace sort tuples that lead to errors, computes how many such tuples exist,
+  /// and identifies the first encountered problematic tuple to provide meaningful diagnostics.
+  fn sort_error_analysis(&self, prereg_problem: bool, bad_terminals: &HashSet<usize>) {
+    // First we build a spanning tree with a path count, parent node and sort index (from parent)
+    // for each node. Nonterminal nodes are named by their start index in the diagram vector
+    // while terminals are named by the absolute index of the terminal in the diagram vector.
+
+    /// Represents a node in the sort error analysis spanning tree.
+    #[derive(Default)]
+    struct Node {
+      path_count: BigInt,
+      parent    : Option<usize>,
+      sort_index: Option<usize>,
+    }
+
+    let diagram = if prereg_problem { &self.sort_diagram } else { &self.constructor_diagram };
+    let nr_args = self.arg_count as usize;
+
+    let mut spanning_tree: HashMap<usize, Node> = HashMap::new();
+    spanning_tree.insert(0, Node {
+      path_count: BigInt::one(),
+      parent    : None,
+      sort_index: None,
+    });
+
+    let mut product       = BigInt::one();
+    let mut bad_count     = BigInt::zero();
+    let mut first_bad     = vec![0; nr_args];
+    let mut current_nodes = HashSet::new();
+
+    current_nodes.insert(0);
+
+    for i in 0..nr_args {
+      let component       = self.arg_kinds[i];
+      let nr_sorts        = component.sort_count();
+      let mut next_nodes  = HashSet::new();
+      product            *= nr_sorts;
+
+      for &parent in &current_nodes {
+        let path_count = spanning_tree[&parent].path_count.clone();
+
+        for k in 0..nr_sorts {
+          let index = parent + k;
+
+          if i == nr_args - 1 {
+            // Terminal node
+            if bad_terminals.contains(&index) {
+              if bad_count.is_zero() {
+                bad_count = path_count.clone();
+                first_bad[nr_args - 1] = k;
+
+                let mut n = parent;
+                for l in (0..nr_args - 1).rev() {
+                  if let Some(node) = spanning_tree.get(&n) {
+                    first_bad[l] = node.sort_index.expect("missing sort index");
+                    n = node.parent.expect("missing parent");
+                  } else {
+                    panic!("missing node in spanning tree");
+                  }
+                }
+              } else {
+                bad_count += path_count.clone();
+              }
+            }
+          } else {
+            // Non-terminal node
+            let target = diagram[index] as usize;
+            let entry  = spanning_tree.entry(target).or_insert_with(Node::default);
+
+            if entry.path_count.is_zero() {
+              entry.path_count = path_count.clone();
+              entry.parent     = Some(parent);
+              entry.sort_index = Some(k);
+              next_nodes.insert(target);
+            } else {
+              entry.path_count += path_count.clone();
+            }
+          }
+        }
+      }
+
+      current_nodes = next_nodes;
+    }
+
+    // Emit warning
+    let kind  = if prereg_problem { "sort" } else { "constructor" };
+    let check = if prereg_problem { "preregularity" } else { "constructor consistency" };
+
+    warn!(
+      "{} declarations for operator symbol failed {} check on {} out of {} sort tuples. First such tuple is ({}).",
+      kind,
+      check,
+      bad_count,
+      product,
+      first_bad.iter()
+               .enumerate()
+               .map(|(i, &idx)| format!("{}", self.arg_kinds[i].sort(idx)))
+               .collect::<Vec<_>>()
+               .join(", ")
+    );
+  }
+
+  /// Usage:
+  ///     let mut out = String::new();
+  ///     sort_table.dump_sort_diagram(&mut out, 2).unwrap();
+  ///     println!("{}", out);
+  #[cfg(feature = "debug")]
+  pub fn dump_sort_diagram(&self, f: &mut impl Write, indent_level: usize) -> std::fmt::Result {
+    if self.special_sort_handling() {
+      return Ok(());
+    }
+
+    writeln!(f, "{}Begin{{SortDiagram}}", " ".repeat(indent_level))?;
+    let indent_level = indent_level + 2;
+    let mut nodes: HashSet<usize> = HashSet::new();
+    nodes.insert(0);
+
+    let range = self.arg_kinds[self.arg_count as usize]; // Result component
+
+    if self.arg_count == 0 {
+      let target = self.sort_diagram[0];
+      writeln!(
+        f,
+        "{}node 0 -> sort {} ({})",
+        " ".repeat(indent_level - 1),
+        target,
+        range.sort(target as usize)
+      )?;
+      return Ok(());
+    }
+
+    for i in 0..(self.arg_count as usize) {
+      let component = self.arg_kinds[i];
+      let nr_sorts = component.sort_count();
+      let mut next_nodes = HashSet::new();
+
+      for &node in &nodes {
+        writeln!(
+          f,
+          "{}Node {} (testing argument {})",
+          " ".repeat(indent_level - 1),
+          node,
+          i
+        )?;
+
+        for k in 0..nr_sorts {
+          let index = node + k;
+          let target = self.sort_diagram[index];
+
+          write!(
+            f,
+            "{}sort {} ({}) -> ",
+            " ".repeat(indent_level),
+            k,
+            component.sort(k)
+          )?;
+
+          if i == self.arg_count as usize - 1 {
+            writeln!(
+              f,
+              "sort {} ({})",
+              target,
+              range.sort(target as usize)
+            )?;
+          } else {
+            writeln!(f, "node {}", target)?;
+            next_nodes.insert(target as usize);
+          }
+        }
+      }
+
+      nodes = next_nodes;
+    }
+
+    writeln!(f, "{}End{{SortDiagram}}", " ".repeat(indent_level - 2))?;
+    Ok(())
   }
 }

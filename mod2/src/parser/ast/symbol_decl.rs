@@ -126,10 +126,18 @@ pub fn construct_symbol_from_decl(
   
   match symbols.entry(name.clone()) {
 
-    Entry::Occupied(s) => {
-      // ToDo: Under what circumstances would a symbol already exist? If the symbol is already declared, this
-      //       should be a duplicate declaration and thus an error.
-      panic!("duplicate variable declaration");
+    Entry::Occupied(mut entry) => {
+      // Operators (functions) can be overloaded. E.g., for A < B and X < Y, we could have
+      //    symbol f: A A -> X;
+      //    symbol f: B B -> Y;
+      let symbol = entry.get_mut();
+      
+      if let Some(type_signature) = type_signature {
+        let constructor_status = attributes.contains(SymbolAttribute::Constructor);
+        let op_declaration     = OpDeclaration::new(type_signature, constructor_status.into());
+        let symbol_copy        = *symbol; // force copy
+        symbol.add_op_declaration(symbol_copy, op_declaration);
+      }
     },
 
     Entry::Vacant(entry) => {
@@ -174,7 +182,8 @@ pub fn construct_symbol_from_decl(
       if let Some(type_signature) = type_signature {
         let constructor_status = attributes.contains(SymbolAttribute::Constructor);
         let op_declaration = OpDeclaration::new(type_signature, constructor_status.into());
-        symbol.add_op_declaration(op_declaration);
+        let symbol_copy = symbol; // force copy
+        symbol.add_op_declaration(symbol_copy, op_declaration);
       }
       
       entry.insert(symbol);

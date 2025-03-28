@@ -24,6 +24,11 @@ impl NatSet {
   }
 
   #[inline(always)]
+  pub fn max_value(&self) -> Option<usize> {
+    self.0.iter().last()
+  }
+
+  #[inline(always)]
   pub fn contains(&self, value: usize) -> bool {
     self.0.contains(value)
   }

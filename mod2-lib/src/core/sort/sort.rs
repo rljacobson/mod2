@@ -51,6 +51,16 @@ impl SpecialSort {
   pub const ErrorSort: SpecialSort = SpecialSort::Kind;
 }
 
+impl From<SpecialSort> for usize {
+  fn from(value: SpecialSort) -> Self {
+    match value {
+      SpecialSort::Kind => 0,
+      SpecialSort::FirstUserSort => 1,
+      SpecialSort::Unknown => panic!("Sort::Unknown cannot be converted to usize"),
+    }
+  }
+}
+
 
 #[derive(Eq, PartialEq, Clone)]
 pub struct Sort {

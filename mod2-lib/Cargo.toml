@@ -12,8 +12,9 @@ keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-r
 categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
 
 [features]
-default  = ["gc_debug"]
+default  = ["gc_debug", "debug"]
 
+debug         = []
 gc_debug      = []
 multithreaded = []
 
