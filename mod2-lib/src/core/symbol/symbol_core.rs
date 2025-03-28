@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::sync::atomic::{AtomicU32, Ordering};
 use mod2_abs::{int_to_subscript, IString};
 use crate::{
   api::Arity,
@@ -49,10 +50,10 @@ impl SymbolCore {
     ) -> SymbolCore
   {
     // Compute hash
-    static mut SYMBOL_COUNT: u32 = 0;
-    unsafe{ SYMBOL_COUNT += 1; }
+    static SYMBOL_COUNT: AtomicU32 = AtomicU32::new(0);
+    SYMBOL_COUNT.fetch_add(1, Ordering::Relaxed);
     let numeric_arity: u32 = arity.as_numeric();
-    let hash_value = unsafe{ SYMBOL_COUNT } | (numeric_arity << 24); // Maude: self.arity << 24
+    let hash_value = SYMBOL_COUNT.load(Ordering::Relaxed) | (numeric_arity << 24); // Maude: self.arity << 24
 
     let symbol = SymbolCore {
       name,

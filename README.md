@@ -1,17 +1,19 @@
 # `mod2-lib`: A pattern matching and term rewriting library
 
-- The `mod2-lib` library builds on lessons learned in previous experiments to bring advanced pattern matching algorithms 
+- The [`mod2-lib`](mod2-lib/README.md) library builds on lessons learned in previous experiments to bring advanced pattern matching algorithms 
   to Rust.
 
-- The `mod2` crate is a small Maude-like language meant to exercise the algorithms in `mod2-lib` and stand as a thorough
+- The [`mod2`](mod2/README.md) crate is a small Maude-like language meant to exercise the algorithms in `mod2-lib` and stand as a thorough
   example of how to use `mod2-lib`.
 
-- The `mod2-abs` crate is an abstraction layer over backend implementations of various generally useful utilities used 
+- The [`mod2-abs`](mod2-abs/README.md) crate is an abstraction layer over backend implementations of various generally useful utilities used 
   throughout.
 
 This project is a work in progress. For a more complete work, check out [Loris](https://github.com/rljacobson/loris).
 
 # Status
+
+## Syntax for mod2
 
 - [X] Lexer & parser
 - [X] M-expression
@@ -20,11 +22,23 @@ This project is a work in progress. For a more complete work, check out [Loris](
 - [ ] Module & submodule semantics
 - [ ] custom operators
 - [ ] Imperative Language
-  - [ ]  match
-  - [ ]  match_all
-  - [ ]  unify
-  - [ ]  replace
-  - [ ]  replace_all
+
+## mod2-lib algorithms
+
+- [ ] Sort infrastructure
+- [ ] Dagify
+- [ ] Compilers
+  - [ ] automata
+  - [ ] Stack Machine
+- [ ] Match
+- [ ] Free theory
+  - [ ] Free net
+- [ ] Built-ins
+- [ ] Variable theory
+- [ ] Other theories
+  - [ ] CUI
+  - [ ] AU
+  - [ ] ACU
 
 # License and Authorship
 
