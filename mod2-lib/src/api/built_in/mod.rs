@@ -25,6 +25,7 @@ use crate::{
       SortPtr
     },
     symbol::{
+      OpDeclaration,
       SymbolAttribute,
       SymbolCore,
       SymbolType
@@ -34,7 +35,6 @@ use crate::{
 
 pub use nonalgebraic_term::*;
 pub use nonalgebraic_symbol::*;
-use crate::core::symbol::OpDeclaration;
 
 // Built-in Types
 pub type Bool    = bool;
@@ -48,72 +48,74 @@ pub type NaturalNumber = u64;
 pub type StringBuiltIn = String;
 
 
-static BUILT_IN_SORTS: Lazy<Arc<HashMap<IString, Sort>>> = Lazy::new(|| {
-  let mut sorts = HashMap::new();
-  // ToDo: Warn when a user shadows a built-in.
-  {
-    let name = IString::from("Float");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  {
-    let name = IString::from("Integer");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  {
-    let name = IString::from("NaturalNumber");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  {
-    let name = IString::from("String");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  {
-    let name = IString::from("Bool");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  {
-    let name = IString::from("Any");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  {
-    let name = IString::from("None");
-    let sort = Sort::new(name.clone());
-    sorts.insert(name, sort);
-  }
-  Arc::new(sorts)
-});
-
 macro_rules! make_symbol {
     ($sort_name:expr, $symbol_name:expr, $symbol_type:expr) => {
         {
-          let sort_name   = IString::from($sort_name);
-          let sort        = get_built_in_sort(&sort_name).unwrap();
-          let symbol_name = IString::from($symbol_name);
-          let mut symbol_core = SymbolCore::new(
+          let sort            = get_built_in_sort($sort_name).unwrap();
+          let symbol_name     = IString::from($symbol_name);
+          let symbol_core = SymbolCore::new(
             symbol_name.clone(),
             Arity::Value(0),
             SymbolAttribute::Constructor.into(),
             $symbol_type,
-            // sort,
           );
-          let op_declaration = OpDeclaration::new(smallvec![sort], true.into());
-          symbol_core.add_op_declaration(op_declaration);
+          let symbol          = Box::new(BoolSymbol::new(symbol_core));
+          let mut symbol_ptr  = SymbolPtr::new(Box::into_raw(symbol));
+          let op_declaration  = OpDeclaration::new(smallvec![sort], true.into());
+          let symbol_ptr_copy = symbol_ptr; // Force copy
+          symbol_ptr.add_op_declaration(symbol_ptr_copy, op_declaration);
           
-          let symbol     = Box::new(BoolSymbol::new(symbol_core));
-          let symbol_ptr = SymbolPtr::new(Box::into_raw(symbol));
-          (symbol_name, symbol_ptr)
+          ($symbol_name, symbol_ptr)
         }
     };
 }
 
-static BUILT_IN_SYMBOLS: Lazy<Arc<HashMap<IString, SymbolPtr>>> = Lazy::new(|| {
-  let mut symbols = HashMap::new();
+static BUILT_IN_SORTS: Lazy<HashMap<&'static str, Sort>> = Lazy::new(|| {
+  let mut sorts = HashMap::default();
+  // ToDo: Warn when a user shadows a built-in.
+  {
+    let name = "Float";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  {
+    let name = "Integer";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  {
+    let name = "NaturalNumber";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  {
+    let name = "String";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  {
+    let name = "Bool";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  {
+    let name = "Any";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  {
+    let name = "None";
+    let sort = Sort::new(IString::from(name));
+    sorts.insert(name, sort);
+  }
+  
+  println!("Initialized built-in sorts: {:?}", sorts);
+  
+  sorts
+});
+
+static BUILT_IN_SYMBOLS: Lazy<HashMap<&'static str, SymbolPtr>> = Lazy::new(|| {
+  let mut symbols = HashMap::default();
   // ToDo: Warn when a user shadows a built-in.
   // Bool true
   {
@@ -145,19 +147,41 @@ static BUILT_IN_SYMBOLS: Lazy<Arc<HashMap<IString, SymbolPtr>>> = Lazy::new(|| {
     let (symbol_name, symbol_ptr) = make_symbol!("NaturalNumber", "NaturalNumber", SymbolType::NaturalNumber);
     symbols.insert(symbol_name, symbol_ptr);
   }
-
-  Arc::new(symbols)
+  
+  symbols
 });
 
 pub fn get_built_in_sort(name: &str) -> Option<SortPtr> {
-  let name = IString::from(name);
-  let sort: &Sort = BUILT_IN_SORTS.get(&name)?;
-  
+  let sort: &Sort = BUILT_IN_SORTS.get(name)?;
   Some(SortPtr::new((sort as *const Sort) as *mut Sort))
 }
 
 pub fn get_built_in_symbol(name: &str) -> Option<SymbolPtr> {
-  let name = IString::from(name);
-  let symbol: SymbolPtr = *BUILT_IN_SYMBOLS.get(&name)?;
+  let symbol: SymbolPtr = *BUILT_IN_SYMBOLS.get(name)?;
   Some(symbol)
+}
+
+
+#[cfg(test)]
+mod tests {
+  use std::ops::Deref;
+  use super::*;
+  
+  #[test]
+  fn test_built_in_sorts() {
+    let maybe_bool_sort = get_built_in_sort("Bool");
+    assert!(maybe_bool_sort.is_some());
+    
+    let bool_sort = maybe_bool_sort.unwrap();
+    assert_eq!(bool_sort.name.deref(), "Bool")
+  }
+
+  #[test]
+  fn test_built_in_symbols() {
+    let maybe_true_symbol = get_built_in_symbol("true");
+    assert!(maybe_true_symbol.is_some());
+
+    let true_symbol = maybe_true_symbol.unwrap();
+    assert_eq!(true_symbol.name().deref(), "true")
+  }
 }

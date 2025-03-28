@@ -40,6 +40,9 @@ mod erased;
 mod graph;
 mod unsafe_ptr;
 
+// Arbitrary precision arithmetic
+pub mod numeric;
+
 // region Hashing data structures
 use std::collections::HashSet as StdHashSet;
 use std::collections::HashMap as StdHashMap;

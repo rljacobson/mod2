@@ -220,37 +220,8 @@ fn format_named_list<T: Display>(f: &mut Formatter<'_>, prefix: &str, name: &str
 
 #[cfg(test)]
 mod tests {
-  use std::assert_matches::assert_matches;
-  use lalrpop_util::{
-    lexer::Token,
-    ParseError
-  };
   use crate::parser::ast::ModuleAST;
-  use super::*;
-
-  fn parse_ex1() -> Result<Box<ModuleAST>, ()>{
-    let path = "examples/example1.mod2";
-    let text = match std::fs::read_to_string(path) {
-      Ok(s) => { s }
-      Err(e) => {
-        panic!("Failed to read {}: {}", path, e);
-      }
-    };
-
-    let parser = crate::parser::parser::ModuleParser::new();
-    let result: Result<Box<ModuleAST>, ParseError<usize, Token, &str>> =  parser.parse(&text);
-    match result {
-      Ok(ast) => {
-        println!("SUCCESS!");
-        Ok(ast)
-      },
-      Err(e) => {
-        eprintln!("Parse error: {}", e);
-        Err(())
-      }
-    }
-  }
-
+  use crate::parser::tests::parse_ex1;
 
   #[test]
   fn test_ex1_construction() {

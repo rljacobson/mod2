@@ -61,15 +61,22 @@ pub trait Symbol {
   fn sort_constraint_table_mut(&mut self) -> &mut Option<SortTable> {
     &mut self.core_mut().sort_table
   }
-  
+
   // endregion Accessors
-  
+
   fn compare(&self, other: &dyn Symbol) -> Ordering {
     self.hash().cmp(&other.hash())
   }
+
+  fn add_op_declaration(&mut self, self_ptr: SymbolPtr, op_declaration: OpDeclaration) {
+    self.core_mut().add_op_declaration(self_ptr, op_declaration);
+  }
   
-  fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
-    self.core_mut().add_op_declaration(op_declaration);
+  /// Called from `Module::close_theory()`
+  fn compile_op_declarations(&mut self) {
+    if let  Some(sort_table) = self.core_mut().sort_table.as_mut() {
+      sort_table.compile_op_declaration()
+    }
   }
 }
 
@@ -77,11 +84,11 @@ pub trait Symbol {
 impl Formattable for dyn Symbol{
   fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
     match style {
-      
+
       FormatStyle::Debug => write!(f, "Symbol<{}>", self.core().name),
-      
+
       _ => write!(f, "{}", self.core().name),
-      
+
     }
   }
 }

@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::sync::atomic::{AtomicU32, Ordering};
 use mod2_abs::{int_to_subscript, IString};
 use crate::{
   api::Arity,
@@ -12,6 +13,7 @@ use crate::{
     strategy::Strategy,
   }
 };
+use crate::api::symbol::SymbolPtr;
 use crate::core::symbol::OpDeclaration;
 
 #[derive(Eq, PartialEq)]
@@ -49,10 +51,10 @@ impl SymbolCore {
     ) -> SymbolCore
   {
     // Compute hash
-    static mut SYMBOL_COUNT: u32 = 0;
-    unsafe{ SYMBOL_COUNT += 1; }
+    static SYMBOL_COUNT: AtomicU32 = AtomicU32::new(0);
+    SYMBOL_COUNT.fetch_add(1, Ordering::Relaxed);
     let numeric_arity: u32 = arity.as_numeric();
-    let hash_value = unsafe{ SYMBOL_COUNT } | (numeric_arity << 24); // Maude: self.arity << 24
+    let hash_value = SYMBOL_COUNT.load(Ordering::Relaxed) | (numeric_arity << 24); // Maude: self.arity << 24
 
     let symbol = SymbolCore {
       name,
@@ -92,11 +94,11 @@ impl SymbolCore {
     self.hash_value
   }
   
-  pub fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
+  pub fn add_op_declaration(&mut self, symbol_ptr: SymbolPtr, op_declaration: OpDeclaration) {
     match &mut self.sort_table {
       
       None => {
-        let mut sort_table = SortTable::default();
+        let mut sort_table = SortTable::new(symbol_ptr);
         sort_table.add_op_declaration(op_declaration);
         self.sort_table = Some(sort_table);
       }

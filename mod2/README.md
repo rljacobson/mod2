@@ -13,7 +13,7 @@ can be "nullary" constants, or _functors_ of specified or variadic arity, or _va
 
 ```maude
 symbol f [assoc, comm, id(h)];
-symbol h/3 :: Int;
+symbol h : Int;
 variable Z;
 ```
 
@@ -33,7 +33,7 @@ and _membership_ axioms, which put constraints on the sorts of expressions.
 ```maude
 rule minus(s(X), s(Y)) => minus(X, Y);
 equation plus(X, Y) = plus(Y, X);
-membership f(X, h(Y, g(Z, Z), f(X))) :: NzNat -> NzNat -> NzNat if X := Y;
+membership f(X, h(Y, g(Z, Z), f(X))) : NzNat NzNat -> NzNat if X := Y;
 ```
 
 All of these may have side conditions, which constrains when the statement can apply. 
