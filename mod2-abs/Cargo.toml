@@ -15,6 +15,7 @@ num-bigint.workspace   = true
 num-traits.workspace   = true
 smallvec.workspace     = true
 string_cache.workspace = true
+paste.workspace        = true
 
 tracing.workspace            = true
 tracing-subscriber.workspace = true

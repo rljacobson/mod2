@@ -1,15 +1,25 @@
-use mod2_abs::IString;
+use mod2_abs::{impl_as_any_ptr_fns, IString};
 use crate::{
-  api::{
-    symbol::Symbol,
-    Arity
+  core::{
+    symbol::{
+      SymbolAttributes,
+      SymbolType,
+      SymbolCore
+    },
+    sort::SortPtr,
+    format::{FormatStyle, Formattable},
   },
-  core::format::{FormatStyle, Formattable},
-  impl_display_debug_for_formattable
+  api::{
+    symbol::{
+      SymbolPtr,
+      Symbol
+    },
+    Arity,
+    free_theory::FreeTerm,
+    term::BxTerm
+  },
+  impl_display_debug_for_formattable,
 };
-use crate::core::sort::SortPtr;
-use crate::core::symbol::{SymbolAttributes, SymbolType};
-use crate::core::symbol::SymbolCore;
 
 pub struct FreeSymbol {
   core: SymbolCore
@@ -33,6 +43,17 @@ impl FreeSymbol {
 }
 
 impl Symbol for FreeSymbol {
+  // impl_as_any_ptr_fns!(Symbol, FreeSymbol);
+  fn as_any(&self) -> &dyn std::any::Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+  fn as_ptr(&self) -> SymbolPtr {
+    SymbolPtr::new(self as *const dyn Symbol as *mut dyn Symbol)
+  }
+
+  fn make_term(&self, args: Vec<BxTerm>) -> BxTerm {
+    Box::new(FreeTerm::new(self.as_ptr(), args))
+  }
+
   fn core(&self) -> &SymbolCore {
     &self.core
   }

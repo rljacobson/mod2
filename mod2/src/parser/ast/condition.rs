@@ -41,7 +41,7 @@ use mod2_lib::{
     term::Term,
   },
 };
-use mod2_lib::api::built_in::get_built_in_symbol;
+use mod2_lib::api::built_in::{get_built_in_symbol, BoolTerm};
 use mod2_lib::api::free_theory::FreeTerm;
 use crate::{
   parser::ast::{
@@ -106,10 +106,9 @@ impl ConditionAST {
 
       ConditionAST::Boolean(lhs) => {
         // The RHS is just boolean true.
-        let true_symbol = get_built_in_symbol("true").unwrap();
         Condition::Equality {
           lhs_term: lhs.construct(symbols),
-          rhs_term: Box::new(FreeTerm::new(true_symbol)),
+          rhs_term: Box::new(BoolTerm::new(true)),
         }
       }
 

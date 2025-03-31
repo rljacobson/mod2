@@ -33,7 +33,7 @@ pub struct SortTable {
   arg_count                : i16,
   op_declarations          : Vec<OpDeclaration>,
   arg_kinds                : Vec<KindPtr>,       // "component vector"
-  pub sort_diagram             : Vec<i32>,
+  pub sort_diagram         : Vec<i32>,
   single_non_error_sort    : Option<SortPtr>,    // if we can only generate one non-error sort
   constructor_diagram      : Vec<i32>,
   maximal_op_decl_set_table: Vec<NatSet>,        // indices of maximal op decls with range <= each sort
@@ -118,6 +118,7 @@ impl SortTable {
   pub fn range_kind(&self) -> KindPtr {
     // ToDo: Is this function fallible? Should it return `Option<KindPtr>`?
     //       If this is only ever called after `Module::compute_kind_closures()`, this is safe.
+    assert!(!self.op_declarations.is_empty(), "cannot get range kind for symbol with no op declarations");
     unsafe { (&self.op_declarations[0])[self.arg_count as usize].kind.unwrap_unchecked() }
   }
 
@@ -126,12 +127,19 @@ impl SortTable {
   /// purposes.
   #[inline(always)]
   pub fn get_range_sort(&self) -> SortPtr {
+    assert!(!self.op_declarations.is_empty(), "cannot get range sort for symbol with no op declarations");
     (&self.op_declarations[0])[self.arg_count as usize]
   }
 
   #[inline(always)]
-  pub fn domain_component(&self, arg_nr: usize) -> KindPtr {
-    unsafe { (&self.op_declarations[0])[arg_nr].kind.unwrap_unchecked() }
+  pub fn domain_component(&self, idx: usize) -> KindPtr {
+    assert!(
+      idx < self.op_declarations.len(),
+      "cannot get domain kind {} for symbol with {} args",
+      idx + 1,
+      self.op_declarations.len()
+    );
+    unsafe { (&self.op_declarations[0])[idx].kind.unwrap_unchecked() }
   }
 
   // #[inline(always)]

@@ -54,7 +54,7 @@ pub struct PreEquation {
   pub conditions: Conditions,
 
   pub lhs_term  : BxTerm,
-  pub kind      : PreEquationKind,
+  pub pe_kind   : PreEquationKind,
 }
 
 
@@ -78,7 +78,7 @@ pub enum PreEquationKind {
 
 impl Display for PreEquation {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match &self.kind {
+    match &self.pe_kind {
 
       PreEquationKind::Equation { rhs_term } => {
         write!(f, "equation {} = {}", self.lhs_term,  rhs_term)?;

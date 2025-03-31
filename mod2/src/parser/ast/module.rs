@@ -6,9 +6,12 @@ use std::{
 use mod2_abs::IString;
 
 use mod2_lib::{
-  api::symbol::{
-    Symbol,
-    SymbolPtr
+  api::{
+    symbol::{
+      Symbol,
+      SymbolPtr
+    },
+    term::BxTerm
   },
   core::{
     pre_equation::{
@@ -28,7 +31,7 @@ use crate::{
     BxRuleDeclarationAST,
     BxSortDeclarationAST,
     ItemAST,
-    construct_symbol_from_decl,
+    construct_symbol_term_from_decl,
     symbol_decl::{
       BxSymbolDeclarationAST,
       BxVariableDeclarationAST
@@ -102,8 +105,10 @@ impl ModuleAST {
     }
 
     // Variable Declarations
+    let mut variables: Vec<BxTerm> = Vec::with_capacity(var_decls.len());
     for var_decl in var_decls {
-      var_decl.construct(&mut symbols, &mut sorts);
+      let var = var_decl.construct(&mut symbols, &mut sorts);
+      variables.push(var);
     }
 
     // Symbol Declarations
@@ -113,7 +118,7 @@ impl ModuleAST {
 
 
     // Rule Declarations
-    let mut rules: Vec<PreEquation> = Vec::new();
+    let mut rules: Vec<PreEquation> = Vec::with_capacity(rule_decls.len());
     for rule_decl in rule_decls {
       let lhs  = rule_decl.lhs.construct(&mut symbols);
       let rhs  = rule_decl.rhs.construct(&mut symbols);
@@ -132,7 +137,7 @@ impl ModuleAST {
         attributes: Default::default(),
         conditions,
         lhs_term  : lhs,
-        kind      : rule,
+        pe_kind: rule,
       };
 
       rules.push(pre_equation);
@@ -140,7 +145,7 @@ impl ModuleAST {
 
 
     // Equation Declarations
-    let mut equations: Vec<PreEquation> = Vec::new();
+    let mut equations: Vec<PreEquation> = Vec::with_capacity(eq_decls.len());
     for eq_decl in eq_decls {
       let lhs      = eq_decl.lhs.construct(&mut symbols);
       let rhs      = eq_decl.rhs.construct(&mut symbols);
@@ -159,7 +164,7 @@ impl ModuleAST {
         attributes: Default::default(),
         conditions,
         lhs_term  : lhs,
-        kind      : equation,
+        pe_kind: equation,
       };
 
       equations.push(pre_equation);
@@ -167,7 +172,7 @@ impl ModuleAST {
 
 
     // Membership Axiom Declarations
-    let mut membership: Vec<PreEquation> = Vec::new();
+    let mut membership: Vec<PreEquation> = Vec::with_capacity(mb_decls.len());
     for mb_decl in mb_decls {
       let lhs        = mb_decl.lhs.construct(&mut symbols);
       let rhs        = mb_decl.rhs.construct(&mut sorts);
@@ -186,7 +191,7 @@ impl ModuleAST {
         attributes: Default::default(),
         conditions,
         lhs_term  : lhs,
-        kind      : membership,
+        pe_kind: membership,
       };
 
       equations.push(pre_equation);

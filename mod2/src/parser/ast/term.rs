@@ -23,6 +23,7 @@ use mod2_lib::{
     term::{BxTerm, Term},
   }
 };
+use mod2_lib::api::built_in::{Bool, BoolTerm};
 use crate::parser::ast::get_or_create_symbol;
 
 pub(crate) type BxTermAST = Box<TermAST>;
@@ -41,6 +42,7 @@ pub(crate) enum TermAST {
   NaturalNumber(NaturalNumber),
   Integer(Integer),
   Float(Float),
+  Bool(Bool)
 }
 
 impl TermAST {
@@ -51,26 +53,22 @@ impl TermAST {
 
       TermAST::Identifier(name) => {
         let symbol = get_or_create_symbol(name, symbols);
-        Box::new(FreeTerm::new(symbol))
+        symbol.make_term(vec![])
       }
 
       TermAST::Application { name, tail } => {
         let symbol = get_or_create_symbol(name, symbols);
-
-        let mut term = FreeTerm::new(symbol);
-        let args = tail.into_iter().map(|t| t.construct(symbols)).collect();
-        term.args = args;
-
-        Box::new(term)
+        let args   = tail.into_iter().map(|t| t.construct(symbols)).collect();
+        symbol.make_term(args)
       }
 
       TermAST::StringLiteral(string_literal) => {
         Box::new(StringTerm::new(string_literal))
       }
 
-      // TermAST::NaturalNumber(natural_number) => {
-      //   Box::new(NaturalNumberTerm::new(natural_number))
-      // }
+      TermAST::Bool(boolean) => {
+        Box::new(BoolTerm::new(*boolean))
+      }
 
       TermAST::Integer(integer) => {
         Box::new(IntegerTerm::new(*integer))
