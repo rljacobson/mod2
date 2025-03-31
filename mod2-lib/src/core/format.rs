@@ -8,7 +8,7 @@ The trait that types that can be formatted implement is `Formattable`. It works 
 `Display` are implemented for `dyn Formattable`, but this isn't enough to implement these traits for `T: Formattable`. 
 We provide a convenience macro that does so:
 
-```ignore
+```
 # use mod2_lib::core::format::{Formattable, FormatStyle, impl_display_debug_for_formattable};
 struct MyStruct;
 impl Formattable for MyStruct {
@@ -18,7 +18,7 @@ impl Formattable for MyStruct {
     write!(f, "MyStruct<{:?}>", style)
   }
 }
-impl_display_debug_for_formattable!(MyStruct)
+impl_display_debug_for_formattable!(MyStruct);
 ```
 
 */

@@ -38,18 +38,17 @@ use mod2_lib::{
   },
   api::{
     symbol::SymbolPtr,
-    term::Term,
+    term::{Term, BxTerm},
+    built_in::{get_built_in_symbol, BoolTerm},
+    free_theory::FreeTerm,
   },
 };
-use mod2_lib::api::built_in::get_built_in_symbol;
-use mod2_lib::api::free_theory::FreeTerm;
-use crate::{
-  parser::ast::{
-    BxFunctorSortAST,
-    BxTermAST
-  },
+
+use crate::parser::ast::{
+  BxFunctorSortAST,
+  BxTermAST,
+  BxSortIdAST,
 };
-use crate::parser::ast::BxSortIdAST;
 
 pub(crate) enum ConditionAST {
   /// Represents equality conditions of the form `lhs = rhs`.
@@ -69,47 +68,47 @@ pub(crate) enum ConditionAST {
 impl ConditionAST {
   pub fn construct(
     &self,
-    symbols: &mut HashMap<IString, SymbolPtr>,
-    sorts  : &mut SortCollection
+    symbols  : &mut HashMap<IString, SymbolPtr>,
+    sorts    : &mut SortCollection,
+    variables: &mut HashMap<IString, BxTerm>
   ) -> Condition
   {
     match self {
 
       ConditionAST::Equality { lhs, rhs } => {
         Condition::Equality {
-          lhs_term: lhs.construct(symbols),
-          rhs_term: rhs.construct(symbols),
+          lhs_term: lhs.construct(symbols, sorts, variables),
+          rhs_term: rhs.construct(symbols, sorts, variables),
         }
       }
 
       ConditionAST::SortMembership { lhs, sort } => {
         let sort = sort.construct(sorts);
         Condition::SortMembership {
-          lhs_term: lhs.construct(symbols),
+          lhs_term: lhs.construct(symbols, sorts, variables),
           sort
         }
       }
 
       ConditionAST::Match { lhs, rhs } => {
         Condition::Match {
-          lhs_term: lhs.construct(symbols),
-          rhs_term: rhs.construct(symbols),
+          lhs_term: lhs.construct(symbols, sorts, variables),
+          rhs_term: rhs.construct(symbols, sorts, variables),
         }
       }
 
       ConditionAST::Rewrite { lhs, rhs } => {
         Condition::Rewrite {
-          lhs_term: lhs.construct(symbols),
-          rhs_term: rhs.construct(symbols),
+          lhs_term: lhs.construct(symbols, sorts, variables),
+          rhs_term: rhs.construct(symbols, sorts, variables),
         }
       }
 
       ConditionAST::Boolean(lhs) => {
         // The RHS is just boolean true.
-        let true_symbol = get_built_in_symbol("true").unwrap();
         Condition::Equality {
-          lhs_term: lhs.construct(symbols),
-          rhs_term: Box::new(FreeTerm::new(true_symbol)),
+          lhs_term: lhs.construct(symbols, sorts, variables),
+          rhs_term: Box::new(BoolTerm::new(true)),
         }
       }
 

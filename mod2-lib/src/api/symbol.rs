@@ -6,24 +6,39 @@ and `Symbol::core_mut()`. This allows a lot of shared implementation in `SymbolC
 
 */
 
-use std::cmp::Ordering;
+use std::{
+  any::Any,
+  cmp::Ordering
+};
 
-use mod2_abs::{IString, Set, UnsafePtr};
+use mod2_abs::{decl_as_any_ptr_fns, IString, Set, UnsafePtr};
 
 use crate::{
-  api::Arity,
+  api::{Arity, term::BxTerm},
   core::{
     format::{FormatStyle, Formattable},
-    symbol::{SortTable, SymbolCore}
+    symbol::{
+      SortTable,
+      SymbolCore,
+      OpDeclaration
+    },
+    sort::kind::KindPtr,
   },
   impl_display_debug_for_formattable,
 };
-use crate::core::symbol::OpDeclaration;
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;
 
 pub trait Symbol {
+  // decl_as_any_ptr_fns!(Symbol);
+  fn as_any(&self) -> &dyn Any;
+  fn as_any_mut(&mut self) -> &mut dyn Any;
+  fn as_ptr(&self) -> SymbolPtr;
+  
+  /// A type-erased way of asking a symbol to make a term of compatible type.
+  fn make_term(&self, args: Vec<BxTerm>) -> BxTerm;
+  
   // region Member Getters and Setters
   /// Trait level access to members for shared implementation
   fn core(&self) -> &SymbolCore;
@@ -53,13 +68,25 @@ pub trait Symbol {
   }
 
   #[inline(always)]
-  fn sort_constraint_table(&self) -> &Option<SortTable> {
+  fn sort_table(&self) -> &Option<SortTable> {
     &self.core().sort_table
   }
 
   #[inline(always)]
-  fn sort_constraint_table_mut(&mut self) -> &mut Option<SortTable> {
+  fn sort_table_mut(&mut self) -> &mut Option<SortTable> {
     &mut self.core_mut().sort_table
+  }
+
+  #[inline(always)]
+  fn domain_kind(&self, idx: usize) -> KindPtr {
+    let sort_table = self.sort_table().as_ref().expect("cannot fetch domain kind of symbol with no sort table");
+    sort_table.domain_component(idx)
+  }
+
+  #[inline(always)]
+  fn range_kind(&self) -> KindPtr {
+    let sort_table = self.sort_table().as_ref().expect("cannot fetch range kind of symbol with no sort table");
+    sort_table.range_kind()
   }
 
   // endregion Accessors

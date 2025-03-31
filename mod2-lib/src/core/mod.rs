@@ -19,18 +19,21 @@ The following compares Maude's `DagNode` to our implementation here.
 */
 
 mod local_bindings;
+mod module;
 mod narrowing_variable_info;
 mod theory;
 mod variable_info;
-pub(crate) mod dag_node_core;
-pub(crate) mod gc;
-pub(crate) mod strategy;
-pub(crate) mod substitution;
 pub mod format;
 pub mod pre_equation;
 pub mod sort;
 pub mod symbol;
 pub mod term_core;
+pub(crate) mod dag_node_core;
+pub(crate) mod gc;
+pub(crate) mod strategy;
+pub(crate) mod substitution;
+
+pub use module::*;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;

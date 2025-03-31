@@ -1,8 +1,13 @@
-use mod2_abs::IString;
+use mod2_abs::{impl_as_any_ptr_fns, IString};
 use crate::{
   api::{
-    symbol::Symbol,
-    Arity
+    symbol::{
+      Symbol,
+      SymbolPtr
+    },
+    Arity,
+    term::BxTerm,
+    variable_theory::VariableTerm
   },
   core::{
     sort::SortPtr,
@@ -12,6 +17,7 @@ use crate::{
       SymbolCore
     },
     format::{FormatStyle, Formattable},
+    term_core::TermCore
   },
   impl_display_debug_for_formattable,
 };
@@ -38,6 +44,19 @@ impl VariableSymbol {
 }
 
 impl Symbol for VariableSymbol {
+  // impl_as_any_ptr_fns!(Symbol, VariableSymbol);
+  fn as_any(&self) -> &dyn std::any::Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+  fn as_ptr(&self) -> SymbolPtr {
+    SymbolPtr::new(self as *const dyn Symbol as *mut dyn Symbol)
+  }
+
+  fn make_term(&self, _args: Vec<BxTerm>) -> BxTerm {
+    // Box::new(VariableTerm::new(name, self.as_ptr()))
+    // Use `VariableTerm::new(name, self.as_ptr())`
+    unimplemented!();
+  }
+
   fn core(&self) -> &SymbolCore {
     &self.core
   }

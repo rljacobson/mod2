@@ -4,22 +4,20 @@ Every theory's term type must implement the `Term` trait. The concrete term type
 have a `TermCore` member that can be accessed through the trait method `Term::core()`
 and `Term::core_mut()`. This allows a lot of shared implementation in `TermCore`.
 
-Note that an implementer of `Term` must also implement `Formattable`. We do it this way rather than a blanket 
+Note that an implementer of `Term` must also implement `Formattable`. We do it this way rather than a blanket
 implementation, because some terms have their own particular representation.
 
 */
 
 use std::{
-  any::Any,
   cmp::Ordering,
   collections::HashMap,
   fmt::Display,
-  hash::{Hash, Hasher}
-  ,
+  hash::{Hash, Hasher},
   ops::Deref
 };
 
-use mod2_abs::{NatSet, RcCell};
+use mod2_abs::{decl_as_any_ptr_fns, NatSet, RcCell, UnsafePtr};
 
 use crate::{
   api::{
@@ -30,34 +28,42 @@ use crate::{
       SymbolSet,
     },
     UNDEFINED,
+    Arity
   },
+  impl_display_debug_for_formattable,
   core::{
+    sort::kind::KindPtr,
     format::Formattable,
     substitution::Substitution,
     term_core::{
       cache_node_for_term,
       clear_cache_and_set_sort_info,
-      lookup_node_for_term
-      ,
+      lookup_node_for_term,
       TermCore,
     },
-  },
-  impl_display_debug_for_formattable,
+    VariableInfo
+  }
 };
+
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<&'static dyn Term>;
 pub type RcTerm    = RcCell<dyn Term>;
+pub type TermPtr   = UnsafePtr<dyn Term>;
 pub type TermSet   = HashMap<u32, usize>;
 
 pub trait Term: Formattable {
-  fn as_any(&self)         -> &dyn Any;
-  fn as_any_mut(&mut self) -> &mut dyn Any;
-  fn as_ptr(&self)         -> *const dyn Term;
-  fn semantic_hash(&self)  -> u32;
+  // decl_as_any_ptr_fns!(Term);
+  fn as_any(&self) -> &dyn std::any::Any;
+  fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+  /// This is very unsafe. Make sure this term is heap allocated and pinned before calling.
+  fn as_ptr(&self) -> TermPtr;
+  fn copy(&self) -> BxTerm;
+  
+  fn hash(&self)           -> u32;
   /// Normalizes the term, returning the computed hash and `true` if the normalization changed
   /// the term or `false` otherwise.
   fn normalize(&mut self, full: bool) -> (u32, bool);
-  
+
   fn core(&self)         -> &TermCore;
   fn core_mut(&mut self) -> &mut TermCore;
 
@@ -123,9 +129,9 @@ pub trait Term: Formattable {
   }
 
   /// Returns an iterator over the arguments of the term
-  fn iter_args(&self) -> Box<dyn Iterator<Item = &dyn Term> + '_>;
+  fn iter_args(&self) -> Box<dyn Iterator<Item = TermPtr> + '_>;
   // Implement an empty iterator with:
-  //    Box::new(std::iter::empty::<&dyn Term>())
+  //    Box::new(std::iter::empty::<TermPtr>())
 
   #[inline(always)]
   fn symbol(&self) -> SymbolPtr {
@@ -134,10 +140,10 @@ pub trait Term: Formattable {
 
   /// Compute the number of nodes in the term tree
   fn compute_size(&self) -> i32 {
-    let cached_size = &self.core().cached_size;
+    let cached_size: i32 = self.core().cached_size.get();
 
-    if cached_size.get() != UNDEFINED {
-      cached_size.get()
+    if cached_size != UNDEFINED {
+      cached_size
     }
     else {
       let mut size = 1; // Count self.
@@ -145,9 +151,13 @@ pub trait Term: Formattable {
         size += arg.compute_size();
       }
 
-      cached_size.set(size);
+      self.core().cached_size.set(size);
       size
     }
+  }
+
+  fn get_kind(&self) -> Option<KindPtr> {
+    self.core().kind
   }
 
   // endregion Accessors
@@ -163,7 +173,7 @@ pub trait Term: Formattable {
     if self.symbol().hash() == other.symbol().hash() {
       self.compare_dag_arguments(other)
     } else {
-      // We only get equality, not ordering, from comparing hashes, so when hashes are unequal, we defer to compare. 
+      // We only get equality, not ordering, from comparing hashes, so when hashes are unequal, we defer to compare.
       self.symbol().compare(other.symbol().deref())
     }
   }
@@ -205,7 +215,7 @@ pub trait Term: Formattable {
     None
   }
 
-  // endregion
+  // endregion Comparison Functions
 
 
   // region DAG Creation
@@ -220,7 +230,7 @@ pub trait Term: Formattable {
   /// sharing. Each implementing type will supply its own implementation of `dagify_aux(…)`, which recursively
   /// calls `dagify(…)` on its children and then converts itself to a type implementing DagNode, returning `DagNodePtr`.
   fn dagify(&self) -> DagNodePtr {
-    let semantic_hash = self.semantic_hash();
+    let semantic_hash = self.hash();
     if let Some(dag_node) = lookup_node_for_term(semantic_hash) {
       return dag_node;
     }
@@ -234,7 +244,133 @@ pub trait Term: Formattable {
   /// Create a directed acyclic graph from this term. This method has the implementation-specific stuff.
   fn dagify_aux(&self) -> DagNodePtr;
 
-  // endregion
+  // endregion DAG Creation
+
+  // region Compiler-related Function
+
+/*
+  /// Compiles the LHS automaton, returning the tuple `(lhs_automaton, subproblem_likely): (RcLHSAutomaton, bool)`
+  fn compile_lhs(
+    &self,
+    match_at_top: bool,
+    variable_info: &VariableInfo,
+    bound_uniquely: &mut NatSet,
+  ) -> (RcLHSAutomaton, bool);
+
+  /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
+  /// the `save_index`.
+  fn compile_rhs_aux(
+    &mut self,
+    builder: &mut RHSBuilder,
+    variable_info: &VariableInfo,
+    available_terms: &mut TermBag,
+    eager_context: bool,
+  ) -> i32;
+
+  // A subterm "honors ground out match" if its matching algorithm guarantees never to return a matching subproblem
+  // when all the terms variables are already bound.
+  fn will_ground_out_match(&self, bound_uniquely: &NatSet) -> bool {
+    self.honors_ground_out_match() && bound_uniquely.is_superset(&self.term_members().occurs_set)
+  }
+
+  fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet);
+
+  fn analyse_collapses(&mut self) {
+    for arg in &mut self.iter_args() {
+      arg.borrow_mut().analyse_collapses();
+    }
+
+    if !self.is_variable() && self.collapse_symbols().is_empty() {
+      self.set_attribute(TermAttribute::Stable);
+    }
+  }
+
+  /// This is the theory-specific part of `find_available_terms`
+  fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool);
+*/
+  /// Computes and updates the set of variables that occur in the context of a term and its
+  /// subterms. The "context" of a term refers to the rest of the term in which it occurs (its
+  /// parent term and sibling subterms).
+  fn determine_context_variables(&mut self) {
+    // Used to defer mutation of self while immutable borrow of self is held by `iter_args`.
+    let mut context_set = NatSet::default();
+
+    for mut term in self.iter_args() {
+      // Insert parent's context set
+      context_set.union_in_place(term.occurs_in_context());
+      // self.occurs_in_context_mut().union_in_place(term.occurs_in_context());
+
+      for other_term in self.iter_args() {
+        if *other_term != *term {
+          // Insert sibling's occurs set
+          context_set.union_in_place(other_term.occurs_below());
+          // self.occurs_in_context_mut().union_in_place(other_term.occurs_below());
+        }
+      }
+
+      term.determine_context_variables();
+    }
+    self.occurs_in_context_mut().union_in_place(&context_set);
+  }
+
+  fn insert_abstraction_variables(&mut self, variable_info: &mut VariableInfo) {
+    self.set_honors_ground_out_match(true);
+    let mut hgom = true;
+
+    for mut term in self.iter_args() {
+      term.insert_abstraction_variables(variable_info);
+      hgom &= term.honors_ground_out_match();
+    }
+    if !hgom {
+      self.set_honors_ground_out_match(false);
+    }
+  }
+
+  /// This method populates the sort information for the term and its subterms based on their
+  /// symbol's sort declarations, validating them against the symbol's expected input and output
+  /// types (domain and range components). (This is a method on `Symbol` in Maude.)
+  fn fill_in_sort_info(&mut self) {
+    let symbol = self.symbol();
+    let sort_table = symbol.deref().sort_table().as_ref();
+    assert!(sort_table.is_some(), "couldn't get component");
+    let sort_table = sort_table.unwrap();
+    let kind = sort_table.range_kind(); // should be const
+
+    if symbol.arity() == Arity::Value(0) {
+      self.set_sort_info(kind.clone(), sort_table.traverse(0, 0)); // HACK
+      return;
+    }
+
+    let mut step = 0;
+    let mut seen_args_count = 0;
+
+    for mut term in self.iter_args() {
+      term.fill_in_sort_info();
+      // ToDo: Restore this assert.
+      debug_assert_eq!(
+        term.get_kind().unwrap(),
+        symbol.domain_kind(seen_args_count),
+        "component error on arg {} while computing sort of {}",
+        seen_args_count,
+        self.symbol()
+      );
+      step = sort_table.traverse(step as usize, term.core().sort_index as usize);
+      seen_args_count += 1;
+    }
+
+    // ToDo: Restore this assert.
+    // debug_assert_eq!(seen_args_count, seen_args_count, "bad # of args for op");
+    self.set_sort_info(kind, step);
+  }
+
+  /// Sets the kind and the sort index of this term.
+  fn set_sort_info(&mut self, kind: KindPtr, sort_index: i32) {
+    let core = self.core_mut();
+    core.kind = Some(kind);
+    core.sort_index = sort_index;
+  }
+
+  // endregion Compiler-related Function
 
 }
 
@@ -245,17 +381,17 @@ pub trait Term: Formattable {
 // Use the `Term::compute_hash(…)` hash for `HashSet`s and friends.
 impl Hash for dyn Term {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    state.write_u32(self.semantic_hash())
+    state.write_u32(self.hash())
   }
 }
 
 impl PartialEq for dyn Term {
   fn eq(&self, other: &Self) -> bool {
-    self.semantic_hash() == other.semantic_hash()
+    self.hash() == other.hash()
   }
 }
 
 impl Eq for dyn Term {}
-// endregion
 
 impl_display_debug_for_formattable!(dyn Term);
+// endregion

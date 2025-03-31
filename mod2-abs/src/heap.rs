@@ -16,9 +16,9 @@ Because both macros use raw pointers, they are inherently **unsafe**, and it is 
 
 Here’s how you might use `heap_construct!` and `heap_destroy!`:
 
-```ignore
-use heap::heap_construct;
-use heap::heap_destroy;
+```
+use mod2_abs::heap_construct;
+use mod2_abs::heap_destroy;
 
 // Create a heap-allocated integer and obtain a raw pointer to it
 let ptr: *mut i32 = heap_construct!(42);

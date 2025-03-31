@@ -10,6 +10,8 @@ use mod2_lib::{
     symbol::{Symbol, SymbolPtr},
     free_theory::FreeTerm,
     built_in::{
+      Bool,
+      BoolTerm,
       Float,
       FloatTerm,
       Integer,
@@ -21,7 +23,8 @@ use mod2_lib::{
       get_built_in_symbol,
     },
     term::{BxTerm, Term},
-  }
+  },
+  core::sort::collection::SortCollection
 };
 use crate::parser::ast::get_or_create_symbol;
 
@@ -41,41 +44,41 @@ pub(crate) enum TermAST {
   NaturalNumber(NaturalNumber),
   Integer(Integer),
   Float(Float),
+  Bool(Bool)
 }
 
 impl TermAST {
-  pub fn construct(&self, symbols: &mut HashMap<IString, SymbolPtr>) -> BxTerm {
+  pub fn construct(&self, symbols: &mut HashMap<IString, SymbolPtr>, sorts: &mut SortCollection, variables: &mut HashMap<IString, BxTerm>) -> BxTerm {
     // ToDo: How do we construct term attributes.
 
     match self {
 
       TermAST::Identifier(name) => {
+        if let Some(var_term) = variables.get(name) {
+          return var_term.copy();
+        }
         let symbol = get_or_create_symbol(name, symbols);
-        Box::new(FreeTerm::new(symbol))
+        symbol.make_term(vec![])
       }
 
       TermAST::Application { name, tail } => {
         let symbol = get_or_create_symbol(name, symbols);
-
-        let mut term = FreeTerm::new(symbol);
-        let args = tail.into_iter().map(|t| t.construct(symbols)).collect();
-        term.args = args;
-
-        Box::new(term)
+        let args   = tail.into_iter().map(|t| t.construct(symbols, sorts, variables)).collect();
+        symbol.make_term(args)
       }
 
       TermAST::StringLiteral(string_literal) => {
         Box::new(StringTerm::new(string_literal))
       }
 
-      // TermAST::NaturalNumber(natural_number) => {
-      //   Box::new(NaturalNumberTerm::new(natural_number))
-      // }
+      TermAST::Bool(boolean) => {
+        Box::new(BoolTerm::new(*boolean))
+      }
 
       TermAST::Integer(integer) => {
         Box::new(IntegerTerm::new(*integer))
       }
-      
+
       TermAST::Float(float) => {
         Box::new(FloatTerm::new(*float))
       }

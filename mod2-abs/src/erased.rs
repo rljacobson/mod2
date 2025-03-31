@@ -10,7 +10,7 @@ So far we just do this to implement `Hash`.
 To use `DynHash`, just implement `Hash` for your trait.
 
 ```rust
-# use mod2lib::abstractions::DynHash;
+# use mod2_abs::DynHash;
 use core::hash::{Hash, Hasher};
 
 pub trait Trait: DynHash{}

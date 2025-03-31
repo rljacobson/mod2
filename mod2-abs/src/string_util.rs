@@ -7,7 +7,8 @@ Join an iterator of strings, which doesn't exist in the stdlib. (C.f. `Vec::join
 From: https://stackoverflow.com/a/66951473
 Usage:
 
-```ignore
+```
+# use mod2_abs::join_iter;
 let iter = [1, 3, 5, 7, 9].iter().cloned();
 println!("{:?}", join_iter(iter, |v| v - 1).collect::<Vec<_>>());
 // [1, 2, 3, 4, 5, 6, 7, 8, 9]

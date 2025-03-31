@@ -29,11 +29,8 @@ use crate::{
     symbol::{Symbol, SymbolPtr, SymbolSet},
     dag_node::DagNodePtr
   },
-  core::{
-    sort::SortPtr,
-  },
+  core::sort::kind::KindPtr
 };
-
 
 pub type TermSet   = HashMap<u32, usize>;
 
@@ -49,7 +46,7 @@ static SET_SORT_INFO_FLAG: AtomicBool = AtomicBool::new(false);
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum TermKind {
+pub enum TermType {
   Free,
   Bound,
   Ground,
@@ -75,16 +72,19 @@ pub enum TermAttribute {
 
 pub type TermAttributes = BitFlags<TermAttribute, u8>;
 
+#[derive(Clone)]
 pub struct TermCore {
   /// The top symbol of the term
   pub(crate) symbol: SymbolPtr,
-  pub(crate) sort  : Option<SortPtr>,
   /// The handles (indices) for the variable terms that occur in this term or its descendants
   pub(crate) occurs_set      : NatSet,
   pub(crate) context_set     : NatSet,
+  // ToDo: How is this related to the kind of its symbol?
+  pub(crate) kind            : Option<KindPtr>,
   pub(crate) collapse_symbols: SymbolSet,
   pub(crate) attributes      : TermAttributes,
-  pub(crate) term_kind       : TermKind,
+  pub(crate) sort_index      : i32,
+  pub(crate) term_type       : TermType,
   pub(crate) save_index      : i32,            // NoneIndex = -1
   hash_value                 : u32,
 
@@ -96,12 +96,13 @@ impl TermCore {
   pub fn new(symbol: SymbolPtr) -> TermCore {
     TermCore {
       symbol,
-      sort            : None,
       occurs_set      : Default::default(),
       context_set     : Default::default(),
+      kind            : None,                 // ToDo: Initialize to `symbol.range_kind()` ?
       collapse_symbols: Default::default(),
       attributes      : TermAttributes::default(),
-      term_kind       : TermKind::Free,
+      sort_index      : UNDEFINED,
+      term_type       : TermType::Free,
       save_index      : 0,
       hash_value      : 0,
       cached_size     : Cell::new(UNDEFINED),
@@ -199,7 +200,6 @@ pub fn clear_cache_and_set_sort_info(set_sort_info: bool) {
 pub fn lookup_node_for_term(semantic_hash: u32) -> Option<DagNodePtr> {
   if let Entry::Occupied(occupied_entry) = unsafe{ #[allow(static_mut_refs)] CONVERTED_TERMS.entry(semantic_hash) } {
     let idx = *occupied_entry.get();
-
     Some(unsafe{ SUBDAG_CACHE[idx] })
   } else {
     None

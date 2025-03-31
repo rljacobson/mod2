@@ -9,6 +9,7 @@ use lalrpop_util::ParseError;
 use mod2_abs::IString;
 use crate::parser::ast::ModuleAST;
 use crate::parser::parser::ModuleParser;
+use crate::parser::tests::parse_ex1;
 
 fn parse_string(text: &str) -> Result<Box<ModuleAST>, ()> {
   let parser = ModuleParser::new();
@@ -60,4 +61,12 @@ fn test_sort_table_sort_diagram(){
     sort_table.dump_sort_diagram(&mut out, 2).unwrap();
     println!("{}", out);
   }
+}
+
+
+#[test]
+fn test_ex1_construction() {
+  let ast: Box<ModuleAST> =  parse_ex1().expect("Failed to parse module");
+  let constructed = ast.construct_module();
+  println!("{:?}", constructed);
 }

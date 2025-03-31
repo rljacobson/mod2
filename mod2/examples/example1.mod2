@@ -30,6 +30,7 @@ mod NaturalNumbers {
     symbol v : Nat -> Nat ; // Variadic
 
     variable X : Any;
+    variable Y : Any;
 
     rule plus(z, X) => X if z = X;
     rule plus(s(Y), X) => plus(Y, s(X));

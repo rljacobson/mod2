@@ -28,8 +28,14 @@ section titled, "Optimizations for Computing a Subsort Relation at Runtime."
 
 use std::fmt::Write;
 use mod2_abs::{NatSet, IString, UnsafePtr};
-use crate::{api::{built_in::get_built_in_sort, Arity}, core::sort::kind::KindPtr, impl_display_debug_for_formattable};
-use crate::core::format::{FormatStyle, Formattable};
+use crate::{
+  api::{built_in::get_built_in_sort, Arity},
+  core::{
+    sort::kind::KindPtr,
+    format::{FormatStyle, Formattable}
+  },
+  impl_display_debug_for_formattable,
+};
 
 /// A pointer to a sort. No ownership is assumed.
 pub type SortPtr  = UnsafePtr<Sort>;
@@ -39,7 +45,7 @@ pub type SortPtr  = UnsafePtr<Sort>;
 #[repr(i8)]
 pub enum SpecialSort {
   Kind          =  0,
-  // ErrorSort     = 0,
+  // ErrorSort     = 0, Defined below
   FirstUserSort =  1,
   Unknown       = -1,
 }

@@ -12,7 +12,9 @@ use std::{
   sync::Arc
 };
 use once_cell::sync::Lazy;
-use mod2_abs::{smallvec, IString};
+use paste::paste;
+
+use mod2_abs::{heap_construct, smallvec, IString};
 
 use crate::{
   api::{
@@ -51,21 +53,31 @@ pub type StringBuiltIn = String;
 macro_rules! make_symbol {
     ($sort_name:expr, $symbol_name:expr, $symbol_type:expr) => {
         {
-          let sort            = get_built_in_sort($sort_name).unwrap();
-          let symbol_name     = IString::from($symbol_name);
+          let name_lit        = stringify!($symbol_name);  
+          let sort =
+          match get_built_in_sort(stringify!($sort_name)) {
+            
+          None => {
+            panic!("COULD NOT FIND SORT {:?}", stringify!($sort_name));
+          }
+          Some(thing) => {thing}
+          };
+          // let sort            = get_built_in_sort(stringify!($sort_name)).unwrap();
+          let symbol_name     = IString::from(name_lit);
           let symbol_core = SymbolCore::new(
             symbol_name.clone(),
             Arity::Value(0),
             SymbolAttribute::Constructor.into(),
             $symbol_type,
           );
-          let symbol          = Box::new(BoolSymbol::new(symbol_core));
-          let mut symbol_ptr  = SymbolPtr::new(Box::into_raw(symbol));
+          let mut symbol_ptr  = SymbolPtr::new(
+            heap_construct!(paste!{ [<$sort_name Symbol>] ::new(symbol_core)})
+          );
           let op_declaration  = OpDeclaration::new(smallvec![sort], true.into());
           let symbol_ptr_copy = symbol_ptr; // Force copy
           symbol_ptr.add_op_declaration(symbol_ptr_copy, op_declaration);
           
-          ($symbol_name, symbol_ptr)
+          (name_lit, symbol_ptr)
         }
     };
 }
@@ -109,8 +121,7 @@ static BUILT_IN_SORTS: Lazy<HashMap<&'static str, Sort>> = Lazy::new(|| {
     sorts.insert(name, sort);
   }
   
-  println!("Initialized built-in sorts: {:?}", sorts);
-  
+  // println!("Initialized built-in sorts: {:?}", sorts);
   sorts
 });
 
@@ -119,35 +130,36 @@ static BUILT_IN_SYMBOLS: Lazy<HashMap<&'static str, SymbolPtr>> = Lazy::new(|| {
   // ToDo: Warn when a user shadows a built-in.
   // Bool true
   {
-    let (symbol_name, symbol_ptr) = make_symbol!("Bool", "true", SymbolType::True);
+    let (symbol_name, symbol_ptr) = make_symbol!(Bool, true, SymbolType::True);
     symbols.insert(symbol_name, symbol_ptr);
   }
   // Bool false
   {
-    let (symbol_name, symbol_ptr) = make_symbol!("Bool", "false", SymbolType::False);
+    let (symbol_name, symbol_ptr) = make_symbol!(Bool, false, SymbolType::False);
     symbols.insert(symbol_name, symbol_ptr);
   }
   // String
   {
-    let (symbol_name, symbol_ptr) = make_symbol!("String", "String", SymbolType::String);
+    let (symbol_name, symbol_ptr) = make_symbol!(String, String, SymbolType::String);
     symbols.insert(symbol_name, symbol_ptr);
   }
   // Float
   {
-    let (symbol_name, symbol_ptr) = make_symbol!("Float", "Float", SymbolType::Float);
+    let (symbol_name, symbol_ptr) = make_symbol!(Float, Float, SymbolType::Float);
     symbols.insert(symbol_name, symbol_ptr);
   }
   // Integer
   {
-    let (symbol_name, symbol_ptr) = make_symbol!("Integer", "Integer", SymbolType::Integer);
+    let (symbol_name, symbol_ptr) = make_symbol!(Integer, Integer, SymbolType::Integer);
     symbols.insert(symbol_name, symbol_ptr);
   }
   // NaturalNumber
   {
-    let (symbol_name, symbol_ptr) = make_symbol!("NaturalNumber", "NaturalNumber", SymbolType::NaturalNumber);
+    let (symbol_name, symbol_ptr) = make_symbol!(NaturalNumber, NaturalNumber, SymbolType::NaturalNumber);
     symbols.insert(symbol_name, symbol_ptr);
   }
   
+  // println!("Initialized built-in symbols: {:?}", symbols);
   symbols
 });
 

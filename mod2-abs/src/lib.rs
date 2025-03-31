@@ -31,14 +31,15 @@ encapsulated in the `log` module.
 
 */
 
+mod erased;
+mod graph;
+mod heap;
 mod nat_set;
 mod rccell;
 mod string_util;
-mod heap;
-pub mod hash;
-mod erased;
-mod graph;
 mod unsafe_ptr;
+pub mod any;
+pub mod hash;
 
 // Arbitrary precision arithmetic
 pub mod numeric;

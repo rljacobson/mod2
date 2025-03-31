@@ -2,7 +2,8 @@
 #![allow(unused)]
 
 mod parser;
-mod module;
+
+pub use mod2_lib::core::Module;
 
 #[cfg(test)]
 mod tests;

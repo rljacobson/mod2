@@ -5,10 +5,7 @@ use std::{
   ops::Deref
 };
 
-use mod2_abs::{
-  hash::hash2 as term_hash,
-  NatSet
-};
+use mod2_abs::{hash::hash2 as term_hash, impl_as_any_ptr_fns, NatSet};
 
 use crate::{
   api::{
@@ -21,6 +18,7 @@ use crate::{
     term::{
       BxTerm,
       Term,
+      TermPtr
     },
     symbol::SymbolPtr,
     free_theory::free_dag_node::FreeDagNode,
@@ -48,10 +46,10 @@ pub struct FreeTerm{
 }
 
 impl FreeTerm {
-  pub fn new(symbol: SymbolPtr) -> Self {
+  pub fn new(symbol: SymbolPtr, args: Vec<BxTerm>) -> Self {
     Self {
       core      : TermCore::new(symbol),
-      args      : vec![],
+      args,
       slot_index: 0,
     }
   }
@@ -91,24 +89,28 @@ impl_display_debug_for_formattable!(FreeTerm);
 
 impl Term for FreeTerm {
   //region Representation and Reduction Methods
-  fn as_any(&self) -> &dyn Any {
-    self
+  // impl_as_any_ptr_fns!(Term, FreeTerm);
+  fn as_any(&self) -> &dyn std::any::Any { self }
+  fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+  fn as_ptr(&self) -> TermPtr {
+    TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  fn as_any_mut(&mut self) -> &mut dyn Any {
-    self
-  }
-
-  fn as_ptr(&self) -> *const dyn Term {
-    self
+  fn copy(&self) -> BxTerm {
+    let term = FreeTerm{
+      core: self.core.clone(),
+      args: self.args.iter().map(|t| t.copy()).collect(),
+      slot_index: self.slot_index.clone(),
+    };
+    Box::new(term)
   }
 
   /// In sync with `normalize`.
-  fn semantic_hash(&self) -> u32 {
+  fn hash(&self) -> u32 {
     let mut hash_value: u32 = self.symbol().hash();
 
     for arg in &self.args {
-      hash_value = term_hash(hash_value, arg.semantic_hash());
+      hash_value = term_hash(hash_value, arg.hash());
     }
 
     hash_value
@@ -142,8 +144,8 @@ impl Term for FreeTerm {
     &mut self.core
   }
 
-  fn iter_args(&self) -> Box<dyn Iterator<Item=&dyn Term> + '_> {
-    Box::new(self.args.iter().map(|arg| arg.as_ref()))
+  fn iter_args(&self) -> Box<dyn Iterator<Item=TermPtr> + '_> {
+    Box::new(self.args.iter().map(|arg| { Term::as_ptr(arg.as_ref()) } ))
   }
 
   // region Comparison Methods

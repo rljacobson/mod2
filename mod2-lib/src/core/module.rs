@@ -1,7 +1,10 @@
 /*!
 
 A `Module` owns all items defined within it. A module is a kind of namespace. Reduction/matching/evaluation
-happens within the context of some module.<br>
+happens within the context of some module.
+
+The `Module` structure is designed for Mod2 but can conceivably be used in other contexts. In any case, it implements 
+algorithms any client application would also require.<br>
 
 ## Module Construction
 
@@ -28,8 +31,12 @@ use mod2_abs::{
   join_iter,
   heap_destroy,
 };
-use mod2_lib::{
-  api::symbol::SymbolPtr,
+
+use crate::{
+  api::{
+    symbol::SymbolPtr,
+    term::BxTerm
+  },
   core::{
     pre_equation::PreEquation,
     sort::{
@@ -37,7 +44,7 @@ use mod2_lib::{
       kind::{BxKind, Kind},
       kind_error::KindError
     }
-  }
+  },
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
@@ -59,10 +66,12 @@ pub struct Module {
   pub submodules: Vec<BxModule>,
   pub status    : ModuleStatus,
 
-  // ToDo: Why not just have the sorts in `kinds`? Do we need `kinds` after construction?
+  // ToDo: Q: Why not just have the sorts in `kinds`? Do we need `kinds` after construction?
+  //       A: We use the symbol's "index within module" as a proxy for the symbol. (Not implemented.)
   pub sorts     : SortCollection,
   pub kinds     : Vec<BxKind>,
   pub symbols   : HashMap<IString, SymbolPtr>,
+  pub variables : HashMap<IString, BxTerm>,
   pub equations : Vec<PreEquation>,
   pub rules     : Vec<PreEquation>,
   pub membership: Vec<PreEquation>,
@@ -101,7 +110,7 @@ impl Module {
              .filter(|(_, sort_ptr)| sort_ptr.kind.is_none())
     {
       let kind = Kind::new(sort);
-      let mut kind = kind.unwrap_or_else(
+      let kind = kind.unwrap_or_else(
         | kind_error | {
           // Maude sets the "is_bad" flag of a module in the case of a cycle in the Sort graph.
           let msg = kind_error.to_string();
@@ -155,6 +164,18 @@ impl Module {
         join_iter(iter, |_| sep).collect::<String>()
       )?;
     }
+    //variables
+    if !self.variables.is_empty() {
+      // format_named_list(f, inner_prefix.as_str(), "variables", &self.variables)?
+      let iter = self.variables.iter().map(|(name, _)| {name.to_string()});
+      let sep = ", ";
+      writeln!(
+        f,
+        "{}variables: [{}]",
+        inner_prefix,
+        join_iter(iter, |_| sep.to_string()).collect::<String>()
+      )?;
+    }
     //equations
     if !self.equations.is_empty() {
       format_named_list(f, inner_prefix.as_str(), "equations", &self.equations)?
@@ -182,9 +203,7 @@ impl Drop for Module {
   /// owned memory when it is dropped.
   fn drop(&mut self) {
     for (_, symbol_ptr) in self.symbols.iter() {
-      unsafe {
-        heap_destroy!(symbol_ptr.as_mut_ptr());
-      }
+      heap_destroy!(symbol_ptr.as_mut_ptr());
     }
   }
 }
@@ -217,16 +236,3 @@ fn format_named_list<T: Display>(f: &mut Formatter<'_>, prefix: &str, name: &str
 }
 
 
-
-#[cfg(test)]
-mod tests {
-  use crate::parser::ast::ModuleAST;
-  use crate::parser::tests::parse_ex1;
-
-  #[test]
-  fn test_ex1_construction() {
-    let ast: Box<ModuleAST> =  parse_ex1().expect("Failed to parse module");
-    let constructed = ast.construct_module();
-    println!("{:?}", constructed);
-  }
-}

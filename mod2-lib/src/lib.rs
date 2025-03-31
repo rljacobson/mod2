@@ -6,7 +6,9 @@
 pub mod api;
 pub mod core;
 
-// Configuration
+// Global Configuration
+/// Indentation amount for displayed structures.
+pub(crate) const DISPLAY_INDENT: usize = 2;
 
 // Sentinel Values
 // ToDo: Do UNDEFINED the right way. Is this great? No. But it's convenient.
