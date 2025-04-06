@@ -13,19 +13,16 @@ use std::{
 
 use mod2_abs::{decl_as_any_ptr_fns, IString, Set, UnsafePtr};
 
-use crate::{
-  api::{Arity, term::BxTerm},
-  core::{
-    format::{FormatStyle, Formattable},
-    symbol::{
-      SortTable,
-      SymbolCore,
-      OpDeclaration
-    },
-    sort::kind::KindPtr,
+use crate::{api::{Arity, term::BxTerm}, core::{
+  format::{FormatStyle, Formattable},
+  symbol::{
+    SortTable,
+    SymbolCore,
+    OpDeclaration
   },
-  impl_display_debug_for_formattable,
-};
+  sort::kind::KindPtr,
+}, impl_display_debug_for_formattable, HashType};
+use crate::core::strategy::Strategy;
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;
@@ -58,7 +55,7 @@ pub trait Symbol {
   ///
   /// The semantics of a symbol are not included in the hash itself, as symbols are unique names by definition.
   #[inline(always)]
-  fn hash(&self) -> u32 {
+  fn hash(&self) -> HashType {
     self.core().hash()
   }
 
@@ -88,18 +85,26 @@ pub trait Symbol {
     let sort_table = self.sort_table().as_ref().expect("cannot fetch range kind of symbol with no sort table");
     sort_table.range_kind()
   }
-
+  
+  #[inline(always)]
+  fn strategy(&self) -> &Strategy {
+    &self.core().strategy
+  }
+  
   // endregion Accessors
 
+  #[inline(always)]
   fn compare(&self, other: &dyn Symbol) -> Ordering {
     self.hash().cmp(&other.hash())
   }
 
+  #[inline(always)]
   fn add_op_declaration(&mut self, self_ptr: SymbolPtr, op_declaration: OpDeclaration) {
     self.core_mut().add_op_declaration(self_ptr, op_declaration);
   }
   
   /// Called from `Module::close_theory()`
+  #[inline(always)]
   fn compile_op_declarations(&mut self) {
     if let  Some(sort_table) = self.core_mut().sort_table.as_mut() {
       sort_table.compile_op_declaration()

@@ -35,11 +35,19 @@ mod erased;
 mod graph;
 mod heap;
 mod nat_set;
+mod memory;
 mod rccell;
 mod string_util;
 mod unsafe_ptr;
+mod partial_ordering;
 pub mod any;
 pub mod hash;
+
+// Generic memory utilities
+pub use memory::as_bytes;
+
+// Aliases and utility 
+pub use partial_ordering::*;
 
 // Arbitrary precision arithmetic
 pub mod numeric;

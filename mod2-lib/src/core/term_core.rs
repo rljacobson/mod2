@@ -23,14 +23,11 @@ use once_cell::sync::Lazy;
 
 use mod2_abs::{NatSet, HashMap};
 
-use crate::{
-  api::{
-    UNDEFINED,
-    symbol::{Symbol, SymbolPtr, SymbolSet},
-    dag_node::DagNodePtr
-  },
-  core::sort::kind::KindPtr
-};
+use crate::{api::{
+  UNDEFINED,
+  symbol::{Symbol, SymbolPtr, SymbolSet},
+  dag_node::DagNodePtr
+}, core::sort::kind::KindPtr, HashType};
 
 pub type TermSet   = HashMap<u32, usize>;
 
@@ -85,8 +82,8 @@ pub struct TermCore {
   pub(crate) attributes      : TermAttributes,
   pub(crate) sort_index      : i32,
   pub(crate) term_type       : TermType,
-  pub(crate) save_index      : i32,            // NoneIndex = -1
-  hash_value                 : u32,
+  pub(crate) save_index      : i32,      // NoneIndex = -1
+  pub(crate) hash_value      : HashType, // Set in `Term::normalize()`
 
   /// The number of nodes in the term tree
   pub(crate) cached_size:  Cell<i32>,
@@ -104,7 +101,7 @@ impl TermCore {
       sort_index      : UNDEFINED,
       term_type       : TermType::Free,
       save_index      : 0,
-      hash_value      : 0,
+      hash_value      : 0,                    // Set in `Term::normalize()`
       cached_size     : Cell::new(UNDEFINED),
     }
   }
@@ -148,7 +145,7 @@ impl TermCore {
     self.occurs_set.is_empty()
   }
 
-  /// The handles (indices) for the variable terms that occur in this term or its descendants
+  /// The handles (indices) for the variable terms that occur in this term or its descendants, `occurs_set`.
   #[inline(always)]
   pub(crate) fn occurs_below(&self) -> &NatSet {
     &self.occurs_set

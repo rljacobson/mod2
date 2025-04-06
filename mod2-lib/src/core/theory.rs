@@ -10,6 +10,7 @@ use crate::core::symbol::{SymbolAttributes, SymbolType};
 use crate::impl_display_debug_for_formattable;
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Hash)]
+#[repr(u8)]
 pub enum EquationalTheory {
   #[default]
   Free = 0,
@@ -17,7 +18,11 @@ pub enum EquationalTheory {
   // AU,
   // CUI,
   Variable,
-  NA,
+  Bool,
+  Float,
+  Integer,
+  NaturalNumber,
+  String,
 }
 
 impl EquationalTheory {
@@ -25,7 +30,11 @@ impl EquationalTheory {
     match self {
       EquationalTheory::Free => "Free",
       EquationalTheory::Variable => "Variable",
-      EquationalTheory::NA => "NA",
+      EquationalTheory::Bool => "Bool",
+      EquationalTheory::Float => "Float",
+      EquationalTheory::Integer => "Integer",
+      EquationalTheory::NaturalNumber => "NaturalNumber",
+      EquationalTheory::String => "String",
     }
   }
 }
@@ -39,11 +48,14 @@ impl Formattable for EquationalTheory {
 impl_display_debug_for_formattable!(EquationalTheory);
 
 pub fn theory_from_symbol_attributes(symbol_type: SymbolType, _attributes: SymbolAttributes) -> EquationalTheory {
-  if symbol_type.is_build_in_data_type() {
-    EquationalTheory::NA
-  } else if symbol_type == SymbolType::Variable {
-    EquationalTheory::Variable
-  } else { 
-    EquationalTheory::Free
+  match symbol_type {
+    SymbolType::Variable      => EquationalTheory::Variable,
+    SymbolType::True          => EquationalTheory::Bool,
+    SymbolType::False         => EquationalTheory::Bool,
+    SymbolType::String        => EquationalTheory::String,
+    SymbolType::Float         => EquationalTheory::Float,
+    SymbolType::Integer       => EquationalTheory::Integer,
+    SymbolType::NaturalNumber => EquationalTheory::NaturalNumber,
+    _                         => EquationalTheory::Free
   }
 }

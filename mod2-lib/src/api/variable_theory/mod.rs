@@ -1,8 +1,11 @@
 mod variable_symbol;
 mod variable_term;
+mod variable_dag_node;
 
+// Flatten module tree
 pub use variable_term::*;
 pub use variable_symbol::*;
+pub use variable_dag_node::*;
 
 /// The `VariableType` of a variable determines what the variable is able to bind to. A `Blank` variable binds to a
 /// single `Term`, a `Sequence` variable binds to a sequence of one or more `Term`s, and a `NullSequence` binds to a

@@ -6,6 +6,10 @@ Requirements of implementers of `DagNode`:
  1. DAG nodes should be newtypes of `DagNodeCore`. In particular...
  2. DAG nodes *must* have the same memory representation as a `DagNodeCore`.
  3. Implementers of `DagNode` are responsible for casting pointers, in particular its arguments.
+ 4. If an implementor owns resources, including ref counted objects like `IString`, it must provide an implementation 
+    of `DagNode::finalize()`. It must also set its `NeedsDestruction` flag.
+ 5. If an implementor holds no children, or if its children are represented differently than just `DagNodePtr`, it
+    must provide an implementation of `iter_args`, `insert_child`, `len`, `compare_arguments`, `mark`.
 
 */
 
@@ -13,28 +17,30 @@ use std::{
   any::Any,
   cmp::{max, Ordering},
   fmt::Display,
-  iter::Iterator
-
-  ,
+  iter::Iterator,
 };
 use mod2_abs::UnsafePtr;
-use crate::{api::{
-  symbol::SymbolPtr,
-  Arity
-}, core::{
-  dag_node_core::{
-    DagNodeCore,
-    DagNodeFlag,
-    DagNodeFlags,
-    ThinDagNodePtr
+use crate::{
+  api::{
+    symbol::SymbolPtr,
+    Arity,
   },
-  format::{FormatStyle, Formattable},
-  gc::{
-    gc_vector::{GCVector, GCVectorRefMut},
-    increment_active_node_count
+  core::{
+    dag_node_core::{
+      DagNodeCore,
+      DagNodeFlag,
+      DagNodeFlags,
+      ThinDagNodePtr,
+    },
+    format::{FormatStyle, Formattable},
+    gc::{
+      gc_vector::{GCVector, GCVectorRefMut},
+      increment_active_node_count,
+    },
+    sort::SortPtr,
   },
-  sort::SortPtr
-}, impl_display_debug_for_formattable};
+  impl_display_debug_for_formattable,
+};
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr    = UnsafePtr<dyn DagNode + 'static>;
 pub type DagNodeVector = GCVector<DagNodePtr>;
@@ -79,7 +85,9 @@ pub trait DagNode {
   }
 
 
-  /// MUST override if Self::args is not a `DagNodeVector`
+  /// MUST override if Self::args is not a `DagNodeVector`.
+  /// Implement an empty iterator with:
+  ///      Box::new(std::iter::empty::<DagNodePtr>())
   fn iter_args(&self) -> Box<dyn Iterator<Item=DagNodePtr>> {
     // For assertions
     // ToDo: These assertions will need to change for variadic nodes.
@@ -146,7 +154,7 @@ pub trait DagNode {
   fn symbol(&self) -> SymbolPtr {
     self.core().symbol
   }
-  
+
   // ToDo: Implement DagNodeCore::get_sort() when `SortTable` is implemented.
   #[inline(always)]
   fn get_sort(&self) -> Option<SortPtr> {
@@ -365,6 +373,12 @@ pub trait DagNode {
     }
   } // end fn mark
 
+  /// Finalize is run when this node is swept during garbage collection if its `NeedsDestruction` flag is set. The 
+  /// finalizer should only release whatever it is directly responsible for and cannot assume any of its children exist.
+  fn finalize(&mut self) {
+    /* empty default implementation */
+  }
+  
   // endregion GC related methods
 }
 
@@ -374,17 +388,16 @@ impl Formattable for dyn DagNode {
       FormatStyle::Debug => {
         write!(f, "DagNode<{}>", self.symbol())
       }
-      
+
       _ => {
         write!(f, "<{}>", self.symbol())
       }
     }
-    
+
   }
 }
 
 impl_display_debug_for_formattable!(dyn DagNode);
-
 
 
 // Unsafe private free functions

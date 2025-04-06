@@ -27,6 +27,7 @@ pub struct VariableSymbol {
 }
 
 impl VariableSymbol {
+  #[inline(always)]
   pub fn new(
     name       : IString,
     arity      : Arity,
@@ -36,7 +37,8 @@ impl VariableSymbol {
     let core = SymbolCore::new(name, arity, attributes, symbol_type);
     VariableSymbol{ core }
   }
-  
+
+  #[inline(always)]
   pub(crate) fn with_name(name: IString) -> VariableSymbol {
     let core = SymbolCore::with_name(name);
     VariableSymbol { core }
@@ -45,8 +47,11 @@ impl VariableSymbol {
 
 impl Symbol for VariableSymbol {
   // impl_as_any_ptr_fns!(Symbol, VariableSymbol);
+  #[inline(always)]
   fn as_any(&self) -> &dyn std::any::Any { self }
+  #[inline(always)]
   fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+  #[inline(always)]
   fn as_ptr(&self) -> SymbolPtr {
     SymbolPtr::new(self as *const dyn Symbol as *mut dyn Symbol)
   }
@@ -57,10 +62,12 @@ impl Symbol for VariableSymbol {
     unimplemented!();
   }
 
+  #[inline(always)]
   fn core(&self) -> &SymbolCore {
     &self.core
   }
 
+  #[inline(always)]
   fn core_mut(&mut self) -> &mut SymbolCore {
     &mut self.core
   }

@@ -23,6 +23,7 @@ use crate::{
     Arity
   },
 };
+use crate::api::variable_theory::{VariableDagNode, VariableSymbol};
 use crate::core::EquationalTheory;
 
 // ToDo: Figure out why multithreading breaks the tests.
@@ -238,4 +239,30 @@ fn test_arena_exhaustion() {
     last_node    = node_ptr;
   }
 
+}
+
+
+#[test]
+fn create_destroy_variable_dag_node() {
+  let name = IString::from("Hello");
+  {
+    let symbol = VariableSymbol::with_name(name.clone());
+    {
+      let node = VariableDagNode::new(symbol.as_ptr(), name.clone());
+      println!("{}", node);
+    }
+    {
+      let mut allocator = acquire_node_allocator("VariableDagNode finalizer test");
+      unsafe { allocator.collect_garbage() }
+    }
+    {
+      // Create a dummy `DagNode` to force sweep
+      let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::None);
+      let dummy_node = FreeDagNode::new(dummy_symbol.as_ptr());
+      _ = dummy_node.len();
+    }
+
+    println!("{}", symbol);
+  }
+  println!("{}", name);
 }

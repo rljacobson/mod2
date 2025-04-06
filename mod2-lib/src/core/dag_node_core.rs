@@ -28,13 +28,22 @@ use enumflags2::{bitflags, make_bitflags, BitFlags};
 use crate::{
   api::{
     Arity,
+    built_in::{
+      StringBuiltIn,
+      BoolDagNode,
+      FloatDagNode,
+      IntegerDagNode,
+      NaturalNumberDagNode,
+      StringDagNode,
+    },
     dag_node::{
       DagNode,
       DagNodePtr,
       DagNodeVector
     },
-    symbol::SymbolPtr,
     free_theory::FreeDagNode,
+    symbol::SymbolPtr,
+    variable_theory::VariableDagNode,
   },
   core::{
     gc::allocate_dag_node,
@@ -42,19 +51,37 @@ use crate::{
   }
 };
 
-static FREE_DAG_NODE_VTABLE: DynMetadata<dyn DagNode> = {
-  // Create a fake pointer of type `*mut FreeDagNode` (which is concrete)
-  let fake_ptr: *mut FreeDagNode = std::ptr::null_mut();
-  // Cast it to a trait object pointer; this creates a fat pointer with the vtable for `FreeDagNode`
-  let fake_trait_object: *mut dyn DagNode = fake_ptr as *mut dyn DagNode;
-  // This prevents the compiler from optimizing the vtable away
-  _ = fake_trait_object.is_null();
-  // Extract the metadata (the vtable pointer)
-  std::ptr::metadata(fake_trait_object)
-};
+/// Create vtable pointers for concrete `DagNode` types
+macro_rules! make_dag_node_vtable {
+    ($tablename:ident, $nodetype:ty) => {
+      static $tablename: DynMetadata<dyn DagNode> = {
+        // Create a fake pointer of type `*mut FreeDagNode` (which is concrete)
+        let fake_ptr: *mut $nodetype = std::ptr::null_mut();
+        // Cast it to a trait object pointer; this creates a fat pointer with the vtable for `FreeDagNode`
+        let fake_trait_object: *mut dyn DagNode = fake_ptr as *mut dyn DagNode;
+        // This prevents the compiler from optimizing the vtable away
+        _ = fake_trait_object.is_null();
+        // Extract the metadata (the vtable pointer)
+        std::ptr::metadata(fake_trait_object)
+      };
+    };
+}
+
+make_dag_node_vtable!(FREE_DAG_NODE_VTABLE, FreeDagNode);
+make_dag_node_vtable!(VARIABLE_DAG_NODE_VTABLE, VariableDagNode);
+make_dag_node_vtable!(BOOL_DAG_NODE_VTABLE, BoolDagNode);
+make_dag_node_vtable!(FLOAT_DAG_NODE_VTABLE, FloatDagNode);
+make_dag_node_vtable!(INTEGER_DAG_NODE_VTABLE, IntegerDagNode);
+make_dag_node_vtable!(NATURALNUMBER_DAG_NODE_VTABLE, NaturalNumberDagNode);
+make_dag_node_vtable!(STRING_DAG_NODE_VTABLE, StringDagNode);
 
 
-pub type ThinDagNodePtr = *mut DagNodeCore; // A thin pointer to a `DagNodeCore` object.
+/// A thin pointer to a `DagNodeCore` object
+pub type ThinDagNodePtr = *mut DagNodeCore;
+
+/// The `DagNodeCore::inline` field needs to be large enough to hold the largest data value that will be stored there.
+/// The largest value is a `Vec<u8>` or `String` (which are the same size), 24 bytes on most 64-bit systems.
+const INLINE_BYTE_COUNT: usize = size_of::<StringBuiltIn>();
 
 
 #[bitflags]
@@ -98,9 +125,28 @@ impl DagNodeFlag {
 
 pub type DagNodeFlags = BitFlags<DagNodeFlag, u8>;
 
-
+/// `DagNodeCore` reserves a storage area that is sized to accommodate
+/// the largest `DagNode` implementor. Instead of a generic memory
+/// pool, we specify common fields and two polymorphic fields:
+///
+///   1. an `args` pointer to garbage collected memory;
+///   2. 16 bytes of "inline" memory for storing values. 
+///
+/// Any derived DagNode instance must only use these fields and is
+/// responsible for reinterpreting data stored there for its own needs.
+/// This is how we ensure all implementors of `DagNode` are the same size.
+/// 
+/// Keep the fields ordered to optimize memory layout.
 pub struct DagNodeCore {
-  pub(crate) symbol    : SymbolPtr,
+  pub(crate) symbol: SymbolPtr,
+  
+  /// Several Theories store values inline:
+  ///   - `NADataType` values for `NADagNode<T: NADataType>`, usually 64 bits
+  ///   - A fat pointer for `ACUDagNode::runs_buffer: Vec<usize>`
+  ///   - `IString` for `VariableDagNode`
+  // ToDo: Can we use the `args` field for this purpose?
+  pub(crate) inline: [u8; INLINE_BYTE_COUNT],
+  
   // ToDo: Figure out `args` representation at `DagNodeCore` level.
   /// Either null or a pointer to a `GCVector<T>`.
   ///
@@ -112,7 +158,7 @@ pub struct DagNodeCore {
   pub(crate) sort_index: i8, // sort index within kind
   pub(crate) theory_tag: EquationalTheory,
   pub(crate) flags     : DagNodeFlags,
-
+  
   // Opt out of `Unpin`
   _pin: PhantomPinned,
 }
@@ -129,11 +175,15 @@ impl DagNodeCore {
     let node     = allocate_dag_node();
     let node_mut = unsafe { &mut *node };
 
-    node_mut.args  = std::ptr::null_mut();
-    node_mut.flags = DagNodeFlags::empty();
+    // Re-initialize memory
+    node_mut.args   = std::ptr::null_mut();
+    node_mut.flags  = DagNodeFlags::empty();
+    node_mut.inline = [0; 24];
 
+    // ToDo: Improve API for args. E.g. make `DagNodeVector` generic.
     if let Arity::Value(arity) = symbol.arity() {
       if arity > 1 {
+        // ToDo: The vector probably shouldn't be allocated here.
         let vec = DagNodeVector::with_capacity(arity as usize);
         node_mut.args = (vec as *mut DagNodeVector) as *mut u8;
         node_mut.flags.insert(DagNodeFlag::NeedsDestruction);
@@ -149,8 +199,7 @@ impl DagNodeCore {
   // endregion Constructors
 
   // region Accessors
-
-
+  
   #[inline(always)]
   pub fn symbol(&self) -> SymbolPtr {
     self.symbol
@@ -160,9 +209,7 @@ impl DagNodeCore {
   pub fn arity(&self) -> Arity {
     self.symbol().arity()
   }
-
-
-
+  
   // endregion
 
   // region GC related methods
@@ -192,27 +239,52 @@ impl DagNodeCore {
   pub fn upgrade(thin_dag_node_ptr: ThinDagNodePtr) -> DagNodePtr {
     assert!(!thin_dag_node_ptr.is_null());
     match unsafe { thin_dag_node_ptr.as_ref_unchecked().theory_tag } {
+      
       EquationalTheory::Free => {
-        // Step 1: Create a fake reference to MyStruct
-        // let fake_ptr: *mut FreeDagNode = std::ptr::null_mut();
-        // // Step 2: Cast the fake reference to a trait object pointer
-        // let fake_trait_object: *mut dyn DagNode = fake_ptr as *mut dyn DagNode;
-        // // Step 3: Extract the vtable from the trait object pointer
-        // let vtable = std::ptr::metadata(fake_trait_object);
-        // Step 4: Combine the thin pointer and vtable pointer into a fat pointer
-        // let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, vtable);
         let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, FREE_DAG_NODE_VTABLE);
-        if fat_ptr.is_null() {
-          panic!("FreeDagNodePtr could not be created from ThinDagNodePtr");
-        }
-
+        debug_assert!(!fat_ptr.is_null(), "FreeDagNodePtr could not be created from ThinDagNodePtr");
         DagNodePtr::new(fat_ptr)
       }
-      // EquationalTheory::Variable => {}
-      // EquationalTheory::Data => {}
-      _ => {
-        panic!("Thin DagNode has invalid theory tag")
+      
+      EquationalTheory::Variable => {
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, VARIABLE_DAG_NODE_VTABLE);
+        debug_assert!(!fat_ptr.is_null(), "VariableDagNodePtr could not be created from ThinDagNodePtr");
+        DagNodePtr::new(fat_ptr)
       }
+      
+      EquationalTheory::Bool => {
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, BOOL_DAG_NODE_VTABLE);
+        debug_assert!(!fat_ptr.is_null(), "BoolDagNodePtr could not be created from ThinDagNodePtr");
+        DagNodePtr::new(fat_ptr)
+      }
+      
+      EquationalTheory::Float => {
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, FLOAT_DAG_NODE_VTABLE);
+        debug_assert!(!fat_ptr.is_null(), "FloatDagNodePtr could not be created from ThinDagNodePtr");
+        DagNodePtr::new(fat_ptr)
+      }
+      
+      EquationalTheory::Integer => {
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, INTEGER_DAG_NODE_VTABLE);
+        debug_assert!(!fat_ptr.is_null(), "IntegerDagNodePtr could not be created from ThinDagNodePtr");
+        DagNodePtr::new(fat_ptr)
+      }
+      
+      EquationalTheory::NaturalNumber => {
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, NATURALNUMBER_DAG_NODE_VTABLE);
+        debug_assert!(!fat_ptr.is_null(), "NaturalNumberDagNodePtr could not be created from ThinDagNodePtr");
+        DagNodePtr::new(fat_ptr)
+      }
+      
+      EquationalTheory::String => {
+        let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, STRING_DAG_NODE_VTABLE);
+        debug_assert!(!fat_ptr.is_null(), "StringDagNodePtr could not be created from ThinDagNodePtr");
+        DagNodePtr::new(fat_ptr)
+      }
+
+      // _ => {
+      //   panic!("Thin DagNode has invalid theory tag")
+      // }
     }
   }
 
@@ -221,5 +293,13 @@ impl DagNodeCore {
 impl Display for DagNodeCore {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "node<{}>", self.symbol())
+  }
+}
+
+impl Drop for DagNodeCore {
+  fn drop(&mut self) {
+    // ToDo: We need a better way of finalizing dag nodes
+    let mut dag_node = DagNodeCore::upgrade(self);
+    dag_node.finalize();
   }
 }

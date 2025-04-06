@@ -1,18 +1,15 @@
 use std::fmt::Display;
 use std::sync::atomic::{AtomicU32, Ordering};
 use mod2_abs::{int_to_subscript, IString};
-use crate::{
-  api::Arity,
-  core::{
-    symbol::{
-      SortTable,
-      SymbolAttributes,
-      SymbolType
-    },
-    format::{FormatStyle, Formattable},
-    strategy::Strategy,
-  }
-};
+use crate::{api::Arity, core::{
+  symbol::{
+    SortTable,
+    SymbolAttributes,
+    SymbolType
+  },
+  format::{FormatStyle, Formattable},
+  strategy::Strategy,
+}, HashType};
 use crate::api::symbol::SymbolPtr;
 use crate::core::symbol::OpDeclaration;
 
@@ -29,7 +26,7 @@ pub struct SymbolCore {
   /// has lower bits equal to the value of an integer that is incremented every time
   /// a symbol is created and upper 8 bits (bits 24..32) equal to the arity. Note:
   /// We enforce symbol creation with `Symbol::new()` by making hash_value private.
-  hash_value : u32,
+  hash_value : HashType,
 
   // ToDo: Possibly replace with `Option<Box<Strategy>>`, where `None` means "standard strategy".
   // `Strategy`
@@ -53,7 +50,7 @@ impl SymbolCore {
     // Compute hash
     static SYMBOL_COUNT: AtomicU32 = AtomicU32::new(0);
     SYMBOL_COUNT.fetch_add(1, Ordering::Relaxed);
-    let numeric_arity: u32 = arity.as_numeric();
+    let numeric_arity: HashType = arity.as_numeric() as HashType;
     let hash_value = SYMBOL_COUNT.load(Ordering::Relaxed) | (numeric_arity << 24); // Maude: self.arity << 24
 
     let symbol = SymbolCore {
@@ -89,8 +86,9 @@ impl SymbolCore {
     self.hash_value.cmp(&other.hash_value)
   }
 
+  /// The hash value of symbols is created on symbol creation in `Symbol::new()`
   #[inline(always)]
-  pub fn hash(&self) -> u32 {
+  pub fn hash(&self) -> HashType {
     self.hash_value
   }
   

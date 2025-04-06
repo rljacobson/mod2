@@ -8,9 +8,15 @@ use std::{
   any::Any,
   cmp::Ordering,
   fmt::Display,
-  ops::Deref
+  ops::Deref,
+  str::FromStr
 };
-use std::str::FromStr;
+use std::hash::{Hash, Hasher};
+use std::mem::transmute;
+use std::ops::{BitAnd, BitXor};
+use ordered_float::OrderedFloat;
+use mod2_abs::hash::{hash2, FastHasher};
+use mod2_abs::NatSet;
 use crate::{
   api::{
     built_in::{
@@ -19,7 +25,8 @@ use crate::{
       Integer,
       NaturalNumber,
       StringBuiltIn,
-      get_built_in_symbol, 
+      get_built_in_symbol,
+      NADataType,
     },
     dag_node::{DagNode, DagNodePtr},
     symbol::Symbol,
@@ -27,19 +34,21 @@ use crate::{
   },
   core::{
     format::{FormatStyle, Formattable},
-    term_core::TermCore
+    term_core::TermCore,
+    TermBag,
   },
+  HashType,
 };
 
 pub type BoolTerm    = NATerm<Bool>;
 pub type FloatTerm   = NATerm<Float>;
 pub type IntegerTerm = NATerm<Integer>;
 pub type StringTerm  = NATerm<StringBuiltIn>;
-pub type NaturalNumberTerm = NATerm<NaturalNumber>;
 pub type NaturalTerm = NATerm<NaturalNumber>;
+pub type NaturalNumberTerm = NATerm<NaturalNumber>;
 
 #[derive(Clone)]
-pub struct NATerm<T: Any + Clone>{
+pub struct NATerm<T: NADataType>{
   core     : TermCore,
   pub value: T,
 }
@@ -86,7 +95,7 @@ impl IntegerTerm {
       value: value.into(),
     }
   }
-  
+
   pub fn from_str(x: &str) -> Self {
     let value: Integer = match x.parse(){
       Ok(x) => x,
@@ -138,19 +147,19 @@ impl BoolTerm {
   }
 }
 
-impl<T: Any + Clone + Display> Formattable for NATerm<T> {
+impl<T: NADataType> Formattable for NATerm<T> {
   fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
     let name = self.core.symbol.name();
     let value_str = if *name == *"String" {
       format!("\"{}\"", self.value)
-    } else { 
+    } else {
       self.value.to_string()
     };
     match  style {
       FormatStyle::Debug => {
         write!(f, "{}Term<{}>", name, value_str)
       }
-      
+
       FormatStyle::Simple
       | FormatStyle::Input
       | FormatStyle::Default => {
@@ -160,7 +169,7 @@ impl<T: Any + Clone + Display> Formattable for NATerm<T> {
   }
 }
 
-impl<T: Any + Clone + Display> Term for NATerm<T> {
+impl<T: NADataType> Term for NATerm<T> {
   fn as_any(&self) -> &dyn Any {
     self
   }
@@ -177,28 +186,32 @@ impl<T: Any + Clone + Display> Term for NATerm<T> {
     Box::new(self.clone())
   }
 
-  fn hash(&self) -> u32 {
-    todo!()
-  }
+  fn normalize(&mut self, _full: bool) -> (Option<BxTerm>, bool, HashType) {
+    let hash_value = hash2(self.symbol().hash(), self.value.hashable_bits());
+    self.core_mut().hash_value = hash_value;
 
-  fn normalize(&mut self, _full: bool) -> (u32, bool) {
-    todo!()
+    (None, false, hash_value)
   }
 
   fn core(&self) -> &TermCore {
-    todo!()
+    &self.core
   }
 
   fn core_mut(&mut self) -> &mut TermCore {
-    todo!()
+    &mut self.core
   }
 
   fn iter_args(&self) -> Box<dyn Iterator<Item=TermPtr> + '_> {
     Box::new(std::iter::empty::<TermPtr>())
   }
 
-  fn compare_term_arguments(&self, _other: &dyn Term) -> Ordering {
-    todo!()
+  fn compare_term_arguments(&self, other: &dyn Term) -> Ordering {
+    let other: &NATerm<T> = other
+        .as_any()
+        .downcast_ref::<NATerm<T>>()
+        .expect("NATerm type mismatch: cannot compare");
+    
+    self.value.compare(&other.value)
   }
 
   fn compare_dag_arguments(&self, _other: &dyn DagNode) -> Ordering {
@@ -206,6 +219,14 @@ impl<T: Any + Clone + Display> Term for NATerm<T> {
   }
 
   fn dagify_aux(&self) -> DagNodePtr {
+    todo!()
+  }
+
+  fn analyse_constraint_propagation(&mut self, _bound_uniquely: &mut NatSet) {
+    /* nothing to do */
+  }
+
+  fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
     todo!()
   }
 }

@@ -17,9 +17,10 @@ For address equality semantics, use `UnsafePtr<T>::add_eq`.
 
 use std::{
   fmt::{Display, Formatter, Debug},
-  ops::{Deref, DerefMut}
+  ops::{Deref, DerefMut},
+  ptr::NonNull
 };
-use std::ptr::NonNull;
+use std::hash::{Hash, Hasher};
 
 pub struct UnsafePtr<T: ?Sized> {
   ptr: NonNull<T>,
@@ -96,6 +97,12 @@ impl<T: Display + ?Sized> Display for UnsafePtr<T> {
 impl<T: Debug + ?Sized> Debug for UnsafePtr<T> {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     Debug::fmt(unsafe { self.ptr.as_ref() }, f)
+  }
+}
+
+impl<T: ?Sized + Hash> Hash for UnsafePtr<T> {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    self.deref().hash(state);
   }
 }
 

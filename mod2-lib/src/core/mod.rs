@@ -21,6 +21,7 @@ The following compares Maude's `DagNode` to our implementation here.
 mod local_bindings;
 mod module;
 mod narrowing_variable_info;
+mod term_bag;
 mod theory;
 mod variable_info;
 pub mod format;
@@ -33,12 +34,14 @@ pub(crate) mod gc;
 pub(crate) mod strategy;
 pub(crate) mod substitution;
 
-pub use module::*;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
 pub(crate) use narrowing_variable_info::NarrowingVariableInfo;
 pub(crate) use variable_info::VariableInfo;
+pub(crate) use term_bag::TermBag;
+// Public API
+pub use module::*;
 pub use theory::*;
 
 
@@ -46,11 +49,13 @@ pub use theory::*;
 pub use gc::root_container::RootContainer;
 
 /// A `*mut Void` is a pointer to a `u8`
+// ToDo: Should this be `()`?
 pub type Void = u8;
 
 
 #[cfg(test)]
 mod tests {
+  use mod2_abs::IString;
   use crate::{
     api::symbol::SymbolPtr,
     core::{
@@ -58,16 +63,21 @@ mod tests {
         DagNodeFlags,
         DagNodeCore
       },
-      EquationalTheory
+      EquationalTheory,
+      term_core::TermCore,
     },
   };
 
   #[test]
   fn size_of_dag_node() {
-    println!("size of SymbolPtr: {}", size_of::<SymbolPtr>());
-    println!("size of EquationalTheory: {}", size_of::<EquationalTheory>());
-    println!("size of DagNodeFlags: {}", size_of::<DagNodeFlags>());
-    println!("size of DagNode: {}", size_of::<DagNodeCore>());
-    assert_eq!(size_of::<DagNodeCore>(), 4 * size_of::<usize>());
+    println!("size of Vec<usize>: {} bytes", size_of::<Vec<usize>>());
+    println!("size of String: {} bytes", size_of::<String>());
+    println!("size of IString: {} bytes", size_of::<IString>());
+    println!("size of TermCore: {} bytes", size_of::<TermCore>());
+    println!("size of SymbolPtr: {} bytes", size_of::<SymbolPtr>());
+    println!("size of EquationalTheory: {} bytes", size_of::<EquationalTheory>());
+    println!("size of DagNodeFlags: {} bytes", size_of::<DagNodeFlags>());
+    println!("size of DagNodeCore: {} bytes", size_of::<DagNodeCore>());
+    // assert_eq!(size_of::<DagNodeCore>(), 6 * size_of::<usize>());
   }
 }

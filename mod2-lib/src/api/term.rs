@@ -19,35 +19,32 @@ use std::{
 
 use mod2_abs::{decl_as_any_ptr_fns, NatSet, RcCell, UnsafePtr};
 
-use crate::{
-  api::{
-    dag_node::{DagNode, DagNodePtr},
-    symbol::{
-      Symbol,
-      SymbolPtr,
-      SymbolSet,
-    },
-    UNDEFINED,
-    Arity
+use crate::{api::{
+  dag_node::{DagNode, DagNodePtr},
+  symbol::{
+    Symbol,
+    SymbolPtr,
+    SymbolSet,
   },
-  impl_display_debug_for_formattable,
-  core::{
-    sort::kind::KindPtr,
-    format::Formattable,
-    substitution::Substitution,
-    term_core::{
-      cache_node_for_term,
-      clear_cache_and_set_sort_info,
-      lookup_node_for_term,
-      TermCore,
-    },
-    VariableInfo
-  }
-};
+  UNDEFINED,
+  Arity
+}, impl_display_debug_for_formattable, core::{
+  sort::kind::KindPtr,
+  format::Formattable,
+  substitution::Substitution,
+  term_core::{
+    cache_node_for_term,
+    clear_cache_and_set_sort_info,
+    lookup_node_for_term,
+    TermCore,
+  },
+  VariableInfo
+}, HashType};
+use crate::core::term_core::TermAttribute;
+use crate::core::TermBag;
 
 pub type BxTerm    = Box<dyn Term>;
-pub type MaybeTerm = Option<&'static dyn Term>;
-pub type RcTerm    = RcCell<dyn Term>;
+pub type MaybeTerm = Option<TermPtr>;
 pub type TermPtr   = UnsafePtr<dyn Term>;
 pub type TermSet   = HashMap<u32, usize>;
 
@@ -59,10 +56,15 @@ pub trait Term: Formattable {
   fn as_ptr(&self) -> TermPtr;
   fn copy(&self) -> BxTerm;
   
-  fn hash(&self)           -> u32;
-  /// Normalizes the term, returning the computed hash and `true` if the normalization changed
-  /// the term or `false` otherwise.
-  fn normalize(&mut self, full: bool) -> (u32, bool);
+  fn hash(&self) -> HashType { self.core().hash_value }
+
+  /// Returns a pointer to the normalized version of self. If a new term was created during
+  /// normalization, it is returned. We also need to know if any subterm changed, so we also
+  /// return a bool, and unless the term is the expression's top-most term, we will always need
+  /// the new hash value, too. The returned tuple is thus `( Option<TermBx>, changed, new_hash)`.
+  ///
+  /// Note: The hash value of a term is first set in this method.
+  fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType);
 
   fn core(&self)         -> &TermCore;
   fn core_mut(&mut self) -> &mut TermCore;
@@ -156,8 +158,16 @@ pub trait Term: Formattable {
     }
   }
 
-  fn get_kind(&self) -> Option<KindPtr> {
+  fn kind(&self) -> Option<KindPtr> {
     self.core().kind
+  }
+  
+  fn set_attribute(&mut self, attribute: TermAttribute) {
+    self.core_mut().attributes.insert(attribute);
+  }
+  
+  fn reset_attribute(&mut self, attribute: TermAttribute) {
+    self.core_mut().attributes.remove(attribute);
   }
 
   // endregion Accessors
@@ -266,64 +276,58 @@ pub trait Term: Formattable {
     available_terms: &mut TermBag,
     eager_context: bool,
   ) -> i32;
+*/
 
   // A subterm "honors ground out match" if its matching algorithm guarantees never to return a matching subproblem
   // when all the terms variables are already bound.
   fn will_ground_out_match(&self, bound_uniquely: &NatSet) -> bool {
-    self.honors_ground_out_match() && bound_uniquely.is_superset(&self.term_members().occurs_set)
+    self.honors_ground_out_match() && bound_uniquely.is_superset(&self.core().occurs_set)
   }
 
   fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet);
 
   fn analyse_collapses(&mut self) {
-    for arg in &mut self.iter_args() {
-      arg.borrow_mut().analyse_collapses();
+    for mut arg in &mut self.iter_args() {
+      arg.analyse_collapses();
     }
 
     if !self.is_variable() && self.collapse_symbols().is_empty() {
       self.set_attribute(TermAttribute::Stable);
     }
   }
-
-  /// This is the theory-specific part of `find_available_terms`
-  fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool);
-*/
-  /// Computes and updates the set of variables that occur in the context of a term and its
-  /// subterms. The "context" of a term refers to the rest of the term in which it occurs (its
-  /// parent term and sibling subterms).
-  fn determine_context_variables(&mut self) {
-    // Used to defer mutation of self while immutable borrow of self is held by `iter_args`.
-    let mut context_set = NatSet::default();
-
+  
+  // There are no arguments to descend into for `VariableTerm`, so this is a no-op.
+  // fn find_available_terms(&self, _available_terms: &mut TermBag, _eager_context: bool, _at_top: bool);
+  
+  /// For each argument term of this term, computes and updates the set of variables that
+  /// occur in the context of the term and its subterms. The "context" of a term refers
+  /// to the rest of the term in which it occurs (its parent term and sibling subterms).
+  fn determine_context_variables(&self) {
     for mut term in self.iter_args() {
       // Insert parent's context set
-      context_set.union_in_place(term.occurs_in_context());
-      // self.occurs_in_context_mut().union_in_place(term.occurs_in_context());
+      term.occurs_in_context_mut().union_in_place(self.occurs_in_context());
 
       for other_term in self.iter_args() {
         if *other_term != *term {
           // Insert sibling's occurs set
-          context_set.union_in_place(other_term.occurs_below());
-          // self.occurs_in_context_mut().union_in_place(other_term.occurs_below());
+          term.occurs_in_context_mut().union_in_place(other_term.occurs_below());
         }
       }
 
       term.determine_context_variables();
     }
-    self.occurs_in_context_mut().union_in_place(&context_set);
   }
 
   fn insert_abstraction_variables(&mut self, variable_info: &mut VariableInfo) {
-    self.set_honors_ground_out_match(true);
+    // Honors ground out match.
     let mut hgom = true;
-
+    
     for mut term in self.iter_args() {
       term.insert_abstraction_variables(variable_info);
       hgom &= term.honors_ground_out_match();
     }
-    if !hgom {
-      self.set_honors_ground_out_match(false);
-    }
+    
+    self.set_honors_ground_out_match(hgom);
   }
 
   /// This method populates the sort information for the term and its subterms based on their
@@ -348,7 +352,7 @@ pub trait Term: Formattable {
       term.fill_in_sort_info();
       // ToDo: Restore this assert.
       debug_assert_eq!(
-        term.get_kind().unwrap(),
+        term.kind().unwrap(),
         symbol.domain_kind(seen_args_count),
         "component error on arg {} while computing sort of {}",
         seen_args_count,
@@ -369,6 +373,9 @@ pub trait Term: Formattable {
     core.kind = Some(kind);
     core.sort_index = sort_index;
   }
+
+  /// Recursively collects the terms in a set for structural sharing.
+  fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool);
 
   // endregion Compiler-related Function
 

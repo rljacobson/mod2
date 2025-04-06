@@ -6,6 +6,8 @@ moved nor mutated in any way, and they live for the life of the program.
 
 mod nonalgebraic_term;
 mod nonalgebraic_symbol;
+mod nonalgebraic_dag_node;
+mod nonalgebraic_datatype;
 
 use std::{
   collections::HashMap,
@@ -37,6 +39,8 @@ use crate::{
 
 pub use nonalgebraic_term::*;
 pub use nonalgebraic_symbol::*;
+pub use nonalgebraic_dag_node::*;
+pub use nonalgebraic_datatype::NADataType;
 
 // Built-in Types
 pub type Bool    = bool;
@@ -121,7 +125,6 @@ static BUILT_IN_SORTS: Lazy<HashMap<&'static str, Sort>> = Lazy::new(|| {
     sorts.insert(name, sort);
   }
   
-  // println!("Initialized built-in sorts: {:?}", sorts);
   sorts
 });
 
@@ -159,7 +162,6 @@ static BUILT_IN_SYMBOLS: Lazy<HashMap<&'static str, SymbolPtr>> = Lazy::new(|| {
     symbols.insert(symbol_name, symbol_ptr);
   }
   
-  // println!("Initialized built-in symbols: {:?}", symbols);
   symbols
 });
 
@@ -172,6 +174,8 @@ pub fn get_built_in_symbol(name: &str) -> Option<SymbolPtr> {
   let symbol: SymbolPtr = *BUILT_IN_SYMBOLS.get(name)?;
   Some(symbol)
 }
+
+
 
 
 #[cfg(test)]

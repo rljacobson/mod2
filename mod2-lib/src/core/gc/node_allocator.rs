@@ -303,7 +303,8 @@ impl NodeAllocator {
     } // end outermost loop
   }
 
-  unsafe fn collect_garbage(&mut self) {
+  // The pub(super) is only for testing.
+  pub(super) unsafe fn collect_garbage(&mut self) {
     static mut GC_COUNT: u64 = 0;
 
     if self.first_arena.is_null() {

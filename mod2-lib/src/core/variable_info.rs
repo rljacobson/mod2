@@ -4,9 +4,9 @@ Information about a variable that gets passed down through the compilation funct
 
 */
 
-use std::ops::Index;
+use std::ops::{Deref, Index};
 use mod2_abs::{NatSet, Graph, debug};
-use crate::api::term::{MaybeTerm, Term};
+use crate::api::term::{MaybeTerm, TermPtr};
 
 /// This is the boundary between real and virtual variables. An `index` represents a real variable
 /// iff `index < MAX_NR_PROTECTED_VARIABLES`.
@@ -58,32 +58,23 @@ impl VariableInfo {
     None
   }
 
-  pub(crate) fn variable_to_index(&mut self, variable: &'static dyn Term) -> i32 {
-    // assert!(variable != &VariableTerm::default(), "null term");
-    assert!(
-      self.variables.len() == self.protected_variable_count as usize,
+  pub(crate) fn variable_to_index(&mut self, variable: TermPtr) -> i32 {
+    assert_eq!(
+      self.variables.len(), 
+      self.protected_variable_count as usize, 
       "can't add new real variables at this stage"
     );
 
-    let idx = self
-      .variables
-      .iter()
-      .position(|v| {
-        if let Some(d) = *v {
-          d.compare(variable).is_eq()
-        } else {
-          false
-        }
-        // v.is_some() && v.unwrap().borrow().compare(&*variable.borrow()).is_eq()
-      });
-    match idx {
-      Some(i) => i as i32,
-      None => {
-        self.variables.push(Some(variable));
-        self.protected_variable_count += 1;
-        (self.variables.len() - 1) as i32
-      }
-    }
+    self.variables
+        .iter()
+        .position(|v| v.as_ref().map_or(false, |d| d.compare(variable.deref()).is_eq()))
+        // If the variable isn't found, add it and return its index.
+        .map(|i| i as i32)
+        .unwrap_or_else(|| {
+          self.variables.push(Some(variable));
+          self.protected_variable_count += 1;
+          (self.variables.len() - 1) as i32
+        })
   }
 
   /// The phrase "remap index" is a noun. This method is a const getter and does not actually compute the remapping. Use
