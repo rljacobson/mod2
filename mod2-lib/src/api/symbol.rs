@@ -13,16 +13,21 @@ use std::{
 
 use mod2_abs::{decl_as_any_ptr_fns, IString, Set, UnsafePtr};
 
-use crate::{api::{Arity, term::BxTerm}, core::{
-  format::{FormatStyle, Formattable},
-  symbol::{
-    SortTable,
-    SymbolCore,
-    OpDeclaration
+use crate::{
+  api::{Arity, term::BxTerm},
+  core::{
+    format::{FormatStyle, Formattable},
+    symbol::{
+      SortTable,
+      SymbolCore,
+      OpDeclaration
+    },
+    sort::kind::KindPtr,
+    strategy::Strategy,
   },
-  sort::kind::KindPtr,
-}, impl_display_debug_for_formattable, HashType};
-use crate::core::strategy::Strategy;
+  impl_display_debug_for_formattable,
+  HashType,
+};
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;

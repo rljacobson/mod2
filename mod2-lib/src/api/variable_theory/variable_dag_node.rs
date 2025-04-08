@@ -54,12 +54,16 @@ use crate::{
   },
 };
 
+/// The index into `DagNodeCode::inline` at which we store the `index` of `VariableDagNode`.
+const VARIABLE_INDEX_OFFSET: usize = size_of::<IString>();
+
 pub struct VariableDagNode(DagNodeCore);
 
 impl VariableDagNode {
 
-  pub fn new(symbol: SymbolPtr, name: IString) -> DagNodePtr {
+  pub fn new(symbol: SymbolPtr, name: IString, index: i8) -> DagNodePtr {
     let mut node = DagNodeCore::with_theory(symbol, EquationalTheory::Variable);
+    node.core_mut().inline[VARIABLE_INDEX_OFFSET] = index as u8;
 
     // Needs destruction to drop the `IString` in `DagNodeCode::inline`, which decrements the `IString`'s internal
     // reference count.
@@ -88,6 +92,16 @@ impl VariableDagNode {
     std::mem::forget(name);
 
     cloned_name
+  }
+
+  #[inline(always)]
+  pub fn index(&self) -> i8 {
+    self.core().inline[VARIABLE_INDEX_OFFSET] as i8
+  }
+
+  #[inline(always)]
+  pub fn set_index(&mut self, index: i8) {
+    self.core_mut().inline[VARIABLE_INDEX_OFFSET] = index as u8;
   }
 
 }

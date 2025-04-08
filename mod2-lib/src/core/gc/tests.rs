@@ -248,7 +248,7 @@ fn create_destroy_variable_dag_node() {
   {
     let symbol = VariableSymbol::with_name(name.clone());
     {
-      let node = VariableDagNode::new(symbol.as_ptr(), name.clone());
+      let node = VariableDagNode::new(symbol.as_ptr(), name.clone(), 0);
       println!("{}", node);
     }
     {

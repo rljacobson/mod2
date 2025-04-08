@@ -69,15 +69,36 @@ mod tests {
   };
 
   #[test]
-  fn size_of_dag_node() {
-    println!("size of Vec<usize>: {} bytes", size_of::<Vec<usize>>());
-    println!("size of String: {} bytes", size_of::<String>());
-    println!("size of IString: {} bytes", size_of::<IString>());
-    println!("size of TermCore: {} bytes", size_of::<TermCore>());
-    println!("size of SymbolPtr: {} bytes", size_of::<SymbolPtr>());
-    println!("size of EquationalTheory: {} bytes", size_of::<EquationalTheory>());
-    println!("size of DagNodeFlags: {} bytes", size_of::<DagNodeFlags>());
-    println!("size of DagNodeCore: {} bytes", size_of::<DagNodeCore>());
-    // assert_eq!(size_of::<DagNodeCore>(), 6 * size_of::<usize>());
+  fn size_of_types() {
+    // A machine word is the size of usize.
+    let word_size = size_of::<usize>();
+
+    // Print header with right-justified columns.
+    println!(
+      "{:<16} {:>7} {:>7} {:>7}",
+      "Type", "Words", "Bytes", "Bits"
+    );
+    // println!("{}", "─".repeat(16 + 10 + 10 + 4));
+
+    // A helper macro to print the information for each type.
+    macro_rules! print_size {
+        ($type:ty) => {{
+            let bytes = size_of::<$type>();
+            // Round up bytes to nearest word.
+            let words = (bytes + word_size - 1) / word_size;
+            let bits = bytes * 8;
+            println!("{:<16} {:>7} {:>7} {:>7}",
+                     stringify!($type), words, bytes, bits);
+        }};
+    }
+
+    print_size!(Vec<usize>);
+    print_size!(String);
+    print_size!(IString);
+    print_size!(TermCore);
+    print_size!(SymbolPtr);
+    print_size!(EquationalTheory);
+    print_size!(DagNodeFlags);
+    print_size!(DagNodeCore);
   }
 }

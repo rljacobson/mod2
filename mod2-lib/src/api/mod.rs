@@ -11,6 +11,7 @@ pub(crate) mod dag_node;
 pub mod variable_theory;
 pub mod free_theory;
 pub mod built_in;
+mod dag_node_cache;
 
 // Special Values
 // ToDo: Do UNDEFINED the right way. Is this great? No. But it's convenient.

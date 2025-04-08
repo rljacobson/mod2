@@ -77,23 +77,23 @@ impl Substitution {
   /// wasn't converted from an `i32` that was `NONE`.
   #[inline(always)]
   pub fn value(&self, index: usize) -> MaybeDagNode {
-    self.get(index as i32)
+    self.get(index as i8)
   }
 
   // Todo: Is this the best way to implement a getter? I think we did it this way so it returned a value.
   // ToDo: Should this take an i8?
   /// This getter takes an `i32` so it can check for negative indices, i.e. `NONE`.
   #[inline(always)]
-  pub fn get(&self, index: i32) -> MaybeDagNode {
+  pub fn get(&self, index: i8) -> MaybeDagNode {
     assert!(index >= 0, "-ve index {}", index);
     assert!(
-      index < self.bindings.len() as i32,
+      (index as usize) < self.bindings.len(),
       "index too big {} vs {}",
       index,
       self.bindings.len()
     );
 
-    // The asserts give confidence but do not guarantee safety here.
+    // The asserts guarantee safety here.
     unsafe { self.bindings.get_unchecked(index as usize).clone() }
   }
 
@@ -113,7 +113,7 @@ impl Substitution {
       assert!(j.is_none() || i == j, "substitution inconsistency at index {}", idx);
       if let (Some(a), Some(b)) = (i, j) {
         if !a.addr_eq(*b) {
-          local_bindings.add_binding(idx as i32, *a);
+          local_bindings.add_binding(idx as i8, *a);
         }
       }
     }
@@ -139,7 +139,7 @@ impl Substitution {
   */
 
   #[inline(always)]
-  pub fn bind(&mut self, index: i32, maybe_value: Option<DagNodePtr>) {
+  pub fn bind(&mut self, index: i8, maybe_value: Option<DagNodePtr>) {
     assert!(index >= 0, "Negative index {}", index);
     assert!(
       (index as usize) < self.bindings.len(),

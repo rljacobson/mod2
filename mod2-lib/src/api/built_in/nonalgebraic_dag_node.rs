@@ -48,7 +48,8 @@ use crate::{
       Integer,
       NaturalNumber,
       Bool,
-      StringBuiltIn
+      StringBuiltIn,
+      get_built_in_symbol,
     },
     dag_node::{
       DagNodeVector,
@@ -61,7 +62,6 @@ use crate::{
     symbol::SymbolPtr,
   }
 };
-use crate::api::built_in::get_built_in_symbol;
 
 pub type BoolDagNode    = NADagNode<Bool>;
 pub type FloatDagNode   = NADagNode<Float>;
@@ -70,6 +70,11 @@ pub type StringDagNode  = NADagNode<String>;
 pub type NaturalNumberDagNode = NADagNode<NaturalNumber>;
 
 pub struct NADagNode<T: NADataType>(DagNodeCore, PhantomData<T>);
+impl<T: NADataType> NADagNode<T> {
+  pub fn value(&self) -> T {
+    T::value_from_dag_node(self)
+  }
+}
 
 /// Implementation for `NADataType` that implement `Copy`
 macro_rules! impl_na_dag_node {
@@ -82,16 +87,7 @@ macro_rules! impl_na_dag_node {
           node.core_mut().inline[..(size_of::<$natype>())].copy_from_slice(as_bytes(&value));
           node
         }
-
-        pub fn value(&self) -> $natype {
-          // Reconstitute the value from its raw bytes
-          let slice = &self.core().inline;
-          let value: $natype = unsafe {
-            std::ptr::read_unaligned(slice.as_ptr() as *const $natype)
-          };
-            value
-          }
-        }
+      }
     };
 }
 
@@ -104,22 +100,14 @@ impl_na_dag_node!(NaturalNumber);
 impl NADagNode<Bool> {
   pub fn new(value: Bool) -> DagNodePtr {
     let symbol = if value {
-      unsafe{ get_built_in_symbol("true").unwrap_unchecked() }
+      unsafe { get_built_in_symbol("true").unwrap_unchecked() }
     } else {
-      unsafe{ get_built_in_symbol("false").unwrap_unchecked() }
+      unsafe { get_built_in_symbol("false").unwrap_unchecked() }
     };
     let mut node = DagNodeCore::with_theory(symbol, <Bool as NADataType>::THEORY);
 
     node.core_mut().inline[..(size_of::<Bool>())].copy_from_slice(as_bytes(&value));
     node
-  }
-
-  pub fn value(&self) -> Bool {
-    let slice = &self.core().inline;
-    let value: Bool = unsafe {
-      std::ptr::read_unaligned(slice.as_ptr() as *const Bool)
-    };
-    value
   }
 }
 
@@ -135,18 +123,6 @@ impl NADagNode<StringBuiltIn> {
     // let (ptr, length, capacity) = value.into_raw_parts();
     node.core_mut().inline =  unsafe{ transmute(value.into_raw_parts()) };
     node
-  }
-
-  pub fn value(&self) -> StringBuiltIn {
-    // Reconstitute the string so its destructor can be called.
-    let (ptr, length, capacity): (*mut u8, usize, usize) = unsafe{ transmute(self.core().inline) };
-    let cloneable_string: StringBuiltIn = unsafe { StringBuiltIn::from_raw_parts(ptr, length, capacity) };
-    
-    let value = cloneable_string.clone();
-    // Do not call destructor on `cloneable_string`
-    std::mem::forget(cloneable_string);
-    
-    value
   }
 }
 

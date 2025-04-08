@@ -44,6 +44,7 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
+use crate::api::dag_node_cache::DagNodeCache;
 
 pub struct FreeTerm{
   core                 : TermCore,
@@ -167,11 +168,11 @@ impl Term for FreeTerm {
     }
   }
 
-  fn compare_dag_arguments(&self, other: &dyn DagNode) -> Ordering {
+  fn compare_dag_arguments(&self, other: DagNodePtr) -> Ordering {
     assert_eq!(self.symbol(), other.symbol(), "symbols differ");
     if let Some(other) = other.as_any().downcast_ref::<FreeDagNode>() {
       for (arg_self, arg_other) in self.args.iter().zip(other.iter_args()) {
-        let r = arg_self.compare_dag_node(arg_other.deref());
+        let r = arg_self.compare_dag_node(arg_other);
         if r.is_ne() {
           return r;
         }
@@ -183,7 +184,7 @@ impl Term for FreeTerm {
   }
 
   // ToDo: This method makes no use of partial_substitution except for `partial_compare_unstable` in `VariableTerm`.
-  fn partial_compare_arguments(&self, partial_substitution: &mut Substitution, other: &dyn DagNode) -> Option<Ordering> {
+  fn partial_compare_arguments(&self, partial_substitution: &mut Substitution, other: DagNodePtr) -> Option<Ordering> {
     assert!(self.symbol().compare(other.symbol().deref()).is_eq(), "symbols differ");
 
     // ToDo: Maude's implementation does a static cast and doesn't check that they have the same number of arguments.
@@ -201,7 +202,7 @@ impl Term for FreeTerm {
 
     if let Some(da) = other.as_any().downcast_ref::<FreeDagNode>() {
       for (term_arg, dag_arg) in self.args.iter().zip(da.iter_args()) {
-        let r = term_arg.partial_compare(partial_substitution, dag_arg.deref());
+        let r = term_arg.partial_compare(partial_substitution, dag_arg);
         if r != PartialOrdering::Equal {
           return r;
         }
@@ -222,12 +223,13 @@ impl Term for FreeTerm {
 
   // endregion
 
-  fn dagify_aux(&self) -> DagNodePtr {
+  #[allow(private_interfaces)]
+  fn dagify_aux(&self, node_cache: &mut DagNodeCache) -> DagNodePtr {
     let new_node = FreeDagNode::new(self.symbol());
-    let args = arg_to_node_vec(new_node.core().args);
+    let args     = arg_to_node_vec(new_node.core().args);
 
     for arg in self.args.iter() {
-      let node = arg.dagify();
+      let node = arg.dagify(node_cache);
       _ = args.push(node);
     }
 

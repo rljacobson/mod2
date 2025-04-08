@@ -10,36 +10,21 @@ of structural sharing, the node instances themselves are not in 1-to-1 correspon
 
 use std::{
   cell::Cell,
-  collections::hash_map::Entry,
-  sync::atomic::{
-    Ordering::Relaxed,
-    AtomicBool,
-  },
   ops::Deref
 };
 
 use enumflags2::{bitflags, BitFlags};
-use once_cell::sync::Lazy;
 
-use mod2_abs::{NatSet, HashMap};
+use mod2_abs::NatSet;
 
-use crate::{api::{
-  UNDEFINED,
-  symbol::{Symbol, SymbolPtr, SymbolSet},
-  dag_node::DagNodePtr
-}, core::sort::kind::KindPtr, HashType};
-
-pub type TermSet   = HashMap<u32, usize>;
-
-static mut CONVERTED_TERMS: Lazy<TermSet> =  Lazy::new(|| {
-  TermSet::new()
-});
-
-static mut SUBDAG_CACHE : Lazy<Vec<DagNodePtr>> = Lazy::new(|| {
-  Vec::new()
-});
-
-static SET_SORT_INFO_FLAG: AtomicBool = AtomicBool::new(false);
+use crate::{
+  api::{
+    UNDEFINED,
+    symbol::{Symbol, SymbolPtr, SymbolSet},
+  },
+  core::sort::kind::KindPtr,
+  HashType,
+};
 
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -80,7 +65,7 @@ pub struct TermCore {
   pub(crate) kind            : Option<KindPtr>,
   pub(crate) collapse_symbols: SymbolSet,
   pub(crate) attributes      : TermAttributes,
-  pub(crate) sort_index      : i32,
+  pub(crate) sort_index      : i8,
   pub(crate) term_type       : TermType,
   pub(crate) save_index      : i32,      // NoneIndex = -1
   pub(crate) hash_value      : HashType, // Set in `Term::normalize()`
@@ -98,7 +83,7 @@ impl TermCore {
       kind            : None,                 // ToDo: Initialize to `symbol.range_kind()` ?
       collapse_symbols: Default::default(),
       attributes      : TermAttributes::default(),
-      sort_index      : UNDEFINED,
+      sort_index      : UNDEFINED as i8,
       term_type       : TermType::Free,
       save_index      : 0,
       hash_value      : 0,                    // Set in `Term::normalize()`
@@ -183,31 +168,4 @@ impl TermCore {
 
   // endregion Accessors
 
-}
-
-/// This function is called from `Term::term_to_dag()`.
-pub fn clear_cache_and_set_sort_info(set_sort_info: bool) {
-  SET_SORT_INFO_FLAG.store(set_sort_info, Relaxed);
-  unsafe { #[allow(static_mut_refs)] SUBDAG_CACHE.clear(); }
-  unsafe { #[allow(static_mut_refs)] CONVERTED_TERMS.clear(); }
-}
-
-/// This free function plays the role of `Term::dagify()`. The sub DAG cache implements structural
-/// sharing.
-pub fn lookup_node_for_term(semantic_hash: u32) -> Option<DagNodePtr> {
-  if let Entry::Occupied(occupied_entry) = unsafe{ #[allow(static_mut_refs)] CONVERTED_TERMS.entry(semantic_hash) } {
-    let idx = *occupied_entry.get();
-    Some(unsafe{ SUBDAG_CACHE[idx] })
-  } else {
-    None
-  }
-}
-
-/// This free function (along with the one above) plays the role of `Term::dagify()`.
-/// The sub DAG cache implements structural sharing.
-pub fn cache_node_for_term(semantic_hash: u32, node: DagNodePtr) {
-  let idx = unsafe{ #[allow(static_mut_refs)] SUBDAG_CACHE.len() };
-  unsafe{ #[allow(static_mut_refs)] SUBDAG_CACHE.push(node) };
-  // sub_dags.insert(self_hash, d.clone());
-  unsafe{ #[allow(static_mut_refs)] CONVERTED_TERMS.insert(semantic_hash, idx) };
 }

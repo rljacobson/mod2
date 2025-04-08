@@ -12,7 +12,7 @@ use crate::{core::substitution::Substitution, api::dag_node::DagNodePtr};
 
 pub struct Binding {
   active:         bool,
-  variable_index: i32,
+  variable_index: i8,
   value:          DagNodePtr,
 }
 
@@ -26,7 +26,7 @@ impl LocalBindings {
     Self::default()
   }
 
-  pub fn add_binding(&mut self, index: i32, value: DagNodePtr) {
+  pub fn add_binding(&mut self, index: i8, value: DagNodePtr) {
     self.bindings.push(Binding {
       active: false,
       variable_index: index,

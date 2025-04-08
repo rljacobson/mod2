@@ -1,54 +1,68 @@
 /*!
 
-The `NADataType` trait provides a uniform interface to types that are used to implement built-in primitive datatypes. 
-So far we just use it for:
-
-  1. getting the right numeric type for hashing `NATerm`s
-  2. implementing a total order compare function for f64
-  3. finalizing an `NADagNode<T>` for those values `T` that own memory (`String`)
-  4. selecting the right `EquationalTheory` variant for `DagNode` construction
+The `NADataType` trait provides a uniform interface to types that are used to implement built-in primitive datatypes.
+It holds the type-specific implementation for `NATerm`s and `NADagNode`s.
 
 */
 
 use std::{
-  fmt::Display,
-  cmp::Ordering,
   any::Any,
-  hash::{Hash, Hasher}
+  cmp::Ordering,
+  fmt::Display,
+  hash::{Hash, Hasher},
+  mem::transmute,
 };
-use std::mem::transmute;
+
 use ordered_float::OrderedFloat;
-use mod2_abs::debug;
-use mod2_abs::hash::FastHasher;
+
+use mod2_abs::{
+  debug,
+  hash::FastHasher
+};
 
 use crate::{
   api::{
     built_in::{
       Bool,
+      BoolDagNode,
       Float,
       Integer,
       NaturalNumber,
-      StringBuiltIn
+      StringBuiltIn,
+      NADagNode,
     },
-    dag_node::DagNode
+    dag_node::{DagNode, DagNodePtr}
   },
+  core::EquationalTheory,
   HashType,
 };
-use crate::core::EquationalTheory;
 
 /// A uniform interface to types that are used to implement built-in primitive datatypes.
-pub trait NADataType: Any + Clone + Display {
+pub trait NADataType: Any + Clone + Display + Sized {
   const THEORY: EquationalTheory;
-  
+
   fn hashable_bits(&self) -> HashType;
   fn compare(&self, other: &Self) -> Ordering;
   fn finalize_dag_node(_node: &mut dyn DagNode){ /* empty default impl */}
+
+  // Default impl for types that are `Copy`
+  fn value_from_dag_node(node: &NADagNode<Self>) -> Self {
+    // Reconstitute the value from its raw bytes
+    let slice = node.core().inline;
+    let value: Self = unsafe {
+      std::ptr::read_unaligned(slice.as_ptr() as *const Self)
+    };
+    value
+  }
+  
+  fn make_dag_node(value: Self) -> DagNodePtr;
 }
 
 impl NADataType for Bool {
   const THEORY: EquationalTheory = EquationalTheory::Bool;
   fn hashable_bits(&self) -> HashType { *self as u8 as u32 }
   fn compare(&self, other: &Self) -> Ordering { other.cmp(self) }
+  fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
 }
 
 impl NADataType for Float {
@@ -58,12 +72,13 @@ impl NADataType for Float {
     // XOR the upper 4 bytes with the lower 4 bytes and truncate
     ((bits64 >> 32) ^ (bits64 & (u32::MAX as u64))) as HashType
   }
-  
+
   fn compare(&self, other: &Self) -> Ordering {
     let ordered_self = OrderedFloat::from(*self);
     let ordered_other = OrderedFloat::from(*other);
     ordered_self.cmp(&ordered_other)
   }
+  fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
 }
 
 impl NADataType for Integer {
@@ -73,8 +88,9 @@ impl NADataType for Integer {
     // XOR the upper 4 bytes with the lower 4 bytes and truncate
     ((bits64 >> 32) ^ (bits64 & (u32::MAX as u64))) as HashType
   }
-  
+
   fn compare(&self, other: &Self) -> Ordering { other.cmp(self) }
+  fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
 }
 
 impl NADataType for NaturalNumber {
@@ -83,8 +99,9 @@ impl NADataType for NaturalNumber {
     // XOR the upper 4 bytes with the lower 4 bytes and truncate
     ((self >> 32) ^ (self & (u32::MAX as u64))) as HashType
   }
-  
+
   fn compare(&self, other: &Self) -> Ordering { self.cmp(&other) }
+  fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
 }
 
 impl NADataType for StringBuiltIn {
@@ -97,7 +114,7 @@ impl NADataType for StringBuiltIn {
     // XOR the upper 4 bytes with the lower 4 bytes and truncate
     ((bits64 >> 32) ^ (bits64 & (u32::MAX as u64))) as HashType
   }
-  
+
   fn compare(&self, other: &Self) -> Ordering { self.cmp(&other) }
 
   fn finalize_dag_node(node: &mut dyn DagNode) {
@@ -108,5 +125,18 @@ impl NADataType for StringBuiltIn {
     let droppable_string: StringBuiltIn = unsafe { StringBuiltIn::from_raw_parts(ptr, length, capacity) };
     drop(droppable_string)
   }
+
+  fn value_from_dag_node(node: &NADagNode<Self>) -> StringBuiltIn {
+    // Reconstitute the string so its destructor can be called.
+    let (ptr, length, capacity): (*mut u8, usize, usize) = unsafe{ transmute(node.core().inline) };
+    let cloneable_string: StringBuiltIn = unsafe { StringBuiltIn::from_raw_parts(ptr, length, capacity) };
+
+    let value = cloneable_string.clone();
+    // Do not call destructor on `cloneable_string`
+    std::mem::forget(cloneable_string);
+
+    value
+  }
+  fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
 }
 

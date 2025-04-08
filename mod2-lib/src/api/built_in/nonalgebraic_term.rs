@@ -8,25 +8,31 @@ use std::{
   any::Any,
   cmp::Ordering,
   fmt::Display,
-  ops::Deref,
-  str::FromStr
+  hash::{Hash, Hasher},
+  mem::transmute,
+  ops::{
+    Deref,
+    BitAnd,
+    BitXor,
+  },
+  str::FromStr,
 };
-use std::hash::{Hash, Hasher};
-use std::mem::transmute;
-use std::ops::{BitAnd, BitXor};
 use ordered_float::OrderedFloat;
-use mod2_abs::hash::{hash2, FastHasher};
-use mod2_abs::NatSet;
+use mod2_abs::{
+  hash::{hash2, FastHasher},
+  NatSet
+};
 use crate::{
   api::{
     built_in::{
       Bool,
       Float,
       Integer,
+      NADataType,
+      NADagNode,
       NaturalNumber,
       StringBuiltIn,
       get_built_in_symbol,
-      NADataType,
     },
     dag_node::{DagNode, DagNodePtr},
     symbol::Symbol,
@@ -39,6 +45,8 @@ use crate::{
   },
   HashType,
 };
+use crate::api::built_in::FloatDagNode;
+use crate::api::dag_node_cache::DagNodeCache;
 
 pub type BoolTerm    = NATerm<Bool>;
 pub type FloatTerm   = NATerm<Float>;
@@ -214,19 +222,24 @@ impl<T: NADataType> Term for NATerm<T> {
     self.value.compare(&other.value)
   }
 
-  fn compare_dag_arguments(&self, _other: &dyn DagNode) -> Ordering {
-    todo!()
+  fn compare_dag_arguments(&self, other: DagNodePtr) -> Ordering {
+    if let Some(other) = other.as_any().downcast_ref::<NADagNode<T>>() {
+      self.value.compare(&T::value_from_dag_node(other))
+    } else { 
+      panic!("NATerm type mismatch: cannot compare");
+    }
   }
 
-  fn dagify_aux(&self) -> DagNodePtr {
-    todo!()
+  #[allow(private_interfaces)]
+  fn dagify_aux(&self, _node_cache: &mut DagNodeCache) -> DagNodePtr {
+    T::make_dag_node(self.value.clone())
   }
 
   fn analyse_constraint_propagation(&mut self, _bound_uniquely: &mut NatSet) {
     /* nothing to do */
   }
 
-  fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
-    todo!()
+  fn find_available_terms(&self, _available_terms: &mut TermBag, _eager_context: bool, _at_top: bool) {
+    /* nothing to do */
   }
 }

@@ -1,3 +1,10 @@
+/*!
+
+
+ToDo: The sort indexes are stored as `i32` values here, but in Maude, `Term::sortIndex` is a `short` == `i16`. 
+
+*/
+
 use std::{
   collections::{HashMap, HashSet},
   fmt::Write
@@ -221,17 +228,17 @@ impl SortTable {
       for other_op_decl in self.op_declarations.iter().skip(1){
         let other_op_kind = unsafe{ other_op_decl.sort_spec[i].kind.unwrap_unchecked() };
         if kind != other_op_kind {
-          error!(0, 
+          error!(0,
             "Sort declarations for operator {} disagree on the sort component for argument {}",
             self.symbol.unwrap(),
             i + 1
           );
         }
       }
-      
+
       self.arg_kinds.push(kind);
     }
-    
+
     self.build_sort_diagram();
     if self.constructor_status() == ConstructorStatus::Complex {
       // self.build_constructor_diagram();

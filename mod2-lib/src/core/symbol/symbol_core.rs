@@ -1,17 +1,28 @@
-use std::fmt::Display;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{
+  fmt::Display,
+  sync::atomic::{AtomicU32, Ordering}
+};
+
 use mod2_abs::{int_to_subscript, IString};
-use crate::{api::Arity, core::{
-  symbol::{
-    SortTable,
-    SymbolAttributes,
-    SymbolType
+
+use crate::{
+  api::{
+    Arity,
+    symbol::SymbolPtr
   },
-  format::{FormatStyle, Formattable},
-  strategy::Strategy,
-}, HashType};
-use crate::api::symbol::SymbolPtr;
-use crate::core::symbol::OpDeclaration;
+  core::{
+    symbol::{
+      SortTable,
+      SymbolAttributes,
+      SymbolType,
+      OpDeclaration
+    },
+    format::{FormatStyle, Formattable},
+    strategy::Strategy,
+  },
+  HashType,
+};
+
 
 #[derive(Eq, PartialEq)]
 pub struct SymbolCore {

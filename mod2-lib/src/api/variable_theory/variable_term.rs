@@ -15,32 +15,33 @@ use crate::{
     substitution::Substitution
   },
   api::{
-    variable_theory::VariableType,
+    variable_theory::{VariableType, VariableDagNode},
     term::{Term, TermPtr, BxTerm},
     symbol::SymbolPtr,
     dag_node::{DagNode, DagNodePtr},
+    dag_node_cache::DagNodeCache,
   },
   impl_display_debug_for_formattable,
   HashType,
   UNDEFINED,
 };
-use crate::api::variable_theory::VariableDagNode;
+
 
 #[derive(Clone)]
 pub struct VariableTerm {
-  pub name         : IString,
-  pub index        : i32,           // Set in `Term::index_variables()`
-  pub variable_type: VariableType,
   pub core         : TermCore,
+  pub name         : IString,
+  pub variable_type: VariableType,
+  pub index        : i8,           // Set in `Term::index_variables()`
 }
 
 impl VariableTerm {
   pub fn new(name: IString, symbol: SymbolPtr) -> Self {
     VariableTerm{
+      core         : TermCore::new(symbol),
       name,
-      index        : UNDEFINED,     // Set in `Term::index_variables()`
       variable_type: VariableType::Blank,
-      core         : TermCore::new(symbol)
+      index        : UNDEFINED as i8, // Set in `Term::index_variables()`
     }
   }
 }
@@ -104,7 +105,7 @@ impl Term for VariableTerm {
   }
 
   #[inline(always)]
-  fn compare_dag_arguments(&self, other: &dyn DagNode) -> Ordering {
+  fn compare_dag_arguments(&self, other: DagNodePtr) -> Ordering {
     if let Some(other) = other.as_any().downcast_ref::<VariableDagNode>() {
       self.name.cmp(&other.name())
     } else {
@@ -112,20 +113,20 @@ impl Term for VariableTerm {
     }
   }
 
-  /*
-    fn partial_compare_unstable(&self, partial_substitution: &mut Substitution, other: &dyn DagNode) -> Option<Ordering> {
-      match partial_substitution.get(self.index) {
-        None => {
-          PartialOrdering::Unknown
-        }
-  
-        Some(dag_node) => dag_node.borrow().compare(other).into(),
+  fn partial_compare_unstable(&self, partial_substitution: &mut Substitution, other: DagNodePtr) -> Option<Ordering> {
+    match partial_substitution.get(self.index) {
+      None => {
+        PartialOrdering::Unknown
       }
+
+      Some(dag_node) => Some(dag_node.compare(other)),
     }
-  */
-  
-  fn dagify_aux(&self) -> DagNodePtr {
-    todo!()
+  }
+
+  #[allow(private_interfaces)]
+  fn dagify_aux(&self, _node_cache: &mut DagNodeCache) -> DagNodePtr {
+    // ToDo: Why do we not consult `node_cache`?
+    VariableDagNode::new(self.symbol(), self.name.clone(), self.index)
   }
 
   fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {

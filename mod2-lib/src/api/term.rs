@@ -19,29 +19,32 @@ use std::{
 
 use mod2_abs::{decl_as_any_ptr_fns, NatSet, RcCell, UnsafePtr};
 
-use crate::{api::{
-  dag_node::{DagNode, DagNodePtr},
-  symbol::{
-    Symbol,
-    SymbolPtr,
-    SymbolSet,
+use crate::{
+  core::{
+    TermBag,
+    VariableInfo,
+    format::Formattable,
+    sort::kind::KindPtr,
+    substitution::Substitution,
+    term_core::{
+      TermAttribute,
+      TermCore,
+    },
   },
-  UNDEFINED,
-  Arity
-}, impl_display_debug_for_formattable, core::{
-  sort::kind::KindPtr,
-  format::Formattable,
-  substitution::Substitution,
-  term_core::{
-    cache_node_for_term,
-    clear_cache_and_set_sort_info,
-    lookup_node_for_term,
-    TermCore,
+  api::{
+    dag_node::{DagNode, DagNodePtr},
+    dag_node_cache::DagNodeCache,
+    symbol::{
+      Symbol,
+      SymbolPtr,
+      SymbolSet,
+    },
+    UNDEFINED,
+    Arity
   },
-  VariableInfo
-}, HashType};
-use crate::core::term_core::TermAttribute;
-use crate::core::TermBag;
+  impl_display_debug_for_formattable,
+  HashType,
+};
 
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<TermPtr>;
@@ -176,10 +179,10 @@ pub trait Term: Formattable {
   // region Comparison Functions
 
   fn compare_term_arguments(&self, _other: &dyn Term) -> Ordering;
-  fn compare_dag_arguments(&self, _other: &dyn DagNode) -> Ordering;
+  fn compare_dag_arguments(&self, _other: DagNodePtr) -> Ordering;
 
   #[inline(always)]
-  fn compare_dag_node(&self, other: &dyn DagNode) -> Ordering {
+  fn compare_dag_node(&self, other: DagNodePtr) -> Ordering {
     if self.symbol().hash() == other.symbol().hash() {
       self.compare_dag_arguments(other)
     } else {
@@ -188,7 +191,7 @@ pub trait Term: Formattable {
     }
   }
 
-  fn partial_compare(&self, partial_substitution: &mut Substitution, other: &dyn DagNode) -> Option<Ordering> {
+  fn partial_compare(&self, partial_substitution: &mut Substitution, other: DagNodePtr) -> Option<Ordering> {
     if !self.is_stable() {
       // Only used for `VariableTerm`
       return self.partial_compare_unstable(partial_substitution, other);
@@ -216,12 +219,12 @@ pub trait Term: Formattable {
   }
 
   /// Overridden in `VariableTerm`
-  fn partial_compare_unstable(&self, _partial_substitution: &mut Substitution, _other: &dyn DagNode) -> Option<Ordering> {
+  fn partial_compare_unstable(&self, _partial_substitution: &mut Substitution, _other: DagNodePtr) -> Option<Ordering> {
     None
   }
 
   /// Overridden in `FreeTerm`
-  fn partial_compare_arguments(&self, _partial_substitution: &mut Substitution, _other: &dyn DagNode) -> Option<Ordering> {
+  fn partial_compare_arguments(&self, _partial_substitution: &mut Substitution, _other: DagNodePtr) -> Option<Ordering> {
     None
   }
 
@@ -232,27 +235,36 @@ pub trait Term: Formattable {
 
   #[inline(always)]
   fn term_to_dag(&self, set_sort_info: bool) -> DagNodePtr {
-    clear_cache_and_set_sort_info(set_sort_info);
-    self.dagify()
+    let mut node_cache = DagNodeCache::new(set_sort_info);
+    self.dagify(&mut node_cache)
   }
 
   /// Create a directed acyclic graph from this term. This trait-level implemented function takes care of structural
   /// sharing. Each implementing type will supply its own implementation of `dagify_aux(…)`, which recursively
   /// calls `dagify(…)` on its children and then converts itself to a type implementing DagNode, returning `DagNodePtr`.
-  fn dagify(&self) -> DagNodePtr {
-    let semantic_hash = self.hash();
-    if let Some(dag_node) = lookup_node_for_term(semantic_hash) {
+  #[allow(private_interfaces)]
+  fn dagify(&self, node_cache: &mut DagNodeCache) -> DagNodePtr {
+    let hash = self.hash();
+    if let Some(dag_node) = node_cache.get(hash) {
       return dag_node;
     }
-
-    let dag_node = self.dagify_aux();
-    cache_node_for_term(semantic_hash, dag_node);
-
+    
+    // The theory-specific part of `dagify`
+    let mut dag_node = self.dagify_aux(node_cache);
+    
+    if node_cache.set_sort_info {
+      assert_ne!(self.core().sort_index, UNDEFINED as i8, "missing sort info");
+      dag_node.set_sort_index(self.core().sort_index);
+      dag_node.set_reduced();
+    }
+    
+    node_cache.insert(hash, dag_node);
     dag_node
   }
 
   /// Create a directed acyclic graph from this term. This method has the implementation-specific stuff.
-  fn dagify_aux(&self) -> DagNodePtr;
+  #[allow(private_interfaces)]
+  fn dagify_aux(&self, node_cache: &mut DagNodeCache) -> DagNodePtr;
 
   // endregion DAG Creation
 
@@ -369,9 +381,9 @@ pub trait Term: Formattable {
 
   /// Sets the kind and the sort index of this term.
   fn set_sort_info(&mut self, kind: KindPtr, sort_index: i32) {
-    let core = self.core_mut();
+    let core  = self.core_mut();
     core.kind = Some(kind);
-    core.sort_index = sort_index;
+    core.sort_index = sort_index as i8;
   }
 
   /// Recursively collects the terms in a set for structural sharing.

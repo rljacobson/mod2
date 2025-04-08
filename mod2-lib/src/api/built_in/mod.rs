@@ -128,6 +128,7 @@ static BUILT_IN_SORTS: Lazy<HashMap<&'static str, Sort>> = Lazy::new(|| {
   sorts
 });
 
+// ToDo: Maude uses a separate symbol for most built-in types. Why?
 static BUILT_IN_SYMBOLS: Lazy<HashMap<&'static str, SymbolPtr>> = Lazy::new(|| {
   let mut symbols = HashMap::default();
   // ToDo: Warn when a user shadows a built-in.
