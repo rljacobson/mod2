@@ -40,7 +40,7 @@ It does build sometimes. It doesn't work yet, but it's super close.
 
 Maude is interesting in part because it implements some of the most performant and sophisticated pattern matching
 algorithms that are known. Some of the algorithms are described across the literature. (See the
-[Bibliography](doc/Bibliography.md).) The most important references are:
+[Bibliography](../doc/Bibliography.md).) The most important references are:
 
 * S. Eker, _Fast matching in combinations of regular equational theories_, Electronic Notes in Theoretical Computer
   Science, 1996,
