@@ -22,12 +22,12 @@ pub const ROOT_OK:   i32 = -2;
 // Small utility types used throughout
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum Arity {
-  Any,
-  None,
-  Unspecified,
-
+  Any,          // Synonym for variadic?
+  None,         // Constant
+  Unspecified,  // Missing value
+  // ToDo: Variadic could be just positive arity together with assoc attribute.
   Variadic,
-  Value(u16)
+  Value(u16)    // Specific value
 }
 
 impl Arity {

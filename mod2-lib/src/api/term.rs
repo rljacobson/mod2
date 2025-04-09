@@ -242,6 +242,8 @@ pub trait Term: Formattable {
   /// Create a directed acyclic graph from this term. This trait-level implemented function takes care of structural
   /// sharing. Each implementing type will supply its own implementation of `dagify_aux(…)`, which recursively
   /// calls `dagify(…)` on its children and then converts itself to a type implementing DagNode, returning `DagNodePtr`.
+  /// 
+  /// Terms should be normalized before dagification.
   #[allow(private_interfaces)]
   fn dagify(&self, node_cache: &mut DagNodeCache) -> DagNodePtr {
     let hash = self.hash();
@@ -362,7 +364,6 @@ pub trait Term: Formattable {
 
     for mut term in self.iter_args() {
       term.fill_in_sort_info();
-      // ToDo: Restore this assert.
       debug_assert_eq!(
         term.kind().unwrap(),
         symbol.domain_kind(seen_args_count),

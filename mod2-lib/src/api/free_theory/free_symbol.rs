@@ -77,3 +77,16 @@ impl Formattable for FreeSymbol{
 }
 
 impl_display_debug_for_formattable!(FreeSymbol);
+
+#[cfg(test)]
+mod tests {
+  use std::ops::Deref;
+  use super::*;
+  
+  #[test]
+  fn test_symbol_creation(){
+    let f = FreeSymbol::with_arity("f".into(), Arity::Any);
+    assert_eq!(f.arity(), Arity::Any);
+    assert_eq!(f.name().deref(), "f");
+  }
+}

@@ -186,7 +186,6 @@ impl Kind {
         sort.index_within_kind = self.append_sort(sort);
       } else {
         sort.index_within_kind = supersort_count as u32;
-        // ToDo: I think sort.supersorts is not mutated, so this should be an iterator.
         for &s in sort.supersorts.iter() {
           if s.kind.is_none() {
             self.register_connected_sorts(s, visited_sort_count);

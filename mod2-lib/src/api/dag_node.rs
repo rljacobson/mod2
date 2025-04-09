@@ -6,7 +6,7 @@ Requirements of implementers of `DagNode`:
  1. DAG nodes should be newtypes of `DagNodeCore`. In particular...
  2. DAG nodes *must* have the same memory representation as a `DagNodeCore`.
  3. Implementers of `DagNode` are responsible for casting pointers, in particular its arguments.
- 4. If an implementor owns resources, including ref counted objects like `IString`, it must provide an implementation 
+ 4. If an implementor owns resources, including ref counted objects like `IString`, it must provide an implementation
     of `DagNode::finalize()`. It must also set its `NeedsDestruction` flag.
  5. If an implementor holds no children, or if its children are represented differently than just `DagNodePtr`, it
     must provide an implementation of `iter_args`, `insert_child`, `len`, `compare_arguments`, `mark`.
@@ -18,6 +18,7 @@ use std::{
   cmp::{max, Ordering},
   fmt::Display,
   iter::Iterator,
+  ops::Deref
 };
 use mod2_abs::UnsafePtr;
 use crate::{
@@ -41,6 +42,7 @@ use crate::{
   },
   impl_display_debug_for_formattable,
 };
+
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr    = UnsafePtr<dyn DagNode + 'static>;
 pub type DagNodeVector = GCVector<DagNodePtr>;
@@ -66,11 +68,10 @@ pub trait DagNode {
   //   self
   // }
 
-  #[inline(always)]
-  fn as_ptr_mut(&self) -> *mut dyn DagNode where Self: Sized {
-    let ptr: *const dyn DagNode = self;
-    ptr as *mut dyn DagNode
-  }
+  fn as_ptr(&self) -> DagNodePtr;
+  // {
+  //   DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
+  // }
 
 
   // region Accessors
@@ -89,30 +90,58 @@ pub trait DagNode {
   /// Implement an empty iterator with:
   ///      Box::new(std::iter::empty::<DagNodePtr>())
   fn iter_args(&self) -> Box<dyn Iterator<Item=DagNodePtr>> {
-    // For assertions
-    // ToDo: These assertions will need to change for variadic nodes.
-    let arity = if let Arity::Value(v) = self.arity() { v } else { 0 };
 
     // The empty case
     if self.core().args.is_null() {
-      assert_eq!(arity, 0);
+      assert!(
+        match self.arity() {
+          Arity::Value(v) if v > 0 => false,
+          _ => true,
+        }
+      );
       Box::new(std::iter::empty())
-    } // The vector case
+    }
+    // The vector case
+    // (other reasons for `needs_destruction` have null args)
     else if self.core().needs_destruction() {
-      assert!(arity>1);
+      assert!( !self.symbol().is_variable() );
+      assert!(
+        match self.arity() {
+          Arity::Value(v) if v > 1 => true,
+
+          Arity::Variadic
+          | Arity::Any => true,
+
+          _ => {
+            println!("Arity of node is {:?}", self.arity());
+            false
+          },
+        }
+      );
 
       let node_vector: DagNodeVectorRefMut = arg_to_node_vec(self.core().args);
       Box::new(node_vector.iter().cloned())
-    } // The singleton case
+    }
+    // The singleton case
     else {
-      assert_eq!(arity, 1);
+      assert!( !self.symbol().is_variable() );
+      assert!(
+        match self.arity() {
+          Arity::Value(v) if v == 1 => true,
+
+          Arity::Variadic
+          | Arity::Any => true,
+
+          _ => false,
+        }
+      );
 
       let node = arg_to_dag_node(self.core().args);
 
       // Make a fat pointer to the single node and return an iterator to it. This allows `self` to
       // escape the method. Of course, `self` actually points to a `DagNode` that is valid for the
       // lifetime of the program, so even in the event of the GC equivalent of a dangling pointer
-      // or use after free, this will be safe. (Strictly speaking, it's probably UB.)
+      // or use after free, this will be safe.
       let v = unsafe { std::slice::from_raw_parts(&node, 1) };
       Box::new(v.iter().map(|n| *n))
     }
@@ -125,11 +154,14 @@ pub trait DagNode {
     // Empty case
     if self.core().args.is_null() {
       self.core_mut().args = new_child.as_mut_ptr() as *mut u8;
-    } // Vector case
+    }
+    // Vector case
+    // (other reasons for `needs_destruction` have null args)
     else if self.core().needs_destruction() {
       let node_vec: DagNodeVectorRefMut = arg_to_node_vec(self.core_mut().args);
       node_vec.push(new_child)
-    } // Singleton case
+    }
+    // Singleton case
     else {
       let existing_child = arg_to_dag_node(self.core_mut().args);
       let arity = if let Arity::Value(arity) = self.arity() {
@@ -373,12 +405,12 @@ pub trait DagNode {
     }
   } // end fn mark
 
-  /// Finalize is run when this node is swept during garbage collection if its `NeedsDestruction` flag is set. The 
+  /// Finalize is run when this node is swept during garbage collection if its `NeedsDestruction` flag is set. The
   /// finalizer should only release whatever it is directly responsible for and cannot assume any of its children exist.
   fn finalize(&mut self) {
     /* empty default implementation */
   }
-  
+
   // endregion GC related methods
 }
 
@@ -386,13 +418,26 @@ impl Formattable for dyn DagNode {
   fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
     match style {
       FormatStyle::Debug => {
-        write!(f, "DagNode<{}>", self.symbol())
+        write!(f, "<{}, {:p}>", self.symbol(), self.as_ptr().as_ptr())?
       }
 
       _ => {
-        write!(f, "<{}>", self.symbol())
+        write!(f, "<{}>", self.symbol())?
       }
+    };
+
+    if self.len() > 0 {
+      let mut args = self.iter_args();
+      write!(f, "(")?;
+      args.next().unwrap().repr(f, style)?;
+      for arg in args {
+        write!(f, ", ")?;
+        arg.repr(f, style)?;
+      }
+      write!(f, ")")?;
     }
+
+    Ok(())
 
   }
 }
@@ -413,5 +458,5 @@ pub fn arg_to_dag_node(args: *mut u8) -> DagNodePtr {
 /// be sure that `args` actually points to a `DagNodeVector`.
 #[inline(always)]
 pub fn arg_to_node_vec(args: *mut u8) -> DagNodeVectorRefMut {
-  unsafe { (args as *mut DagNodeVector).as_mut_unchecked() }
+  unsafe { (args as *mut DagNodeVector).as_mut().unwrap() }
 }

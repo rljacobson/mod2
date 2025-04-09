@@ -37,6 +37,7 @@ use crate::{
 #[derive(PartialEq, Eq)]
 pub struct SortTable {
   symbol                   : Option<SymbolPtr>,
+  arity                    : Arity,              // possibly `Any`, etc.
   arg_count                : i16,
   op_declarations          : Vec<OpDeclaration>,
   arg_kinds                : Vec<KindPtr>,       // "component vector"
@@ -50,6 +51,7 @@ impl Default for SortTable {
   fn default() -> Self {
     Self {
       symbol                   : None,
+      arity                    : Arity::Unspecified,
       arg_count                : 0,
       op_declarations          : Vec::new(),
       arg_kinds                : Vec::new(),
@@ -83,7 +85,17 @@ impl SortTable {
 
   #[inline(always)]
   pub fn arity(&self) -> Arity {
-    self.arg_count.into()
+    if self.arg_count == 0 {
+      assert!(
+        match self.arity {
+          Arity::Value(v) if v > 0 => false,
+          _ => true
+        }
+      );
+      self.arity
+    } else {
+      self.arg_count.into()
+    }
   }
 
   #[inline(always)]

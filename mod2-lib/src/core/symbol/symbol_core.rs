@@ -122,7 +122,9 @@ impl SymbolCore {
   #[inline(always)]
   pub(crate) fn arity(&self) -> Arity {
     match self.sort_table {
-      None => Arity::Unspecified,
+      None => { 
+        self.arity
+      },
       Some(ref sort_table) => {
         sort_table.arity()
       }

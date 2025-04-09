@@ -118,6 +118,11 @@ impl DagNode for VariableDagNode {
   }
 
   #[inline(always)]
+  fn as_ptr(&self) -> DagNodePtr {
+    DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
+  }
+
+  #[inline(always)]
   fn core(&self) -> &DagNodeCore {
     &self.0
   }

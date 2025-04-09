@@ -25,7 +25,8 @@ use crate::{
       free_dag_node::FreeDagNode,
       FreeOccurrence
     },
-    variable_theory::VariableTerm
+    variable_theory::VariableTerm,
+    dag_node_cache::DagNodeCache,
   },
   core::{
     format::{
@@ -44,7 +45,6 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
-use crate::api::dag_node_cache::DagNodeCache;
 
 pub struct FreeTerm{
   core                 : TermCore,
@@ -132,6 +132,8 @@ impl Term for FreeTerm {
       changed = changed || child_changed;
       hash_value = term_hash(hash_value, child_hash);
     }
+    
+    self.core_mut().hash_value = hash_value;
 
     (None, changed, hash_value)
   }
@@ -225,12 +227,11 @@ impl Term for FreeTerm {
 
   #[allow(private_interfaces)]
   fn dagify_aux(&self, node_cache: &mut DagNodeCache) -> DagNodePtr {
-    let new_node = FreeDagNode::new(self.symbol());
-    let args     = arg_to_node_vec(new_node.core().args);
+    let mut new_node = FreeDagNode::new(self.symbol());
 
     for arg in self.args.iter() {
       let node = arg.dagify(node_cache);
-      _ = args.push(node);
+      new_node.insert_child(node);
     }
 
     new_node

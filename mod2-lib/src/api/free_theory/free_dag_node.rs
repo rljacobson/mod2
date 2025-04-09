@@ -22,7 +22,7 @@ use crate::{
     EquationalTheory
   },
   api::{
-    symbol::SymbolPtr,
+    Arity,
     dag_node::{
       DagNodeVector,
       DagNodeVectorRefMut,
@@ -31,7 +31,8 @@ use crate::{
       arg_to_dag_node,
       arg_to_node_vec
     },
-    Arity
+    symbol::SymbolPtr,
+    term::Term,
   },
 };
 
@@ -63,6 +64,11 @@ impl DagNode for FreeDagNode {
   #[inline(always)]
   fn as_any_mut(&mut self) -> &mut dyn Any {
     self
+  }
+
+  #[inline(always)]
+  fn as_ptr(&self) -> DagNodePtr {
+    DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
   }
 
   #[inline(always)]
