@@ -3,7 +3,32 @@
 The `mod2-lib` library builds on lessons learned in writing [`Mod`](https://github.com/rljacobson/Mod) and
 [`mod2`](https://github.com/rljacobson/mod2) to bring advanced pattern matching algorithms to Rust.
 
-It is a work in progress and is not yet functional. For a more complete work, check out [Loris](https://github.com/rljacobson/loris).
+It is a work in progress. For a more complete work, check out [Loris](https://github.com/rljacobson/loris).
+
+## Background
+
+> **[Maude](https://github.com/SRI-CSL/Maude)** is a high-performance reflective language and system supporting both equational and rewriting logic
+> specification and programming for a wide range of applications.
+
+Maude is interesting in part because it implements some of the most performant and sophisticated pattern matching
+algorithms that are known. Some of the algorithms are described across the literature. (See the
+[Bibliography](../doc/Bibliography.md).) The most important references are:
+
+* S. Eker, _Fast matching in combinations of regular equational theories_, Electronic Notes in Theoretical Computer
+  Science, 1996,
+  vol. 4, p. 90-109, ISSN 1571-0661, https://doi.org/10.1016/S1571-0661(04)00035-0.
+* S. Eker,
+  _Associative-commutative matching via bipartite graph matching_,
+  Computer Journal, 38 (5) (1995), pp. 381-399
+
+The algorithms are complicated. Maude is implemented in C++. The code is excellent. However, because Maude was
+designed to be modular, and because of the algorithms in \[Eker 1996] that allow combinations of theories, the
+algorithms for matching are somewhat obscured. In other words, you can't just copy and paste the algorithm into your
+own code.
+
+Thus, I am attempting to reimplement the algorithms in Rust and hopefully clarify some of the implementation details
+at the same time.
+
 
 ## Status
 
@@ -31,31 +56,20 @@ It is a work in progress and is not yet functional. For a more complete work, ch
 
 ## Building
 
-It does build sometimes. It doesn't work yet, but it's super close.
+From the workspace root you can run
 
-## Background
+```shell
+cargo build --package mod2-lib
+```
 
-> **[Maude](https://github.com/SRI-CSL/Maude)** is a high-performance reflective language and system supporting both equational and rewriting logic
-> specification and programming for a wide range of applications.
+But that doesn't exactly do anything. The `mod2` package provides an OBJ3-like syntax as a front-end to the pattern 
+matching / term rewriting system.
 
-Maude is interesting in part because it implements some of the most performant and sophisticated pattern matching
-algorithms that are known. Some of the algorithms are described across the literature. (See the
-[Bibliography](../doc/Bibliography.md).) The most important references are:
+```shell
+cargo build --package mod2
+```
 
-* S. Eker, _Fast matching in combinations of regular equational theories_, Electronic Notes in Theoretical Computer
-  Science, 1996,
-  vol. 4, p. 90-109, ISSN 1571-0661, https://doi.org/10.1016/S1571-0661(04)00035-0.
-* S. Eker,
-  _Associative-commutative matching via bipartite graph matching_,
-  Computer Journal, 38 (5) (1995), pp. 381-399
-
-The algorithms are complicated. Maude is implemented in C++. The code is excellent. However, because Maude was
-designed to be modular, and because of the algorithms in \[Eker 1996] that allow combinations of theories, the
-algorithms for matching are somewhat obscured. In other words, you can't just copy and paste the algorithm into your
-own code.
-
-Thus, I am attempting to reimplement the algorithms in Rust and hopefully clarify some of the implementation details
-at the same time.
+See the example(s) in `mod2/examples/`.
 
 # Authorship and License
 

@@ -2,11 +2,12 @@
 #![allow(unused)]
 
 mod parser;
+#[cfg(test)]
+mod tests;
 
 pub use mod2_lib::core::Module;
 
-#[cfg(test)]
-mod tests;
+pub use parser::{parse_to_module, parse_to_term};
 
 
 // Global Configuration

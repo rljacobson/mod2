@@ -414,7 +414,7 @@ impl FreeTerm {
   ) {
     let alien_count = aliens.len();
 
-    // Add any alien that will "ground out match" to current sequence.
+    // Add any alien that will "ground out match" to the current sequence.
     // By matching these early we maximize the chance of early match failure,
     // and avoid wasted work at match time.
     for i in step..alien_count {
@@ -884,16 +884,3 @@ impl FreeTerm {
     */
 }
 
-
-
-
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_free_term() {
-
-  }
-}

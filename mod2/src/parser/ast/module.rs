@@ -53,7 +53,8 @@ pub(crate) struct ModuleAST {
 impl ModuleAST {
 
   /// Constructs a `Module` representation of `self`, consuming `self`.
-  pub fn construct_module(mut self) -> Module {
+  // ToDo: Inherit parent's environment (symbols/sorts/variables)
+  pub fn construct_module(mut self) -> BxModule {
     // The items of the module are binned according to type before processing.
     let mut modules   : Vec<BxModuleAST>                = Vec::new();
     let mut var_decls : Vec<BxVariableDeclarationAST>   = Vec::new();
@@ -205,7 +206,7 @@ impl ModuleAST {
     // Submodules
     let mut submodules: Vec<BxModule> =
         modules.into_iter()
-               .map(|m| Box::new(m.construct_module()))
+               .map(|m| m.construct_module())
                .collect();
 
 
@@ -224,7 +225,8 @@ impl ModuleAST {
     unsafe {
       new_module.compute_kind_closures();
     }
-    new_module
+    
+    Box::new(new_module)
   }
 }
 

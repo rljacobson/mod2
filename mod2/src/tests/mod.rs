@@ -4,27 +4,14 @@ These are tests for mod2-lib that are difficult to do without parsing and module
 
 */
 
-use lalrpop_util::lexer::Token;
-use lalrpop_util::ParseError;
+use std::collections::HashMap;
+use lalrpop_util::{
+  lexer::Token,
+  ParseError
+};
 use mod2_abs::IString;
-use crate::parser::ast::ModuleAST;
-use crate::parser::parser::ModuleParser;
-use crate::parser::tests::parse_ex1;
-
-fn parse_string(text: &str) -> Result<Box<ModuleAST>, ()> {
-  let parser = ModuleParser::new();
-  let result: Result<Box<ModuleAST>, ParseError<usize, Token, &str>> =  parser.parse(&text);
-  match result {
-    Ok(ast) => {
-      println!("SUCCESS!");
-      Ok(ast)
-    },
-    Err(e) => {
-      eprintln!("Parse error: {}", e);
-      Err(())
-    }
-  }
-}
+use mod2_lib::core::sort::collection::SortCollection;
+use crate::parse_to_module;
 
 #[test]
 fn test_sort_table_sort_diagram(){
@@ -45,9 +32,9 @@ fn test_sort_table_sort_diagram(){
   symbol r: C;
   ";
 
-  let ast = parse_string(source);
-  assert!(ast.is_ok());
-  let module = ast.unwrap().construct_module();
+  let module = parse_to_module(source);
+  assert!(module.is_ok());
+  let module = module.unwrap();
 
   println!("{:?}", module);
 
@@ -66,7 +53,26 @@ fn test_sort_table_sort_diagram(){
 
 #[test]
 fn test_ex1_construction() {
-  let ast: Box<ModuleAST> =  parse_ex1().expect("Failed to parse module");
-  let constructed = ast.construct_module();
+
+  let path = "examples/example1.mod2";
+  let text = std::fs::read_to_string(path).unwrap_or_else(|e| {
+    panic!("Failed to read {}: {}", path, e);
+  });
+
+  let constructed = parse_to_module(&*text).unwrap();
   println!("{:?}", constructed);
+}
+
+#[test]
+fn test_parse_term() {
+  let mut parser = crate::parser::parser::TermParser::default();
+  let input = "f(\"hello\", 1, 2.0, true, g(x, y, z, false))";
+  let term = parser.parse(input).unwrap();
+
+  let mut symbols = HashMap::new();
+  let mut sorts = SortCollection::new();
+  let mut variables = HashMap::new();
+
+  let term = term.construct(&mut symbols, &mut sorts, &mut variables);
+  println!("{:?}", term);
 }

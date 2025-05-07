@@ -75,6 +75,8 @@ VariableKeyword  : () = { "variable",   "var" };
 RuleKeyword      : () = { "rule",       "rl" };
 EquationKeyword  : () = { "equation",   "eq" };
 MembershipKeyword: () = { "membership", "mb" };
+TrueKeyword      : () = { "true" };
+FalseKeyword      : () = { "false" };
 
 // Grammar rules
 
@@ -211,7 +213,9 @@ MembershipDeclaration: MembershipDeclarationAST = {
 };
 
 // Term and Pattern definitions
-Term: BxTermAST = {
+pub Term: BxTermAST = {
+    TrueKeyword => Box::new(TermAST::Bool(true)),
+    FalseKeyword => Box::new(TermAST::Bool(false)),
     <string_literal: StringLiteral> => Box::new(TermAST::StringLiteral(string_literal)),
     <name: Identifier> "(" <tail: TermList> ")" => {
         Box::new(TermAST::Application { name, tail })

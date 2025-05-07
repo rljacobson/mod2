@@ -1,7 +1,7 @@
 /*!
 
 
-ToDo: The sort indexes are stored as `i32` values here, but in Maude, `Term::sortIndex` is a `short` == `i16`. 
+ToDo: The sort indexes are stored as `i32` values here, but in Maude, `Term::sortIndex` is a `short` == `i16`.
 
 */
 

@@ -137,7 +137,11 @@ impl NaturalNumberTerm {
 
 impl BoolTerm {
   pub fn new(value: Bool) -> BoolTerm {
-    let core = TermCore::new(unsafe{get_built_in_symbol("Bool").unwrap_unchecked()});
+    let symbol = match value {
+      true => unsafe{get_built_in_symbol("true").unwrap_unchecked()},
+      false => unsafe{get_built_in_symbol("false").unwrap_unchecked()},
+    };
+    let core = TermCore::new(symbol);
     BoolTerm {
       core,
       value: value.into(),

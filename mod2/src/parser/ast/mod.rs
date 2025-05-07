@@ -111,7 +111,6 @@ RewriteCondition := Term RuleOp Term ;
 
 use std::collections::hash_map::Entry;
 use mod2_abs::{heap_construct, HashMap, IString};
-use mod2_lib::api::symbol::{Symbol, SymbolPtr};
 
 mod module;
 mod term;
@@ -125,8 +124,15 @@ pub use sort::*;
 pub use term::*;
 pub use attribute::*;
 pub use condition::*;
-use mod2_lib::api::free_theory::FreeSymbol;
 pub use symbol_decl::*;
+
+use mod2_lib::{
+  api::{
+    symbol::{Symbol, SymbolPtr},
+    built_in::get_built_in_symbol,
+    free_theory::FreeSymbol
+  }
+};
 
 /// An item is anything that lives in a module.
 pub(crate) enum ItemAST {
@@ -180,6 +186,13 @@ pub(crate) struct MembershipDeclarationAST {
 /// By default, we make such symbols free symbols. 
 fn get_or_create_symbol<T:Into<IString>>(name: T, symbols: &mut HashMap<IString, SymbolPtr>) -> SymbolPtr {
   let name = name.into();
+  
+  // Built-ins like `true` and `false`
+  // ToDo: If the user tries to shadow a built-in, usages will still reference the built-in. This may not be the right
+  //       semantics once shadowing built-ins is made a warning/error.
+  if let Some(symbol) = get_built_in_symbol(&*name) {
+    return symbol;
+  }
 
   match symbols.entry(name.clone()) {
     Entry::Occupied(s) => *s.get(),

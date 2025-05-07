@@ -58,7 +58,7 @@ pub trait Term: Formattable {
   /// This is very unsafe. Make sure this term is heap allocated and pinned before calling.
   fn as_ptr(&self) -> TermPtr;
   fn copy(&self) -> BxTerm;
-  
+
   fn hash(&self) -> HashType { self.core().hash_value }
 
   /// Returns a pointer to the normalized version of self. If a new term was created during
@@ -164,11 +164,11 @@ pub trait Term: Formattable {
   fn kind(&self) -> Option<KindPtr> {
     self.core().kind
   }
-  
+
   fn set_attribute(&mut self, attribute: TermAttribute) {
     self.core_mut().attributes.insert(attribute);
   }
-  
+
   fn reset_attribute(&mut self, attribute: TermAttribute) {
     self.core_mut().attributes.remove(attribute);
   }
@@ -242,7 +242,7 @@ pub trait Term: Formattable {
   /// Create a directed acyclic graph from this term. This trait-level implemented function takes care of structural
   /// sharing. Each implementing type will supply its own implementation of `dagify_aux(…)`, which recursively
   /// calls `dagify(…)` on its children and then converts itself to a type implementing DagNode, returning `DagNodePtr`.
-  /// 
+  ///
   /// Terms should be normalized before dagification.
   #[allow(private_interfaces)]
   fn dagify(&self, node_cache: &mut DagNodeCache) -> DagNodePtr {
@@ -250,16 +250,16 @@ pub trait Term: Formattable {
     if let Some(dag_node) = node_cache.get(hash) {
       return dag_node;
     }
-    
+
     // The theory-specific part of `dagify`
     let mut dag_node = self.dagify_aux(node_cache);
-    
+
     if node_cache.set_sort_info {
       assert_ne!(self.core().sort_index, UNDEFINED as i8, "missing sort info");
       dag_node.set_sort_index(self.core().sort_index);
       dag_node.set_reduced();
     }
-    
+
     node_cache.insert(hash, dag_node);
     dag_node
   }
@@ -309,10 +309,10 @@ pub trait Term: Formattable {
       self.set_attribute(TermAttribute::Stable);
     }
   }
-  
+
   // There are no arguments to descend into for `VariableTerm`, so this is a no-op.
   // fn find_available_terms(&self, _available_terms: &mut TermBag, _eager_context: bool, _at_top: bool);
-  
+
   /// For each argument term of this term, computes and updates the set of variables that
   /// occur in the context of the term and its subterms. The "context" of a term refers
   /// to the rest of the term in which it occurs (its parent term and sibling subterms).
@@ -335,12 +335,12 @@ pub trait Term: Formattable {
   fn insert_abstraction_variables(&mut self, variable_info: &mut VariableInfo) {
     // Honors ground out match.
     let mut hgom = true;
-    
+
     for mut term in self.iter_args() {
       term.insert_abstraction_variables(variable_info);
       hgom &= term.honors_ground_out_match();
     }
-    
+
     self.set_honors_ground_out_match(hgom);
   }
 

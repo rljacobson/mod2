@@ -57,17 +57,15 @@ pub type StringBuiltIn = String;
 macro_rules! make_symbol {
     ($sort_name:expr, $symbol_name:expr, $symbol_type:expr) => {
         {
-          let name_lit        = stringify!($symbol_name);  
-          let sort =
-          match get_built_in_sort(stringify!($sort_name)) {
-            
-          None => {
-            panic!("COULD NOT FIND SORT {:?}", stringify!($sort_name));
-          }
-          Some(thing) => {thing}
+          let name_lit = stringify!($symbol_name);  
+          let sort     = match get_built_in_sort(stringify!($sort_name)) {
+            None => {
+              panic!("COULD NOT FIND SORT {:?}", stringify!($sort_name));
+            }
+            Some(thing) => {thing}
           };
-          // let sort            = get_built_in_sort(stringify!($sort_name)).unwrap();
-          let symbol_name     = IString::from(name_lit);
+          // let sort     = get_built_in_sort(stringify!($sort_name)).unwrap();
+          let symbol_name = IString::from(name_lit);
           let symbol_core = SymbolCore::new(
             symbol_name.clone(),
             Arity::Value(0),

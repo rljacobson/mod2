@@ -54,7 +54,7 @@ pub trait NADataType: Any + Clone + Display + Sized {
     };
     value
   }
-  
+
   fn make_dag_node(value: Self) -> DagNodePtr;
 }
 
