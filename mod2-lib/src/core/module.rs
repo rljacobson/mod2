@@ -46,6 +46,8 @@ use crate::{
     }
   },
 };
+#[cfg(feature = "profiling")]
+use crate::core::profile::{StatementProfile, SymbolProfile};
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub enum ModuleStatus {
@@ -78,14 +80,57 @@ pub struct Module {
   // pub strategies: Vec<PreEquation>, // Unimplemented
 
   // Members for performance profiling
-  // symbol_info: Vec<SymbolProfile>,
-  // mb_info    : Vec<StatementProfile>, // Membership
-  // eq_info    : Vec<StatementProfile>, // Equation
-  // rl_info    : Vec<StatementProfile>, // Rule
-  // sd_info    : Vec<StatementProfile>, // Strategy Definition
+  #[cfg(feature = "profiling")]
+  symbol_info: Vec<SymbolProfile>,
+  #[cfg(feature = "profiling")]
+  mb_info    : Vec<StatementProfile>, // Membership
+  #[cfg(feature = "profiling")]
+  eq_info    : Vec<StatementProfile>, // Equation
+  #[cfg(feature = "profiling")]
+  rl_info    : Vec<StatementProfile>, // Rule
+  #[cfg(feature = "profiling")]
+  sd_info    : Vec<StatementProfile>, // Strategy Definition
 }
 
 impl Module {
+  pub fn new(
+    name      : IString,
+    submodules: Vec<BxModule>,
+    sorts     : SortCollection,
+    symbols   : HashMap<IString, SymbolPtr>,
+    variables : HashMap<IString, BxTerm>,
+    equations : Vec<PreEquation>,
+    rules     : Vec<PreEquation>,
+    membership: Vec<PreEquation>,
+  ) -> BxModule {
+    Box::new(
+      Module{
+        name,
+        status    : ModuleStatus::default(),
+        submodules,
+        kinds     : vec![], // computed below
+        sorts,
+        symbols,
+        rules,
+        equations,
+        membership,
+        variables,
+  
+        // Members for performance profiling
+        #[cfg(feature = "profiling")]
+        symbol_info: vec![],
+        #[cfg(feature = "profiling")]
+        mb_info    : vec![],
+        #[cfg(feature = "profiling")]
+        eq_info    : vec![],
+        #[cfg(feature = "profiling")]
+        rl_info    : vec![],
+        #[cfg(feature = "profiling")]
+        sd_info    : vec![],
+      }
+    )
+  }
+  
   /**
   Computes the transitive closure of the subsort relation, constructing the lattice of sorts. This only needs to be
   done once when the module is constructed. It is not idempotent.
@@ -101,7 +146,7 @@ impl Module {
   */
   pub fn compute_kind_closures(&mut self) {
     assert_eq!(self.status, ModuleStatus::Open, "tried to compute kind closure when module status is not open");
-    // Make a temporary dummy sort collection
+    // Temporarily swap out the sort collection with a dummy. 
     let mut sorts = SortCollection::new();
     std::mem::swap(&mut self.sorts, &mut sorts);
 

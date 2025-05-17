@@ -12,11 +12,12 @@ keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-r
 categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
 
 [features]
-default  = ["gc_debug", "debug"]
+default  = ["gc_debug", "debug", "profiling"]
 
 debug         = []
 gc_debug      = []
 multithreaded = []
+profiling     = []
 
 [dependencies]
 mod2-abs = { path = "../mod2-abs" }
@@ -26,3 +27,4 @@ paste.workspace         = true
 enumflags2.workspace    = true
 once_cell.workspace     = true
 rand.workspace          = true
+nu-ansi-term.workspace  = true

@@ -26,7 +26,7 @@ use mod2_lib::{
     symbol::SymbolType
   },
 };
-
+use mod2_lib::core::pre_equation::PreEquationAttributes;
 use crate::{
   parser::ast::{
     BxEquationDeclarationAST,
@@ -108,6 +108,7 @@ impl ModuleAST {
       }
     }
 
+    
     // Variable Declarations
     let mut variables: HashMap<IString, BxTerm> = HashMap::with_capacity(var_decls.len());
     for var_decl in var_decls {
@@ -116,6 +117,7 @@ impl ModuleAST {
       variables.insert(name, var);
     }
 
+    
     // Symbol Declarations
     for sym_decl in sym_decls {
       sym_decl.construct(&mut symbols, &mut sorts);
@@ -125,11 +127,9 @@ impl ModuleAST {
     // Rule Declarations
     let mut rules: Vec<PreEquation> = Vec::with_capacity(rule_decls.len());
     for rule_decl in rule_decls {
-      let lhs  = rule_decl.lhs.construct(&mut symbols, &mut sorts, &mut variables);
-      let rhs  = rule_decl.rhs.construct(&mut symbols, &mut sorts, &mut variables);
-      let rule = PreEquationKind::Rule{
-        rhs_term: rhs,
-      };
+      let lhs = rule_decl.lhs.construct(&mut symbols, &mut sorts, &mut variables);
+      let rhs = rule_decl.rhs.construct(&mut symbols, &mut sorts, &mut variables);
+
       let conditions: Conditions
           = rule_decl.conditions
                      .unwrap_or_default()
@@ -137,13 +137,13 @@ impl ModuleAST {
                      .map(|c| Box::new(c.construct(&mut symbols, &mut sorts, &mut variables)))
                      .collect();
 
-      let pre_equation = PreEquation{
-        name      : None,
-        attributes: Default::default(),
+      let pre_equation = PreEquation::new_rule(
+        None,
+        lhs,
+        rhs,
         conditions,
-        lhs_term  : lhs,
-        pe_kind   : rule,
-      };
+        PreEquationAttributes::default(),
+      );
 
       rules.push(pre_equation);
     }
@@ -152,11 +152,9 @@ impl ModuleAST {
     // Equation Declarations
     let mut equations: Vec<PreEquation> = Vec::with_capacity(eq_decls.len());
     for eq_decl in eq_decls {
-      let lhs      = eq_decl.lhs.construct(&mut symbols, &mut sorts, &mut variables);
-      let rhs      = eq_decl.rhs.construct(&mut symbols, &mut sorts, &mut variables);
-      let equation = PreEquationKind::Equation{
-        rhs_term: rhs,
-      };
+      let lhs = eq_decl.lhs.construct(&mut symbols, &mut sorts, &mut variables);
+      let rhs = eq_decl.rhs.construct(&mut symbols, &mut sorts, &mut variables);
+
       let conditions: Conditions
           = eq_decl.conditions
                    .unwrap_or_default()
@@ -164,13 +162,13 @@ impl ModuleAST {
                    .map(|c| Box::new(c.construct(&mut symbols, &mut sorts, &mut variables)))
                    .collect();
 
-      let pre_equation = PreEquation{
-        name      : None,
-        attributes: Default::default(),
+      let pre_equation = PreEquation::new_equation(
+        None,
+        lhs,
+        rhs,
         conditions,
-        lhs_term  : lhs,
-        pe_kind   : equation,
-      };
+        PreEquationAttributes::default(),
+      );
 
       equations.push(pre_equation);
     }
@@ -179,11 +177,9 @@ impl ModuleAST {
     // Membership Axiom Declarations
     let mut membership: Vec<PreEquation> = Vec::with_capacity(mb_decls.len());
     for mb_decl in mb_decls {
-      let lhs        = mb_decl.lhs.construct(&mut symbols, &mut sorts, &mut variables);
-      let rhs        = mb_decl.rhs.construct(&mut sorts);
-      let membership = PreEquationKind::Membership{
-        sort: rhs,
-      };
+      let lhs = mb_decl.lhs.construct(&mut symbols, &mut sorts, &mut variables);
+      let rhs = mb_decl.rhs.construct(&mut sorts);
+
       let conditions: Conditions
           = mb_decl.conditions
                    .unwrap_or_default()
@@ -191,13 +187,13 @@ impl ModuleAST {
                    .map(|c| Box::new(c.construct(&mut symbols, &mut sorts, &mut variables)))
                    .collect();
 
-      let pre_equation = PreEquation{
-        name      : None,
-        attributes: Default::default(),
+      let pre_equation = PreEquation::new_membership(
+        None,
+        lhs,
+        rhs,
         conditions,
-        lhs_term  : lhs,
-        pe_kind   : membership,
-      };
+        PreEquationAttributes::default(),
+      );
 
       equations.push(pre_equation);
     }
@@ -210,23 +206,19 @@ impl ModuleAST {
                .collect();
 
 
-    let mut new_module = Module{
-      name      : self.name,
-      status    : Default::default(),
-      kinds     : vec![], // computed below
+    let mut new_module = Module::new(
+      self.name,
       submodules,
       sorts,
       symbols,
-      rules,
-      equations,
-      membership,
       variables,
-    };
-    unsafe {
-      new_module.compute_kind_closures();
-    }
-    
-    Box::new(new_module)
+      equations,
+      rules,
+      membership,
+    );
+    new_module.compute_kind_closures();
+
+    new_module
   }
 }
 

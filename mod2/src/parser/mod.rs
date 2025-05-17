@@ -60,7 +60,7 @@ pub mod tests {
   use super::*;
 
   #[test]
-  pub fn text_parse_ex1() -> Result<BxModule, ()>{
+  pub fn text_parse_ex1() {
     let path = "examples/example1.mod2";
     let text = match std::fs::read_to_string(path) {
       Ok(s) => { s }
@@ -68,17 +68,14 @@ pub mod tests {
         panic!("Failed to read {}: {}", path, e);
       }
     };
-
     let result: Result<BxModule, ParseError<usize, Token, &str>> =  parse_to_module(&text);
     
     match result {
       Ok(module) => {
         println!("SUCCESS!");
-        Ok(module)
       }
       Err(e) => {
         panic!("Parse error: {}", e);
-        Err(())
       }
     }
   }

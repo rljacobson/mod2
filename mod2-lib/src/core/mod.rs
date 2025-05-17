@@ -18,6 +18,9 @@ The following compares Maude's `DagNode` to our implementation here.
 
 */
 
+#[cfg(feature = "profiling")]
+mod profile;
+
 mod local_bindings;
 mod module;
 mod narrowing_variable_info;
@@ -33,6 +36,8 @@ pub(crate) mod dag_node_core;
 pub(crate) mod gc;
 pub(crate) mod strategy;
 pub(crate) mod substitution;
+mod redex_position;
+mod interpreter;
 
 
 // Reexports to flatten some of the smaller modules
