@@ -72,6 +72,11 @@ impl<T: ?Sized> UnsafePtr<T> {
   pub fn vtable_eq(&self, rhs: UnsafePtr<T>) -> bool {
     std::ptr::metadata(self.ptr.as_ptr()) == std::ptr::metadata(rhs.ptr.as_ptr())
   }
+  
+  pub fn ptr_hash(&self) -> u64 {
+    let ptr_addr = self.as_ptr() as *const () as usize;
+    (ptr_addr as u64) >> 3
+  }
 }
 
 impl<T: ?Sized> Deref for UnsafePtr<T> {

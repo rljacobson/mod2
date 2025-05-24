@@ -40,6 +40,7 @@ mod rccell;
 mod string_util;
 mod unsafe_ptr;
 mod partial_ordering;
+mod index_set;
 pub mod any;
 pub mod hash;
 
@@ -82,6 +83,8 @@ pub use string_cache::DefaultAtom as IString;
 // pub use heap::{heap_construct, heap_destroy};
 
 // region Items meant to be used only internally
+
+pub use index_set::IndexSet;
 
 pub use graph::Graph;
 
