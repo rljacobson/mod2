@@ -110,17 +110,17 @@ mod tests {
     let h_term = match h_term.normalize(true) {
       (Some(new_h_term), changed, hash) => {
         println!("new h term: {}, changed: {}, hash: {}", new_h_term, changed, hash);
-        assert_eq!(new_h_term.hash(), hash);
+        assert_eq!(new_h_term.structural_hash(), hash);
         new_h_term
       }
       (None, true, hash) => {
         println!("h term changed: {}, hash: {}", h_term, hash);
-        assert_eq!(h_term.hash(), hash);
+        assert_eq!(h_term.structural_hash(), hash);
         Box::new(h_term)
       }
       (_, _, hash) => {
         println!("h term hash: {}", hash);
-        assert_eq!(h_term.hash(), hash);
+        assert_eq!(h_term.structural_hash(), hash);
         Box::new(h_term)
       }
     };
@@ -129,17 +129,17 @@ mod tests {
     let g_term = match g_term.normalize(true) {
       (Some(new_g_term), changed, hash) => {
         println!("new g term: {}, changed: {}, hash: {}", new_g_term, changed, hash);
-        assert_eq!(new_g_term.hash(), hash);
+        assert_eq!(new_g_term.structural_hash(), hash);
         new_g_term
       }
       (None, true, hash) => {
         println!("g term changed: {}, hash: {}", g_term, hash);
-        assert_eq!(g_term.hash(), hash);
+        assert_eq!(g_term.structural_hash(), hash);
         Box::new(g_term)
       }
       (_, _, hash) => {
         println!("g term hash: {}", hash);
-        assert_eq!(g_term.hash(), hash);
+        assert_eq!(g_term.structural_hash(), hash);
         Box::new(g_term)
       }
     };
@@ -148,17 +148,17 @@ mod tests {
     let _f_term = match f_term.normalize(true) {
       (Some(new_f_term), changed, hash) => {
         println!("new f term: {}, changed: {}, hash: {}", new_f_term, changed, hash);
-        assert_eq!(new_f_term.hash(), hash);
+        assert_eq!(new_f_term.structural_hash(), hash);
         new_f_term
       }
       (None, true, hash) => {
         println!("f term changed: {}, hash: {}", f_term, hash);
-        assert_eq!(f_term.hash(), hash);
+        assert_eq!(f_term.structural_hash(), hash);
         Box::new(f_term)
       }
       (_, _, hash) => {
         println!("f term hash: {}", hash);
-        assert_eq!(f_term.hash(), hash);
+        assert_eq!(f_term.structural_hash(), hash);
         Box::new(f_term)
       }
     };
@@ -192,17 +192,17 @@ mod tests {
     let g_term = match g_term.normalize(true) {
       (Some(new_g_term), changed, hash) => {
         println!("new g term: {}, changed: {}, hash: {}", new_g_term, changed, hash);
-        assert_eq!(new_g_term.hash(), hash);
+        assert_eq!(new_g_term.structural_hash(), hash);
         new_g_term
       }
       (None, true, hash) => {
         println!("g term changed: {}, hash: {}", g_term, hash);
-        assert_eq!(g_term.hash(), hash);
+        assert_eq!(g_term.structural_hash(), hash);
         Box::new(g_term)
       }
       (_, _, hash) => {
         println!("g term hash: {}", hash);
-        assert_eq!(g_term.hash(), hash);
+        assert_eq!(g_term.structural_hash(), hash);
         Box::new(g_term)
       }
     };
@@ -211,17 +211,17 @@ mod tests {
     let f_term = match f_term.normalize(true) {
       (Some(new_f_term), changed, hash) => {
         println!("new f term: {}, changed: {}, hash: {}", new_f_term, changed, hash);
-        assert_eq!(new_f_term.hash(), hash);
+        assert_eq!(new_f_term.structural_hash(), hash);
         new_f_term
       }
       (None, true, hash) => {
         println!("f term changed: {}, hash: {}", f_term, hash);
-        assert_eq!(f_term.hash(), hash);
+        assert_eq!(f_term.structural_hash(), hash);
         Box::new(f_term)
       }
       (_, _, hash) => {
         println!("f term hash: {}", hash);
-        assert_eq!(f_term.hash(), hash);
+        assert_eq!(f_term.structural_hash(), hash);
         Box::new(f_term)
       }
     };

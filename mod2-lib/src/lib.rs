@@ -11,7 +11,7 @@ pub mod core;
 /// Indentation amount for displayed structures.
 pub(crate) const DISPLAY_INDENT: usize = 2;
 
-/// The type to use for symbol, term, and DAG node hashes.
+/// The type to use for symbol, term, and DAG node structural hashes.
 pub type HashType = u32;
 
 // Sentinel Values

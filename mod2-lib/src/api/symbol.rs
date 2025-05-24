@@ -37,10 +37,10 @@ pub trait Symbol {
   fn as_any(&self) -> &dyn Any;
   fn as_any_mut(&mut self) -> &mut dyn Any;
   fn as_ptr(&self) -> SymbolPtr;
-  
+
   /// A type-erased way of asking a symbol to make a term of compatible type.
   fn make_term(&self, args: Vec<BxTerm>) -> BxTerm;
-  
+
   // region Member Getters and Setters
   /// Trait level access to members for shared implementation
   fn core(&self) -> &SymbolCore;
@@ -56,7 +56,7 @@ pub trait Symbol {
     self.core().name.clone()
   }
 
-  /// Same as `get_order` or `get_hash_value`, used for "semantic hash".
+  /// Same as `get_order` or `get_hash_value`, used for "structural_hash".
   ///
   /// The semantics of a symbol are not included in the hash itself, as symbols are unique names by definition.
   #[inline(always)]
@@ -90,12 +90,12 @@ pub trait Symbol {
     let sort_table = self.sort_table().as_ref().expect("cannot fetch range kind of symbol with no sort table");
     sort_table.range_kind()
   }
-  
+
   #[inline(always)]
   fn strategy(&self) -> &Strategy {
     &self.core().strategy
   }
-  
+
   // endregion Accessors
 
   #[inline(always)]
@@ -107,7 +107,7 @@ pub trait Symbol {
   fn add_op_declaration(&mut self, self_ptr: SymbolPtr, op_declaration: OpDeclaration) {
     self.core_mut().add_op_declaration(self_ptr, op_declaration);
   }
-  
+
   /// Called from `Module::close_theory()`
   #[inline(always)]
   fn compile_op_declarations(&mut self) {

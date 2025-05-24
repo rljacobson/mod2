@@ -25,43 +25,40 @@ use std::{
 };
 use std::marker::PhantomData;
 use mod2_abs::{as_bytes, IString};
-
-use crate::{
-  core::{
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlags,
-      DagNodeFlag,
-      ThinDagNodePtr
-    },
-    EquationalTheory,
-    gc::{
-      allocate_dag_node,
-      increment_active_node_count
-    },
+use mod2_abs::hash::hash2;
+use crate::{core::{
+  dag_node_core::{
+    DagNodeCore,
+    DagNodeFlags,
+    DagNodeFlag,
+    ThinDagNodePtr
   },
-  api::{
-    Arity,
-    built_in::{
-      NADataType,
-      Float,
-      Integer,
-      NaturalNumber,
-      Bool,
-      StringBuiltIn,
-      get_built_in_symbol,
-    },
-    dag_node::{
-      DagNodeVector,
-      DagNodeVectorRefMut,
-      DagNode,
-      DagNodePtr,
-      arg_to_dag_node,
-      arg_to_node_vec
-    },
-    symbol::SymbolPtr,
-  }
-};
+  EquationalTheory,
+  gc::{
+    allocate_dag_node,
+    increment_active_node_count
+  },
+}, api::{
+  Arity,
+  built_in::{
+    NADataType,
+    Float,
+    Integer,
+    NaturalNumber,
+    Bool,
+    StringBuiltIn,
+    get_built_in_symbol,
+  },
+  dag_node::{
+    DagNodeVector,
+    DagNodeVectorRefMut,
+    DagNode,
+    DagNodePtr,
+    arg_to_dag_node,
+    arg_to_node_vec
+  },
+  symbol::SymbolPtr,
+}, HashType};
 
 pub type BoolDagNode    = NADagNode<Bool>;
 pub type FloatDagNode   = NADagNode<Float>;
@@ -141,6 +138,10 @@ impl<T: NADataType> DagNode for NADagNode<T> {
   #[inline(always)]
   fn as_ptr(&self) -> DagNodePtr {
     DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
+  }
+
+  fn structural_hash(&self) -> HashType {
+    hash2(self.symbol().hash(), self.value().hashable_bits())
   }
 
   #[inline(always)]

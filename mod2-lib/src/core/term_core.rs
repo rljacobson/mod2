@@ -68,6 +68,7 @@ pub struct TermCore {
   pub(crate) sort_index      : i8,
   pub(crate) term_type       : TermType,
   pub(crate) save_index      : i32,      // NoneIndex = -1
+  /// Stores the structural hash computed in `Term::normalize()`
   pub(crate) hash_value      : HashType, // Set in `Term::normalize()`
 
   /// The number of nodes in the term tree

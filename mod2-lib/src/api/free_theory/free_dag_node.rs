@@ -6,35 +6,32 @@ use std::{
   },
   ops::DerefMut
 };
-
-use crate::{
-  core::{
-    gc::{
-      allocate_dag_node,
-      increment_active_node_count
-    },
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlags,
-      DagNodeFlag,
-      ThinDagNodePtr
-    },
-    EquationalTheory
+use mod2_abs::hash::hash2;
+use crate::{core::{
+  gc::{
+    allocate_dag_node,
+    increment_active_node_count
   },
-  api::{
-    Arity,
-    dag_node::{
-      DagNodeVector,
-      DagNodeVectorRefMut,
-      DagNode,
-      DagNodePtr,
-      arg_to_dag_node,
-      arg_to_node_vec
-    },
-    symbol::SymbolPtr,
-    term::Term,
+  dag_node_core::{
+    DagNodeCore,
+    DagNodeFlags,
+    DagNodeFlag,
+    ThinDagNodePtr
   },
-};
+  EquationalTheory
+}, api::{
+  Arity,
+  dag_node::{
+    DagNodeVector,
+    DagNodeVectorRefMut,
+    DagNode,
+    DagNodePtr,
+    arg_to_dag_node,
+    arg_to_node_vec
+  },
+  symbol::SymbolPtr,
+  term::Term,
+}, HashType};
 
 pub struct FreeDagNode(DagNodeCore);
 
@@ -69,6 +66,16 @@ impl DagNode for FreeDagNode {
   #[inline(always)]
   fn as_ptr(&self) -> DagNodePtr {
     DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
+  }
+
+  fn structural_hash(&self) -> HashType {
+    let mut hash_value: HashType = self.symbol().hash();
+    
+    for arg in self.iter_args(){
+      hash_value = hash2(hash_value, arg.structural_hash());
+    }
+    
+    hash_value
   }
 
   #[inline(always)]

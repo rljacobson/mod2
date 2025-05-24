@@ -3,20 +3,20 @@
 A `TermBag` is a cache of terms occurring in patterns or right hand sides that can be reused in building right hand
 sides to enable common subexpression sharing both within rhs and lhs->rhs.
 
-A special __semantic hash__ is used to determine if two terms are "the same." Sameness means only that a term from the
+A special __structural_hash__ is used to determine if two terms are "the same." Sameness means only that a term from the
 term bag can be used in place of the given term. In fact, even when two terms are semantically the same, there may be
 reasons why a separate copy needs to be used instead of a shared cached term. In particular, if local changes need to be
 made to a term without effecting all other semantically identical terms, then the globally shared cached term can't be
 used.
 
-We need a bimap between semantic hash and terms. The simplest way is to use the semantic hash as a key. Then
+We need a bimap between structural_hash and terms. The simplest way is to use the structural_hash as a key. Then
 
 ```ignore
-term -> semantic hash  : just the semantic hash function itself
-semantic hash -> term  : a lookup in the "term bag."
+term -> structural_hash  : just the structural_hash function itself
+structural_hash -> term  : a lookup in the "term bag."
 ```
 
-Maude uses "small" numbers in place of the semantic hash. The term bag must keep track of these numbers, and they are
+Maude uses "small" numbers in place of the structural_hash. The term bag must keep track of these numbers, and they are
 not deterministic. It isn't clear to me why.
 
 In Maude, a `TermBag` is a thin wrapper around a PointerSet.
@@ -53,7 +53,7 @@ trait TermHashSetExt {
 
 impl TermHashSetExt for HashMap<HashValueType, TermPtr> {
   fn insert_no_replace(&mut self, value: TermPtr) -> Option<TermPtr> {
-    match self.entry(value.deref().hash()) {
+    match self.entry(value.deref().structural_hash()) {
       Entry::Occupied(entry) => {
         Some(*entry.get())
       }
@@ -69,7 +69,7 @@ impl TermHashSetExt for HashMap<HashValueType, TermPtr> {
   }
 
   fn find(&self, value: TermPtr) -> Option<(TermPtr, HashValueType)> {
-    let key = value.deref().hash();
+    let key = value.deref().structural_hash();
     self.find_for_hash(key).map(|v| (v, key))
 
   }
@@ -122,12 +122,12 @@ impl TermBag {
   pub(crate) fn insert_built_term(&mut self, term: TermPtr, eager_context: bool) {
     // New built terms should not arise if there is an existing usable term in the appropriate context.
     if eager_context {
-      let success = self.terms_usable_in_eager_context.insert(term.hash(), term).is_none();
+      let success = self.terms_usable_in_eager_context.insert(term.structural_hash(), term).is_none();
       if !success {
         warning!(0, "re-insertion of {}", term);
       }
     } else {
-      let success = self.terms_usable_in_lazy_context.insert(term.hash(), term).is_none();
+      let success = self.terms_usable_in_lazy_context.insert(term.structural_hash(), term).is_none();
       if !success {
         warning!(0, "re-insertion of {}", term);
       }

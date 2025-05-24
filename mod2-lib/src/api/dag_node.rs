@@ -20,28 +20,26 @@ use std::{
   iter::Iterator,
   ops::Deref
 };
+use std::hash::{Hash, Hasher};
 use mod2_abs::UnsafePtr;
-use crate::{
-  api::{
-    symbol::SymbolPtr,
-    Arity,
+use crate::{api::{
+  symbol::SymbolPtr,
+  Arity,
+}, core::{
+  dag_node_core::{
+    DagNodeCore,
+    DagNodeFlag,
+    DagNodeFlags,
+    ThinDagNodePtr,
   },
-  core::{
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlag,
-      DagNodeFlags,
-      ThinDagNodePtr,
-    },
-    format::{FormatStyle, Formattable},
-    gc::{
-      gc_vector::{GCVector, GCVectorRefMut},
-      increment_active_node_count,
-    },
-    sort::SortPtr,
+  format::{FormatStyle, Formattable},
+  gc::{
+    gc_vector::{GCVector, GCVectorRefMut},
+    increment_active_node_count,
   },
-  impl_display_debug_for_formattable,
-};
+  sort::SortPtr,
+}, impl_display_debug_for_formattable, HashType};
+use crate::api::term::Term;
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr    = UnsafePtr<dyn DagNode + 'static>;
@@ -73,6 +71,9 @@ pub trait DagNode {
   //   DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
   // }
 
+  /// Gives the same value as the corresponding method on `Term`, but computes it anew each time its called.
+  /// This should be kept in sync with the theory's term structural hash computation.
+  fn structural_hash(&self) -> HashType;
 
   // region Accessors
 
@@ -84,7 +85,6 @@ pub trait DagNode {
   fn arity(&self) -> Arity {
     self.core().arity()
   }
-
 
   /// MUST override if Self::args is not a `DagNodeVector`.
   /// Implement an empty iterator with:
@@ -414,6 +414,23 @@ pub trait DagNode {
   // endregion GC related methods
 }
 
+// region trait impls for DagNode
+
+// ToDo: Revisit whether `semantic_hash` is appropriate for the `Hash` trait.
+// Use the `DagNode::compute_hash(…)` hash for `HashSet`s and friends.
+impl Hash for dyn DagNode {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    state.write_u32(self.structural_hash())
+  }
+}
+// To use `DagNode` with `HashSet`, it needs to implement `Eq`
+impl PartialEq for dyn DagNode {
+  fn eq(&self, other: &Self) -> bool {
+    self.structural_hash() == other.structural_hash()
+  }
+}
+impl Eq for dyn DagNode {}
+
 impl Formattable for dyn DagNode {
   fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
     match style {
@@ -444,6 +461,7 @@ impl Formattable for dyn DagNode {
 
 impl_display_debug_for_formattable!(dyn DagNode);
 
+// endregion trait impls for DagNode
 
 // Unsafe private free functions
 

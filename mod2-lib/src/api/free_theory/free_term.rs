@@ -113,11 +113,11 @@ impl Term for FreeTerm {
   }
 
 
-  fn hash(&self) -> HashType {
+  fn structural_hash(&self) -> HashType {
     self.core().hash_value
   }
 
-  /// In sync with `semantic_hash`
+  /// In sync with `FreeDagNode::structural_hash()`
   fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType) {
     let mut changed   : bool     = false;
     let mut hash_value: HashType = self.symbol().hash();

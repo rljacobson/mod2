@@ -59,14 +59,17 @@ pub trait Term: Formattable {
   fn as_ptr(&self) -> TermPtr;
   fn copy(&self) -> BxTerm;
 
-  fn hash(&self) -> HashType { self.core().hash_value }
+  /// Returns the structural hash computed in `Term::normalize()`
+  fn structural_hash(&self) -> HashType { self.core().hash_value }
 
   /// Returns a pointer to the normalized version of self. If a new term was created during
   /// normalization, it is returned. We also need to know if any subterm changed, so we also
   /// return a bool, and unless the term is the expression's top-most term, we will always need
   /// the new hash value, too. The returned tuple is thus `( Option<TermBx>, changed, new_hash)`.
   ///
-  /// Note: The hash value of a term is first set in this method.
+  /// Note: The structural hash value of a term is first set in this method. The algorithm used
+  ///       to compute this hash should be kept in sync with the corresponding implementation
+  ///       of `DagNode::structural_hash()`.
   fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType);
 
   fn core(&self)         -> &TermCore;
@@ -246,7 +249,7 @@ pub trait Term: Formattable {
   /// Terms should be normalized before dagification.
   #[allow(private_interfaces)]
   fn dagify(&self, node_cache: &mut DagNodeCache) -> DagNodePtr {
-    let hash = self.hash();
+    let hash = self.structural_hash();
     if let Some(dag_node) = node_cache.get(hash) {
       return dag_node;
     }
@@ -398,19 +401,18 @@ pub trait Term: Formattable {
 // region trait impls for Term
 
 // ToDo: Revisit whether `semantic_hash` is appropriate for the `Hash` trait.
-// Use the `Term::compute_hash(…)` hash for `HashSet`s and friends.
+// Use the `Term::structural_hash(…)` hash for `HashSet`s and friends.
 impl Hash for dyn Term {
   fn hash<H: Hasher>(&self, state: &mut H) {
-    state.write_u32(self.hash())
+    state.write_u32(self.structural_hash())
   }
 }
-
+// To use `Term` with `HashSet`, it needs to implement `Eq`
 impl PartialEq for dyn Term {
   fn eq(&self, other: &Self) -> bool {
-    self.hash() == other.hash()
+    self.structural_hash() == other.structural_hash()
   }
 }
-
 impl Eq for dyn Term {}
 
 impl_display_debug_for_formattable!(dyn Term);

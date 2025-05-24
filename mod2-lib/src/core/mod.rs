@@ -39,7 +39,6 @@ pub(crate) mod substitution;
 mod redex_position;
 mod interpreter;
 
-
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
 pub(crate) use narrowing_variable_info::NarrowingVariableInfo;

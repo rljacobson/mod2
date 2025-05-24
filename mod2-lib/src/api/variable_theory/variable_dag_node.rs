@@ -25,34 +25,31 @@ use std::{
 };
 
 use mod2_abs::{as_bytes, debug, IString};
-
-use crate::{
-  core::{
-    gc::{
-      allocate_dag_node,
-      increment_active_node_count
-    },
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlags,
-      DagNodeFlag,
-      ThinDagNodePtr
-    },
-    EquationalTheory
+use mod2_abs::hash::hash2;
+use crate::{core::{
+  gc::{
+    allocate_dag_node,
+    increment_active_node_count
   },
-  api::{
-    symbol::SymbolPtr,
-    dag_node::{
-      DagNodeVector,
-      DagNodeVectorRefMut,
-      DagNode,
-      DagNodePtr,
-      arg_to_dag_node,
-      arg_to_node_vec
-    },
-    Arity
+  dag_node_core::{
+    DagNodeCore,
+    DagNodeFlags,
+    DagNodeFlag,
+    ThinDagNodePtr
   },
-};
+  EquationalTheory
+}, api::{
+  symbol::SymbolPtr,
+  dag_node::{
+    DagNodeVector,
+    DagNodeVectorRefMut,
+    DagNode,
+    DagNodePtr,
+    arg_to_dag_node,
+    arg_to_node_vec
+  },
+  Arity
+}, HashType};
 
 /// The index into `DagNodeCode::inline` at which we store the `index` of `VariableDagNode`.
 const VARIABLE_INDEX_OFFSET: usize = size_of::<IString>();
@@ -120,6 +117,10 @@ impl DagNode for VariableDagNode {
   #[inline(always)]
   fn as_ptr(&self) -> DagNodePtr {
     DagNodePtr::new(self as *const dyn DagNode as *mut dyn DagNode)
+  }
+
+  fn structural_hash(&self) -> HashType {
+    hash2(self.symbol().hash(), self.name().get_hash())
   }
 
   #[inline(always)]

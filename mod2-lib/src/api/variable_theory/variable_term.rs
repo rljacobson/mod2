@@ -67,16 +67,10 @@ impl Term for VariableTerm {
   }
 
   #[inline(always)]
-  fn hash(&self) -> HashType {
+  fn structural_hash(&self) -> HashType {
     self.symbol().hash()
   }
-
-  /// Returns a pointer to the normalized version of self. If a new term was created during
-  /// normalization, it is returned. We also need to know if any subterm changed, so we also
-  /// return a bool, and unless the term is the expression's top-most term, we will always need
-  /// the new hash value, too. The returned tuple is thus `( Option<TermBx>, changed, new_hash)`.
-  ///
-  /// Note: The hash value of a term is first set in this method.
+  
   fn normalize(&mut self, _full: bool) -> (Option<BxTerm>, bool, HashType) {
     let hash_value = hash2(self.symbol().hash(), self.name.get_hash());
     self.core_mut().hash_value = hash_value;

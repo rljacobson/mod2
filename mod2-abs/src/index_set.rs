@@ -2,22 +2,24 @@
 
 An `IndexSet` swaps a value for an index (a `usize`) using some key value. We have two use cases:
 1. When the value and key are the same, namely a pointer
-2. When the key is provided by the client code, typically a semantic hash of the value.
+2. When the key is provided by the client code, typically a structural_hash of the value.
 
 In the first case, we provide the `IndexSet::insert` and `IndexSet::value_to_index` methods. In the second case,
 we provide the `IndexSet::insert_with_hash` method.
+
+This data structure replaces `PointerSet`, `DagNodeSet`, and `IndexedSet`.
 
 Eker describes this as an important optimization. In Maude, `PointerSet` has two distinct use cases:
 1. to assign a unique index to each pointer
 2. to assign a unique index to each pointer with a provided hash value
 
 In the first case, the hash value is an implementation detail that need not be exposed to the user. In the second case,
-the hash value is a semantic hash, and we are associating both a canonical object and an index to this hash. In both
+the hash value is a structural_hash, and we are associating both a canonical object and an index to this hash. In both
 cases, the functionality of the `PointerSet` can be based on Maude's `IndexedSet` (but isn't), so we just implement
 a single container for all cases.
 
-ToDo: `PointerSet` stores a value upon insert in the case that the provided hash is equal to an existing hash but the 
-      pointer is different. This is only relevant with semantic hashes. It's not clear if this behavior is important.
+ToDo: `PointerSet` stores a value upon insert in the case that the provided hash is equal to an existing hash but the
+      pointer is different. This is only relevant with structural_hashes. It's not clear if this behavior is important.
       This implementation neither replaces the value nor stores the given value if the hash exists.
 
 */
@@ -26,13 +28,13 @@ use std::collections::hash_map::Entry;
 use std::hash::Hash;
 use crate::{HashMap, UnsafePtr};
 
-pub struct IndexSet<Key, Value> 
+pub struct IndexSet<Key, Value>
     where Key  : Hash + Clone + Eq, Value : PartialEq
 {
   /// Maps an index to a key of the hash map below
   keys: Vec<Key>,
   // ToDo: Use a faster hasher
-  /// Maps a key to an object and index. Sometimes the key is the hash value, and sometimes it is the pointer itself. 
+  /// Maps a key to an object and index. Sometimes the key is the hash value, and sometimes it is the pointer itself.
   indices: HashMap<Key, (usize, Value)>,
 }
 
@@ -71,7 +73,7 @@ where Value  : Hash + Clone + Eq
 
     }
   }
-  
+
   /// Use the value's own hash to get the index.
   pub fn value_to_index(&self, value: Value) -> Option<usize> {
     self.indices.get(&value).map(| (index, _) | *index )
@@ -116,7 +118,7 @@ where Key  : Hash + Clone + Eq,
         .filter(|(_, v)| *v == value)
         .map(|(idx, _)| *idx)
   }
-  
+
 
   /// Use the index to get the key
   pub fn index_to_key(&self, index: usize) -> Option<Key> {
@@ -130,8 +132,8 @@ where Key  : Hash + Clone + Eq,
       | key | &self.indices.get(key).unwrap().1
     )
   }
-  
-  
+
+
   pub fn len(&self) -> usize {
     self.keys.len()
   }

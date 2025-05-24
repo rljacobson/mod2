@@ -105,6 +105,8 @@ impl<T: Debug + ?Sized> Debug for UnsafePtr<T> {
   }
 }
 
+// ToDo: It's not clear if this is the hash implementation we want to have for pointers.
+/// Use the referent's `Hash` implementation if it exists.
 impl<T: ?Sized + Hash> Hash for UnsafePtr<T> {
   fn hash<H: Hasher>(&self, state: &mut H) {
     self.deref().hash(state);
