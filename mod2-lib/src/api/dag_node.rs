@@ -86,9 +86,9 @@ pub trait DagNode {
     self.core().arity()
   }
 
-  /// MUST override if Self::args is not a `DagNodeVector`.
+  /// MUST override if `Self::args` is not a [`DagNodeVector`].
   /// Implement an empty iterator with:
-  ///      Box::new(std::iter::empty::<DagNodePtr>())
+  ///      `Box::new(std::iter::empty::<DagNodePtr>())`
   fn iter_args(&self) -> Box<dyn Iterator<Item=DagNodePtr>> {
 
     // The empty case
@@ -147,7 +147,7 @@ pub trait DagNode {
     }
   }
 
-  /// MUST override if Self::args is not a `DagNodeVector`
+  /// MUST override if `Self::args` is not a [`DagNodeVector`]
   fn insert_child(&mut self, new_child: DagNodePtr){
     // ToDo: Should we signal if arity is exceeded and/or DagNodeVector needs to reallocate?
 

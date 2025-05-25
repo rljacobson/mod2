@@ -19,8 +19,6 @@ section titled, "Optimizations for Computing a Subsort Relation at Runtime."
 
 ## See Also...
 
- - A [`SortSpec`](crate::core::sort::sort_spec::SortSpec) is a generalization of `Sort` that additionally permits
-   functors.
  - A ['Kind'](crate::core::sort::kind::Kind) is a connected component of the lattice of `Sort`s induced by the subsort
    relation.
 

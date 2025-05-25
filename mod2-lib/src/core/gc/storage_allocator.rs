@@ -4,13 +4,26 @@
 
 See GarbageCollector.md for a detailed explanation of how it works. Below is a brief summary of how it works.
 
-The Bucket allocator manages memory by organizing it into buckets, each containing raw memory that can be allocated in smaller chunks. When a program requests memory, the allocator first searches the in-use buckets for a free chunk. In the typical case, the current active bucket has the capacity to allocate the requested chunk, and so the allocator acts as a "bump" allocator. If no suitable space is found, it checks unused buckets (if any exist) or allocates new ones to accommodate the request.
+The Bucket allocator manages memory by organizing it into buckets, each containing raw memory that
+can be allocated in smaller chunks. When a program requests memory, the allocator first searches the
+in-use buckets for a free chunk. In the typical case, the current active bucket has the capacity to
+allocate the requested chunk, and so the allocator acts as a "bump" allocator. If no suitable space
+is found, it checks unused buckets (if any exist) or allocates new ones to accommodate the request.
 
-The garbage collection process in the bucket allocator follows a mark-and-sweep pattern with a copying strategy. During the mark phase, the allocator traverses the live data and copies it to available initially empty buckets (i.e. buckets which were empty prior to garbage collection). If the available buckets do not have enough space to accommodate the live objects, new buckets are allocated and added to the list. Once the objects are copied, the old memory locations are free to be collected in the sweep phase.
+The garbage collection process in the bucket allocator follows a mark-and-sweep pattern
+with a copying strategy. During the mark phase, the allocator traverses the live data
+and copies it to available initially empty buckets (i.e. buckets which were empty prior
+to garbage collection). If the available buckets do not have enough space to accommodate
+the live objects, new buckets are allocated and added to the list. Once the objects
+are copied, the old memory locations are free to be collected in the sweep phase.
 
-In the sweep phase, the allocator clears the old buckets, resetting their free space to the full bucket size. These buckets are then moved to the unused list and reset to an empty state, making them available for future allocations.
+In the sweep phase, the allocator clears the old buckets, resetting their free
+space to the full bucket size. These buckets are then moved to the unused list
+and reset to an empty state, making them available for future allocations.
 
-Because live objects are relocated during garbage collection to previously empty buckets, there is no fragmentation after garbage collection. What's more, copying occurs in depth-first order on the graph nodes, improving locality for certain access patterns.
+Because live objects are relocated during garbage collection to previously empty buckets,
+there is no fragmentation after garbage collection. What's more, copying occurs in
+depth-first order on the graph nodes, improving locality for certain access patterns.
 
 */
 
@@ -25,14 +38,17 @@ use mod2_abs::{debug, heap_construct, info};
 use crate::{
   core::{
     gc::bucket::Bucket,
-    Void
+    Byte
   }
 };
 
 
-const BUCKET_MULTIPLIER    : usize = 8;              // To determine bucket size for huge allocations
-const MIN_BUCKET_SIZE      : usize = 256 * 1024 - 8; // Bucket size for normal allocations
-const INITIAL_TARGET       : usize = 220 * 1024;     // Just under 8/9 of MIN_BUCKET_SIZE
+/// To determine bucket size for huge allocations
+const BUCKET_MULTIPLIER    : usize = 8;              
+/// Bucket size for normal allocations
+const MIN_BUCKET_SIZE      : usize = 256 * 1024 - 8; 
+/// Just under 8/9 of MIN_BUCKET_SIZE
+const INITIAL_TARGET       : usize = 220 * 1024;     
 const TARGET_MULTIPLIER    : usize = 8;
 
 static GLOBAL_STORAGE_ALLOCATOR: Lazy<Mutex<StorageAllocator>> = Lazy::new(|| {
@@ -88,7 +104,7 @@ impl StorageAllocator {
   }
 
   /// Allocates the given number of bytes using bucket storage.
-  pub fn allocate_storage(&mut self, bytes_needed: usize) -> *mut Void {
+  pub fn allocate_storage(&mut self, bytes_needed: usize) -> *mut Byte {
     assert_eq!(bytes_needed % size_of::<usize>(), 0, "only whole machine words can be allocated");
     self.storage_in_use += bytes_needed;
 

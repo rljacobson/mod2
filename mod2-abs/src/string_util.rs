@@ -4,7 +4,7 @@ use std::fmt::Display;
 /**
 Join an iterator of strings, which doesn't exist in the stdlib. (C.f. `Vec::join(…)`)
 
-From: https://stackoverflow.com/a/66951473
+From: <https://stackoverflow.com/a/66951473>
 Usage:
 
 ```

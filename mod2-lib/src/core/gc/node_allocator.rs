@@ -1,13 +1,31 @@
 /*!
 
 # Arena Allocator
+
 See GarbageCollector.md for a detailed explanation of how it works. Below is a brief summary of how it works.
 
-The arena allocator manages memory by organizing it into arenas, which are fixed size arrays of nodes available for allocation. The allocator uses a simple mark-and-sweep algorithm to collect garbage, but the sweep phase is "lazy." When the program requests a new node allocation, the allocator searches linearly for free nodes within these arenas and reuses them when possible. During this linear search, the allocator performs a "lazy sweep," clearing all "marked" flags on nodes and running destructors when necessary. This proceeds until either an available node is found and returned or all nodes are found to be in use, in which case it may expand by creating a new arena or adding capacity to existing ones.
+The arena allocator manages memory by organizing it into arenas, which are fixed size arrays
+of nodes available for allocation. The allocator uses a simple mark-and-sweep algorithm
+to collect garbage, but the sweep phase is "lazy." When the program requests a new node
+allocation, the allocator searches linearly for free nodes within these arenas and reuses
+them when possible. During this linear search, the allocator performs a "lazy sweep,"
+clearing all "marked" flags on nodes and running destructors when necessary. This proceeds
+until either an available node is found (its "marked" flag is already clear) and returned or
+all nodes are found to be in use, in which case it may expand by creating a new arena or adding
+capacity to existing ones.
 
-When garbage collection is triggered, the allocator then sweeps the remaining (not yet searched) part of the arena(s). Then it begins the mark phase. During marking, the allocator requests all node roots to flag nodes that are actively in use so that they’re preserved. During this phase, the number of active nodes is computed. After marking, the allocator compares it's total node capacity to the number of active nodes and, if the available capacity is less than a certain "slop factor," more arenas are allocated from system memory. The "cursor" for the linear search is then reset to the first node of the first arena.
+When garbage collection is triggered, the allocator then sweeps the remaining (not yet
+searched) part of the arena(s). Then it begins the mark phase. During marking, the allocator
+requests all node roots to flag nodes that are actively in use so that they’re preserved.
+During this phase, the number of active nodes is computed. After marking, the allocator
+compares it's total node capacity to the number of active nodes and, if the available
+capacity is less than a certain "slop factor," more arenas are allocated from system memory.
+The "cursor" for the linear search is then reset to the first node of the first arena.
 
-Since the sweep phase is done lazily, the time it takes to sweep the arenas is amortized between garbage collection events. Because garbage collection is triggered when the linear search for free nodes nears the end of the last arena, allocating a "slop factor" of extra arenas keeps garbage collection events low.
+Since the sweep phase is done lazily, the time it takes to sweep the arenas
+is amortized between garbage collection events. Because garbage collection is
+triggered when the linear search for free nodes nears the end of the last arena,
+allocating a "slop factor" of extra arenas keeps garbage collection events low.
 
 */
 
@@ -52,7 +70,7 @@ const UPPER_BOUND     : usize = 32 * 1024 * 1024; // Use big model if >= 32 mill
 // It looks like Maude assumes DagNodes are 6 words in size, but ours are 3 words,
 // at least so far.
 pub(crate) const ARENA_SIZE: usize = 5460; // Arena size in nodes; 5460 * 6 + 1 + new/malloc_overhead <= 32768 words
-const RESERVE_SIZE         : usize = 256; // If fewer nodes left call GC when allowed
+const RESERVE_SIZE         : usize =  256; // If fewer nodes left call GC when allowed
 
 
 pub(crate) static ACTIVE_NODE_COUNT: AtomicUsize = AtomicUsize::new(0);
@@ -84,7 +102,7 @@ pub fn allocate_dag_node() -> ThinDagNodePtr {
 
 pub(crate) struct NodeAllocator {
   arenas : Vec<Box<Arena>>,
-  
+
   // General settings
   show_gc: bool, // Do we report GC stats to user
   need_to_collect_garbage: bool,
@@ -106,7 +124,7 @@ impl NodeAllocator {
   pub fn new() -> Self {
     NodeAllocator {
       arenas: vec![],
-      
+
       show_gc: true,
       need_to_collect_garbage: false,
 
@@ -134,7 +152,7 @@ impl NodeAllocator {
   pub fn want_to_collect_garbage(&self) -> bool {
     self.need_to_collect_garbage
   }
-  
+
   /// Get the given node at the current arena
   #[inline(always)]
   pub fn node_at(&mut self, idx: usize) -> ThinDagNodePtr {
@@ -173,7 +191,7 @@ impl NodeAllocator {
       let current_node_ptr = self.node_at(current_node_idx);
       current_node_ptr.as_mut_unchecked().args = null_mut();
       self.next_node_idx = current_node_idx + 1;
-      
+
     } // end of unsafe block
 
     increment_active_node_count();
@@ -229,7 +247,7 @@ impl NodeAllocator {
             self.current_arena_past_active_arena = true;
           }
 
-          self.current_arena_idx = self.arenas.len(); 
+          self.current_arena_idx = self.arenas.len();
           self.allocate_new_arena();
           self.end_idx   = ARENA_SIZE; // ToDo: Why no reserve here?
 

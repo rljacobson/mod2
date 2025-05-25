@@ -13,11 +13,6 @@ pub mod free_theory;
 pub mod built_in;
 mod dag_node_cache;
 
-// Special Values
-// ToDo: Do UNDEFINED the right way. Is this great? No. But it's convenient.
-pub const UNDEFINED: i32 = -1;
-pub const NONE:      i32 = -1;
-pub const ROOT_OK:   i32 = -2;
 
 // Small utility types used throughout
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]

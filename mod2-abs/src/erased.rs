@@ -1,7 +1,7 @@
 /*!
 
 Implements the [erased trait](https://quinedot.github.io/rust-learning/dyn-trait-erased.html) pattern
-from [Learning Rust: Hashable Box<dyn Trait>](https://quinedot.github.io/rust-learning/dyn-trait-hash.html).
+from [Learning Rust: `Hashable Box<dyn Trait>`](https://quinedot.github.io/rust-learning/dyn-trait-hash.html).
 
 While this code is very generic, it isn't needed for users of the library. It only exists to support internal code.
 

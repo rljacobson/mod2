@@ -5,7 +5,9 @@ by placing a reference to the DagNode at the index of the number. Names are numb
 
  From \[Eker 2003]:
 
- > For efficiency, the set of variable bindings at each stage in the recursion in both simplify and build_hierarchy can be tracked by a single global array indexed by small integers representing variables.
+ > For efficiency, the set of variable bindings at each stage in the
+ > recursion in both simplify and build_hierarchy can be tracked by a
+ > single global array indexed by small integers representing variables.
 
  */
 

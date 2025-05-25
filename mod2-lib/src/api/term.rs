@@ -20,30 +20,33 @@ use std::{
 use mod2_abs::{decl_as_any_ptr_fns, NatSet, RcCell, UnsafePtr};
 
 use crate::{
+  api::{
+    symbol::{
+      Symbol,
+      SymbolPtr,
+      SymbolSet
+    },
+    dag_node_cache::DagNodeCache,
+    dag_node::{
+      DagNodePtr,
+      DagNode
+    },
+    Arity
+  },
+  impl_display_debug_for_formattable,
+  HashType,
   core::{
-    TermBag,
     VariableInfo,
+    TermBag,
     format::Formattable,
     sort::kind::KindPtr,
     substitution::Substitution,
     term_core::{
       TermAttribute,
-      TermCore,
-    },
+      TermCore
+    }
   },
-  api::{
-    dag_node::{DagNode, DagNodePtr},
-    dag_node_cache::DagNodeCache,
-    symbol::{
-      Symbol,
-      SymbolPtr,
-      SymbolSet,
-    },
-    UNDEFINED,
-    Arity
-  },
-  impl_display_debug_for_formattable,
-  HashType,
+  UNDEFINED
 };
 
 pub type BxTerm    = Box<dyn Term>;

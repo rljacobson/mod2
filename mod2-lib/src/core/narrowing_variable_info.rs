@@ -1,5 +1,15 @@
 /*!
 
+The [`NarrowingVariableInfo`] struct manages the state and mapping of variables during
+narrowing operations. This struct maintains information about variables used in narrowing
+processes, providing a bridge between variable indices and their DAG representations.
+
+It is typically instantiated during the initialization of narrowing search states, such
+as when creating a `NarrowingSearchState` object. The struct offers functionality to track
+and manage variable bindings throughout the narrowing process, facilitating unification
+and matching operations. [`NarrowingVariableInfo`] instances are commonly passed to
+various narrowing-related functions and structs, serving as a central repository for
+variable-related data and ensuring consistent variable handling across the narrowing system.
 
 */
 

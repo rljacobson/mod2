@@ -40,10 +40,9 @@ We report two kinds of errors during construction of a kind:
 
 ## See Also...
 
- 1. `Kind`s are connected components of the graph of [`Sort`s](crate::core::sort::sort::Sort) induced by the subsort
+ - `Kind`s are connected components of the graph of [`Sort`s](crate::core::sort::sort::Sort) induced by the subsort
     relation.
- 2. A [`SortSpec`](crate::core::sort::sort_spec::SortSpec) is either a [`Sort`](crate::core::sort::sort::Sort) or a
-    functor (from `SortSpec` to `SortSpec`).
+
 
 */
 

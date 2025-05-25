@@ -1,10 +1,12 @@
 /*!
 
 A `Term` is a node in the expression tree. That is, an expression tree is a term, and
-each subexpression is a term. The algorithms do not operate on expression trees (terms).
-Instead, the algorithms operate on a directed acyclic graph (DAG) is constructed from the
-tree. Thus, for each `Term` type, there is a corresponding `DagNode` type. However, because
-of structural sharing, the node instances themselves are not in 1-to-1 correspondence.
+each subexpression is a term. 
+
+The algorithms do not operate on expression trees (terms). Instead, the algorithms
+operate on a directed acyclic graph (DAG) is constructed from the tree. Thus, for
+each `Term` type, there is a corresponding `DagNode` type. However, because of
+structural sharing, the node instances themselves are not in 1-to-1 correspondence.
 
 */
 
@@ -19,11 +21,15 @@ use mod2_abs::NatSet;
 
 use crate::{
   api::{
-    UNDEFINED,
-    symbol::{Symbol, SymbolPtr, SymbolSet},
+    symbol::{
+      SymbolSet,
+      SymbolPtr,
+      Symbol
+    }
   },
   core::sort::kind::KindPtr,
   HashType,
+  UNDEFINED
 };
 
 
