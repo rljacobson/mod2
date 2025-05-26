@@ -34,10 +34,7 @@ use crate::{core::{
     ThinDagNodePtr
   },
   EquationalTheory,
-  gc::{
-    allocate_dag_node,
-    increment_active_node_count
-  },
+  gc::allocate_dag_node,
 }, api::{
   Arity,
   built_in::{

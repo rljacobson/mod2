@@ -8,10 +8,7 @@ use std::{
 };
 use mod2_abs::hash::hash2;
 use crate::{core::{
-  gc::{
-    allocate_dag_node,
-    increment_active_node_count
-  },
+  gc::allocate_dag_node,
   dag_node_core::{
     DagNodeCore,
     DagNodeFlags,

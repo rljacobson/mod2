@@ -10,7 +10,7 @@ The allocator for garbage collected memory. This is really two different allocat
 mod arena;
 mod bucket;
 pub(crate) mod gc_vector;
-mod node_allocator;
+pub(crate) mod node_allocator;
 mod storage_allocator;
 pub(crate) mod root_container;
 
@@ -20,9 +20,6 @@ mod tests;
 // Used internally
 use node_allocator::acquire_node_allocator;
 use storage_allocator::acquire_storage_allocator;
-// Needed within all node `mark()` methods
-pub(crate) use node_allocator::increment_active_node_count;
-
 // These are the only public API
 pub use node_allocator::{
   ok_to_collect_garbage,

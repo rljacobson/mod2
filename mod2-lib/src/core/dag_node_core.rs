@@ -283,19 +283,17 @@ impl DagNodeCore {
       // }
     }
   }
+  
+  pub fn finalize_in_place(&mut self) {
+    // ToDo: We need a better way of finalizing dag nodes
+    let mut dag_node = DagNodeCore::upgrade(self);
+    dag_node.finalize();
+  }
 
 }
 
 impl Display for DagNodeCore {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "node<{}>", self.symbol())
-  }
-}
-
-impl Drop for DagNodeCore {
-  fn drop(&mut self) {
-    // ToDo: We need a better way of finalizing dag nodes
-    let mut dag_node = DagNodeCore::upgrade(self);
-    dag_node.finalize();
   }
 }

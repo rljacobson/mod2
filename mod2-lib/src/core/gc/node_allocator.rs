@@ -30,6 +30,7 @@ allocating a "slop factor" of extra arenas keeps garbage collection events low.
 */
 
 use std::{
+  ptr::null_mut,
   sync::{
     atomic::{
       Ordering::Relaxed,
@@ -38,10 +39,6 @@ use std::{
     Mutex,
     MutexGuard,
   },
-  ptr::{
-    drop_in_place,
-    null_mut
-  }
 };
 use once_cell::sync::Lazy;
 use mod2_abs::{debug, info};
@@ -143,7 +140,7 @@ impl NodeAllocator {
   #[inline(always)]
   pub fn ok_to_collect_garbage(&mut self) {
     if self.need_to_collect_garbage {
-      unsafe{ self.collect_garbage(); }
+      self.collect_garbage();
     }
   }
 
@@ -155,7 +152,7 @@ impl NodeAllocator {
 
   /// Get the given node at the current arena
   #[inline(always)]
-  pub fn node_at(&mut self, idx: usize) -> ThinDagNodePtr {
+  pub fn node_at(&mut self, idx: usize) -> &mut DagNodeCore {
     let arena = self.arenas[self.current_arena_idx].as_mut();
     arena.node_at_mut(idx)
   }
@@ -164,37 +161,34 @@ impl NodeAllocator {
   pub fn allocate_dag_node(&mut self) -> ThinDagNodePtr {
     let mut current_node_idx = self.next_node_idx;
 
-    unsafe{
-      loop {
-        if current_node_idx == self.end_idx {
-          // Arena is full or no arena has been allocated. Allocate a new one.
-          current_node_idx = self.slow_new_dag_node();
+    loop {
+      if current_node_idx == self.end_idx {
+        // Arena is full or no arena has been allocated. Allocate a new one.
+        current_node_idx = self.slow_new_dag_node();
+        break;
+      }
+
+      { // Scope of `current_node_mut: &mut DagNode`
+        let current_node_mut = self.node_at(current_node_idx);
+        if !current_node_mut.is_marked() {
+          if current_node_mut.needs_destruction() {
+            current_node_mut.finalize_in_place();
+          }
           break;
         }
+        current_node_mut.flags.remove(DagNodeFlag::Marked);
+        // current_node_mut.flags = DagNodeFlags::default();
+      }
 
-        { // Scope of `current_node_mut: &mut DagNode`
-          let current_node_mut = self.node_at(current_node_idx).as_mut_unchecked();
-          if !current_node_mut.is_marked() {
-            if current_node_mut.needs_destruction() {
-              drop_in_place(current_node_mut);
-            }
-            break;
-          }
-          current_node_mut.flags.remove(DagNodeFlag::Marked);
-          // current_node_mut.flags = DagNodeFlags::default();
-        }
+      current_node_idx += 1;
+    } // end loop
 
-        current_node_idx += 1;
-      } // end loop
+    // initialize/reset
+    let current_node_mut = self.node_at(current_node_idx);
+    current_node_mut.args = null_mut();
+    self.next_node_idx = current_node_idx + 1;
 
-      // initialize/reset
-      let current_node_ptr = self.node_at(current_node_idx);
-      current_node_ptr.as_mut_unchecked().args = null_mut();
-      self.next_node_idx = current_node_idx + 1;
-
-    } // end of unsafe block
-
-    increment_active_node_count();
+    ACTIVE_NODE_COUNT.fetch_add(1, Relaxed);
     self.node_at(current_node_idx)
   }
 
@@ -211,7 +205,7 @@ impl NodeAllocator {
   }
 
   /// Allocate a new `DagNode` when the current arena is (almost) full. Returns the index into the current arena.
-  unsafe fn slow_new_dag_node(&mut self) -> usize {
+  fn slow_new_dag_node(&mut self) -> usize {
     #[cfg(feature = "gc_debug")]
     {
       debug!(2, "slow_new_dag_node()");
@@ -223,7 +217,7 @@ impl NodeAllocator {
         // Allocate the first arena
         self.allocate_new_arena();
         // The last arena in the linked list is given a reserve.
-        self.end_idx   = ARENA_SIZE - RESERVE_SIZE;
+        self.end_idx = ARENA_SIZE - RESERVE_SIZE;
 
         // These two members are initialized on first call to `NodeAllocator::sweep_arenas()`.
         // self.last_active_arena = arena;
@@ -249,7 +243,7 @@ impl NodeAllocator {
 
           self.current_arena_idx = self.arenas.len();
           self.allocate_new_arena();
-          self.end_idx   = ARENA_SIZE; // ToDo: Why no reserve here?
+          self.end_idx = ARENA_SIZE; // ToDo: Why no reserve here?
 
           // The index of the first node in the new arena
           return 0;
@@ -285,12 +279,11 @@ impl NodeAllocator {
 
       // Loop over all nodes from self.next_node_idx to self.end_idx
       for cursor_idx in self.next_node_idx..self.end_idx {
-        let cursor_ptr = arena.node_at_mut(cursor_idx);
-        let cursor_mut = cursor_ptr.as_mut_unchecked();
+        let cursor_mut = arena.node_at_mut(cursor_idx);
 
         if !cursor_mut.is_marked(){
           if cursor_mut.needs_destruction(){
-            drop_in_place(cursor_ptr);
+            cursor_mut.finalize_in_place();
           }
           return cursor_idx;
         }
@@ -302,15 +295,17 @@ impl NodeAllocator {
   }
 
   // The pub(super) is only for testing.
-  pub(super) unsafe fn collect_garbage(&mut self) {
+  pub(super) fn collect_garbage(&mut self) {
     static mut GC_COUNT: u64 = 0;
 
     if self.arenas.is_empty() {
       return;
     }
 
-    GC_COUNT += 1;
-    let gc_count = GC_COUNT; // To silence shared_mut_ref warning
+    let gc_count = unsafe {
+      GC_COUNT += 1;
+      GC_COUNT
+    };
     if self.show_gc {
       // We moved this up here so that it appears before the bucket storage statistics.
       println!("Collection: {}", gc_count);
@@ -322,7 +317,7 @@ impl NodeAllocator {
 
     // Mark phase
 
-    let old_active_node_count = active_node_count();
+    let old_active_node_count = ACTIVE_NODE_COUNT.load(Relaxed);
     ACTIVE_NODE_COUNT.store(0, Relaxed); // to be updated during mark phase.
 
     acquire_storage_allocator()._prepare_to_mark();
@@ -332,7 +327,7 @@ impl NodeAllocator {
     acquire_storage_allocator()._sweep_garbage();
 
     // Garbage Collection for Arenas
-    let active_node_count = active_node_count(); // updated during mark phase
+    let active_node_count = ACTIVE_NODE_COUNT.load(Relaxed); // updated during mark phase
 
     let node_capacity = self.arenas.len() * ARENA_SIZE;
 
@@ -389,15 +384,11 @@ impl NodeAllocator {
     self.current_arena_past_active_arena = false;
     self.current_arena_idx = 0;
     self.next_node_idx = 0;
-    match self.current_arena_idx == self.arenas.len() - 1 {
-      true => {
-        // The last arena in the linked list is given a reserve.
-        self.end_idx = ARENA_SIZE - RESERVE_SIZE;
-      },
-      false => {
-        self.end_idx = ARENA_SIZE;
-      }
-    }
+    // The last arena in the linked list is given a reserve.
+    self.end_idx = match self.current_arena_idx == self.arenas.len() - 1 {
+      true  => ARENA_SIZE - RESERVE_SIZE,
+      false => ARENA_SIZE
+    };
     self.need_to_collect_garbage = false;
 
     #[cfg(feature = "gc_debug")]
@@ -408,7 +399,7 @@ impl NodeAllocator {
   }
 
   /// Tidy up lazy sweep phase - clear marked flags and call dtors where necessary.
-  unsafe fn sweep_arenas(&mut self) {
+  fn sweep_arenas(&mut self) {
     #[cfg(feature = "gc_debug")]
     {
       debug!(2, "sweep_arenas()");
@@ -430,8 +421,7 @@ impl NodeAllocator {
         let end_node_idx = ARENA_SIZE;
 
         while node_cursor != end_node_idx {
-          let node_cursor_ptr = self.arenas[arena_cursor].node_at_mut(node_cursor);
-          let node_cursor_mut = node_cursor_ptr.as_mut_unchecked();
+          let node_cursor_mut = self.arenas[arena_cursor].node_at_mut(node_cursor);
 
           if node_cursor_mut.is_marked() {
             new_last_active_arena = arena_cursor;
@@ -440,7 +430,7 @@ impl NodeAllocator {
           }
           else {
             if node_cursor_mut.needs_destruction() {
-              drop_in_place(node_cursor_ptr);
+              node_cursor_mut.finalize_in_place();
             }
             node_cursor_mut.flags = DagNodeFlags::default();
           }
@@ -456,8 +446,7 @@ impl NodeAllocator {
       let end_node_idx = self.last_active_node_idx;
 
       while node_cursor <= end_node_idx {
-        let node_cursor_ptr = self.arenas[arena_cursor].node_at_mut(node_cursor);
-        let node_cursor_mut = node_cursor_ptr.as_mut_unchecked();
+        let node_cursor_mut = self.arenas[arena_cursor].node_at_mut(node_cursor);
 
         if node_cursor_mut.is_marked() {
           new_last_active_arena = arena_cursor;
@@ -466,7 +455,7 @@ impl NodeAllocator {
         }
         else {
           if node_cursor_mut.needs_destruction() {
-            drop_in_place(node_cursor_ptr);
+            node_cursor_mut.finalize_in_place();
           }
           node_cursor_mut.flags = DagNodeFlags::default();
         }
@@ -481,19 +470,15 @@ impl NodeAllocator {
 
   /// Verify that no `DagNode` objects within the arenas managed by the allocator are in a “marked” state.
   #[cfg(feature = "gc_debug")]
-  unsafe fn check_invariant(&self) {
+  fn check_invariant(&self) {
     for (arena_idx, arena) in self.arenas.iter().enumerate() {
-      let bound: usize =
-          match arena_idx == self.current_arena_idx {
-
-            true => self.next_node_idx,
-
-            false => ARENA_SIZE
-
-          };
+      let bound = match arena_idx == self.current_arena_idx {
+        true  => self.next_node_idx,
+        false => ARENA_SIZE
+      };
 
       for node_idx in 0..bound {
-        if arena.node_at(node_idx).as_ref_unchecked().is_marked() {
+        if arena.node_at(node_idx).is_marked() {
           debug!(2, "check_invariant() : MARKED DagNode! arena = {} node = {}", arena_idx, node_idx);
         }
       } // end loop over nodes
@@ -503,10 +488,10 @@ impl NodeAllocator {
   }
 
   #[cfg(feature = "gc_debug")]
-  unsafe fn check_arenas(&self) {
+  fn check_arenas(&self) {
     for (arena_idx, arena) in self.arenas.iter().enumerate() {
       for node_idx in 0..ARENA_SIZE {
-        if arena.node_at(node_idx).as_ref_unchecked().is_marked()  {
+        if arena.node_at(node_idx).is_marked()  {
           debug!(2, "check_arenas() : MARKED DagNode! arena = {} node = {}", arena_idx, node_idx);
         }
       } // end loop over nodes
@@ -565,17 +550,3 @@ impl NodeAllocator {
     eprintln!("╰─────────────────────────────────────────────╯");
   }
 }
-
-
-
-
-#[inline(always)]
-pub(crate) fn increment_active_node_count() {
-  ACTIVE_NODE_COUNT.fetch_add(1, Relaxed);
-}
-
-#[inline(always)]
-pub fn active_node_count() -> usize {
-  ACTIVE_NODE_COUNT.load(Relaxed)
-}
-

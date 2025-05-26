@@ -250,17 +250,16 @@ fn create_destroy_variable_dag_node() {
     {
       let node = VariableDagNode::new(symbol.as_ptr(), name.clone(), 0);
       println!("{}", node);
+      // Node goes out of scope. 
     }
     {
       let mut allocator = acquire_node_allocator("VariableDagNode finalizer test");
-      unsafe { allocator.collect_garbage() }
+      allocator.collect_garbage();
     }
-    {
-      // Create a dummy `DagNode` to force sweep
-      let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::None);
-      let dummy_node = FreeDagNode::new(dummy_symbol.as_ptr());
-      _ = dummy_node.len();
-    }
+    // Create a dummy `DagNode` to force lazy sweep
+    let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::None);
+    let dummy_node = FreeDagNode::new(dummy_symbol.as_ptr());
+    _ = dummy_node.len(); // Don't optimize away
 
     println!("{}", symbol);
   }

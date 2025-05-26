@@ -190,13 +190,13 @@ impl StorageAllocator {
   }
 
   /// Garbage Collection for Buckets, called after mark completes
-  pub(crate) unsafe fn _sweep_garbage(&mut self) {
+  pub(crate) fn _sweep_garbage(&mut self) {
     let mut maybe_bucket = self.bucket_list;
 
     // Reset all formerly active buckets
     self.unused_list = maybe_bucket;
     while let Some(mut bucket) = maybe_bucket {
-      let bucket_mut = bucket.as_mut();
+      let bucket_mut = unsafe{ bucket.as_mut() };
       bucket_mut.reset();
       maybe_bucket = bucket_mut.next_bucket;
     }
@@ -216,7 +216,7 @@ impl StorageAllocator {
         "Now (MB)"
       );
       info!(1,
-        "{:<10} {:<10} {:<10.2} {:<10} {:<13.2} {:<10} {:<10.2} {:<10.2}  {:<10.2}",
+        "{:<10} {:<10} {:<10.2} {:<10} {:<13.2} {:<10} {:<10.2} {:<10.2} {:<10.2}",
         self.bucket_count,
         self.total_bytes_allocated,
         (self.total_bytes_allocated as f64) / (1024.0 * 1024.0),

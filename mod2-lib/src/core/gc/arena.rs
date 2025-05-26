@@ -45,17 +45,13 @@ impl Arena {
   }
 
   #[inline(always)]
-  pub fn node_at(&self, idx: usize) -> *const DagNodeCore {
+  pub fn node_at(&self, idx: usize) -> &DagNodeCore {
     &self.data[idx]
   }
 
   #[inline(always)]
-  pub fn node_at_mut(&mut self, idx: usize) -> *mut DagNodeCore {
+  pub fn node_at_mut(&mut self, idx: usize) -> &mut DagNodeCore {
     &mut self.data[idx]
   }
-
-  #[inline(always)]
-  pub fn first_node_mut(&mut self) -> *mut DagNodeCore {
-    self.node_at_mut(0)
-  }
+  
 }

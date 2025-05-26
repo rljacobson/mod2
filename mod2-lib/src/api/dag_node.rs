@@ -17,33 +17,45 @@ use std::{
   any::Any,
   cmp::{max, Ordering},
   fmt::Display,
+  hash::{Hash, Hasher},
   iter::Iterator,
-  ops::Deref
+  ops::Deref,
+  sync::atomic::Ordering::Relaxed,
 };
-use std::hash::{Hash, Hasher};
 use mod2_abs::UnsafePtr;
-use crate::{api::{
-  symbol::SymbolPtr,
-  Arity,
-}, core::{
-  dag_node_core::{
-    DagNodeCore,
-    DagNodeFlag,
-    DagNodeFlags,
-    ThinDagNodePtr,
+use crate::{
+  api::{
+    symbol::SymbolPtr,
+    Arity,
+    term::Term
   },
-  format::{FormatStyle, Formattable},
-  gc::{
-    gc_vector::{GCVector, GCVectorRefMut},
-    increment_active_node_count,
+  core::{
+    dag_node_core::{
+      DagNodeCore,
+      DagNodeFlag,
+      DagNodeFlags,
+      ThinDagNodePtr
+    },
+    format::{
+      FormatStyle,
+      Formattable
+    },
+    gc::{
+      node_allocator::ACTIVE_NODE_COUNT,
+      gc_vector::{
+        GCVector,
+        GCVectorRefMut
+      }
+    },
+    sort::SortPtr
   },
-  sort::SortPtr,
-}, impl_display_debug_for_formattable, HashType};
-use crate::api::term::Term;
+  impl_display_debug_for_formattable,
+  HashType,
+};
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
-pub type DagNodePtr    = UnsafePtr<dyn DagNode + 'static>;
-pub type DagNodeVector = GCVector<DagNodePtr>;
+pub type DagNodePtr          = UnsafePtr<dyn DagNode + 'static>;
+pub type DagNodeVector       = GCVector<DagNodePtr>;
 pub type DagNodeVectorRefMut = GCVectorRefMut<DagNodePtr>;
 
 /// Commutative theories can have this more compact representation
@@ -378,7 +390,7 @@ pub trait DagNode {
       return;
     }
 
-    increment_active_node_count();
+    ACTIVE_NODE_COUNT.fetch_add(1, Relaxed);
     self.core_mut().flags.insert(DagNodeFlag::Marked);
 
     // The empty case
