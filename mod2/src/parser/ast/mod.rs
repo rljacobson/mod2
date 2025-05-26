@@ -110,29 +110,30 @@ RewriteCondition := Term RuleOp Term ;
 */
 
 use std::collections::hash_map::Entry;
-use mod2_abs::{heap_construct, HashMap, IString};
-
-mod module;
-mod term;
-mod sort;
-mod attribute;
-mod condition;
-mod symbol_decl;
-
-pub use module::*;
-pub use sort::*;
-pub use term::*;
-pub use attribute::*;
-pub use condition::*;
-pub use symbol_decl::*;
-
+use mod2_abs::{heap_construct, HashMap, IString, SmallVec};
 use mod2_lib::{
   api::{
     symbol::{Symbol, SymbolPtr},
     built_in::get_built_in_symbol,
     free_theory::FreeSymbol
-  }
+  },
+  core::sort::SortPtr
 };
+
+mod attribute;
+mod condition;
+mod module;
+mod sort;
+mod symbol_decl;
+mod term;
+
+pub use attribute::*;
+pub use condition::*;
+pub use module::*;
+pub use sort::*;
+pub use symbol_decl::*;
+pub use term::*;
+
 
 /// An item is anything that lives in a module.
 pub(crate) enum ItemAST {

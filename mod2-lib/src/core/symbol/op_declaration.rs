@@ -25,7 +25,7 @@ use mod2_abs::SmallVec;
 use crate::core::sort::SortPtr;
 
 
-pub type TypeSignature = SmallVec<[SortPtr; 1]>;
+pub type TypeSignature = SmallVec<SortPtr, 1>;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default)]
 #[repr(u8)]

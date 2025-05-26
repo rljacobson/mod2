@@ -1,56 +1,50 @@
 use std::{
-  cell::RefCell,
-  cmp::max,
   collections::hash_map::Entry,
-  rc::Rc,
+  ops::Deref
 };
-use std::ops::Deref;
-use mod2_abs::{HashMap, IString, rc_cell, RcCell, heap_construct, SmallVec, smallvec};
 
+use mod2_abs::{heap_construct, smallvec, HashMap, IString};
 use mod2_lib::{
   api::{
-    variable_theory::VariableSymbol,
     built_in::{
-      get_built_in_symbol,
-      get_built_in_sort,
-      Integer,
-      StringBuiltIn,
-      Float,
-      NaturalNumber,
-      Bool
+      BoolTerm,
+      FloatTerm,
+      IntegerTerm,
+      NaturalTerm,
+      StringTerm
+    },
+    free_theory::FreeSymbol,
+    symbol::{
+      Symbol,
+      SymbolPtr,
+    },
+    term::{BxTerm, Term},
+    variable_theory::{
+      VariableSymbol,
+      VariableTerm
     },
     Arity,
-    symbol::{
-      SymbolPtr,
-      Symbol,
-    },
-    free_theory::FreeSymbol
   },
   core::{
-    sort::{
-      collection::SortCollection,
-      SortPtr
-    },
-    symbol::{SymbolAttributes, SymbolType}
+    sort::collection::SortCollection,
+    symbol::{
+      OpDeclaration,
+      SymbolAttribute,
+      SymbolAttributes,
+      SymbolType,
+      TypeSignature
+    }
   },
 };
-use mod2_lib::api::built_in::{BoolTerm, FloatTerm, IntegerTerm, NaturalTerm, StringTerm};
-use mod2_lib::api::free_theory::FreeTerm;
-use mod2_lib::api::term::{BxTerm, Term, TermPtr};
-use mod2_lib::api::variable_theory::VariableTerm;
-use mod2_lib::core::symbol::{OpDeclaration, SymbolAttribute};
-use crate::{
-  parser::ast::{
-    attribute::AttributeAST,
-    BxSortIdAST,
-    BxSortSpecAST
-  }
+use crate::parser::ast::{
+  attribute::AttributeAST,
+  BxSortIdAST,
+  BxSortSpecAST
 };
 
 
 pub(crate) type BxVariableDeclarationAST = Box<VariableDeclarationAST>;
-pub(crate) type BxSymbolDeclarationAST = Box<SymbolDeclarationAST>;
-pub type TypeSignature = SmallVec<[SortPtr; 1]>;
+pub(crate) type BxSymbolDeclarationAST   = Box<SymbolDeclarationAST>;
 
 pub(crate) struct SymbolDeclarationAST {
   pub name      : IString,

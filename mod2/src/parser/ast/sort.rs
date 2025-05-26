@@ -1,20 +1,21 @@
 use mod2_abs::{smallvec, IString, SmallVec};
 use mod2_lib::{
+  api::{
+    built_in::Integer,
+    Arity
+  },
   core::{
     sort::{
       collection::SortCollection,
       SortPtr,
-    }
+    },
+    symbol::TypeSignature
   }
 };
-use mod2_lib::api::Arity;
-use mod2_lib::api::built_in::Integer;
 
 pub(crate) type BxFunctorSortAST = Box<FunctorSortAST>;
 pub(crate) type BxSortIdAST      = Box<SortIdAST>;
 pub(crate) type BxSortSpecAST    = Box<SortSpecAST>;
-
-type TypeSignature = SmallVec<[SortPtr; 1]>;
 
 pub(crate) enum SortSpecAST {
   Sort(BxSortIdAST),

@@ -20,25 +20,27 @@ use std::{
     Mutex,
     MutexGuard,
   },
-  ptr::drop_in_place,
+  ptr::{
+    drop_in_place,
+    null_mut
+  }
 };
-use std::ptr::null_mut;
 use once_cell::sync::Lazy;
 use mod2_abs::{debug, info};
 
 use crate::{
-  core::dag_node_core::{
-    ThinDagNodePtr,
-    DagNodeCore,
-    DagNodeFlag,
-    DagNodeFlags,
-  },
   core::{
+    dag_node_core::{
+      ThinDagNodePtr,
+      DagNodeCore,
+      DagNodeFlag,
+      DagNodeFlags,
+    },
     gc::{
       arena::Arena,
       storage_allocator::acquire_storage_allocator,
       root_container::mark_roots,
-    },
+    }
   }
 };
 
