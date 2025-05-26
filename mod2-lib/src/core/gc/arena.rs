@@ -18,13 +18,12 @@ use crate::{
 
 #[repr(align(8))]
 pub struct Arena {
-  pub(crate) next_arena: *mut Arena,
-  data: [DagNodeCore; ARENA_SIZE],
+  pub(crate) data: [DagNodeCore; ARENA_SIZE],
 }
 
 impl Arena {
   #[inline(always)]
-  pub fn allocate_new_arena() -> *mut Arena {
+  pub fn allocate_new_arena() -> Box<Arena> {
 
     // Create an uninitialized array
     let data: [MaybeUninit<DagNodeCore>; ARENA_SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -39,15 +38,24 @@ impl Arena {
     */
 
     let arena = Box::new(Arena{
-      next_arena: null_mut(),
-      data      : unsafe { std::mem::transmute::<_, [DagNodeCore; ARENA_SIZE]>(data) }
+      data: unsafe { std::mem::transmute::<_, [DagNodeCore; ARENA_SIZE]>(data) }
     });
 
-    Box::into_raw(arena)
+    arena
   }
 
   #[inline(always)]
-  pub fn first_node(&mut self) -> *mut DagNodeCore {
-    &mut self.data[0]
+  pub fn node_at(&self, idx: usize) -> *const DagNodeCore {
+    &self.data[idx]
+  }
+
+  #[inline(always)]
+  pub fn node_at_mut(&mut self, idx: usize) -> *mut DagNodeCore {
+    &mut self.data[idx]
+  }
+
+  #[inline(always)]
+  pub fn first_node_mut(&mut self) -> *mut DagNodeCore {
+    self.node_at_mut(0)
   }
 }

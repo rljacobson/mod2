@@ -223,11 +223,6 @@ impl DagNodeCore {
     self.flags.contains(DagNodeFlag::NeedsDestruction)
   }
 
-  #[inline(always)]
-  pub fn simple_reuse(&self) -> bool {
-    !self.flags.contains(DagNodeFlag::Marked) && !self.needs_destruction()
-  }
-
   //endregion
 
   /// Upgrades the thin pointer to a DagNodeCore object to a fat pointer to a concrete implementor of the `DagNode`

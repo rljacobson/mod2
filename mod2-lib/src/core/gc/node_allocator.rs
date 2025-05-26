@@ -83,21 +83,19 @@ pub fn allocate_dag_node() -> ThinDagNodePtr {
 
 
 pub(crate) struct NodeAllocator {
+  arenas : Vec<Box<Arena>>,
+  
   // General settings
-  show_gc   : bool, // Do we report GC stats to user
-
-  need_to_collect_garbage        : bool,
+  show_gc: bool, // Do we report GC stats to user
+  need_to_collect_garbage: bool,
 
   // Arena management variables
-  arena_count                    : u32,
   current_arena_past_active_arena: bool,
-  first_arena                    : *mut Arena,
-  last_arena                     : *mut Arena,
-  current_arena                  : *mut Arena,
-  next_node                      : *mut DagNodeCore,
-  end_pointer                    : *mut DagNodeCore,
-  last_active_arena              : *mut Arena,
-  last_active_node               : *mut DagNodeCore,
+  current_arena_idx              : usize,
+  next_node_idx                  : usize,
+  end_idx                        : usize,
+  last_active_arena_idx          : usize,
+  last_active_node_idx           : usize,
 }
 
 // Access is hidden behind a mutex.
@@ -107,30 +105,26 @@ unsafe impl Send for NodeAllocator {}
 impl NodeAllocator {
   pub fn new() -> Self {
     NodeAllocator {
-      show_gc    : true,
-      arena_count: 0,
+      arenas: vec![],
+      
+      show_gc: true,
+      need_to_collect_garbage: false,
 
       current_arena_past_active_arena: true,
-      need_to_collect_garbage        : false,
-
-      first_arena      : std::ptr::null_mut(),
-      last_arena       : std::ptr::null_mut(),
-      current_arena    : std::ptr::null_mut(),
-      next_node        : std::ptr::null_mut(),
-      end_pointer      : std::ptr::null_mut(),
-      last_active_arena: std::ptr::null_mut(),
-      last_active_node : std::ptr::null_mut(),
+      current_arena_idx              : 0,
+      next_node_idx                  : 0,
+      end_idx                        : 0,
+      last_active_arena_idx          : 0,
+      last_active_node_idx           : 0,
     }
   }
 
-  /// Tell the garbage collect to collect garbage if it needs to.
+  /// Tell the garbage collector to collect garbage if it needs to.
   /// You can query whether it needs to by calling `want_to_collect_garbage`,
   /// but this isn't necessary.
   #[inline(always)]
   pub fn ok_to_collect_garbage(&mut self) {
-    if self.need_to_collect_garbage
-        || acquire_storage_allocator().want_to_collect_garbage()
-    {
+    if self.need_to_collect_garbage {
       unsafe{ self.collect_garbage(); }
     }
   }
@@ -140,75 +134,66 @@ impl NodeAllocator {
   pub fn want_to_collect_garbage(&self) -> bool {
     self.need_to_collect_garbage
   }
+  
+  /// Get the given node at the current arena
+  #[inline(always)]
+  pub fn node_at(&mut self, idx: usize) -> ThinDagNodePtr {
+    let arena = self.arenas[self.current_arena_idx].as_mut();
+    arena.node_at_mut(idx)
+  }
 
   /// Allocates a new `DagNode`
-  pub fn allocate_dag_node(&mut self) -> *mut DagNodeCore {
-    // ToDo: I think we can replace these pointers with indices into the current arena's data array.
-    //       Includes next_node, end_pointer, end_node.
-    let mut current_node = self.next_node;
+  pub fn allocate_dag_node(&mut self) -> ThinDagNodePtr {
+    let mut current_node_idx = self.next_node_idx;
 
     unsafe{
       loop {
-        if (current_node.is_null() && self.end_pointer.is_null()) || current_node == self.end_pointer {
-          // Arena is full. Allocate a new one.
-          current_node = self.slow_new_dag_node();
+        if current_node_idx == self.end_idx {
+          // Arena is full or no arena has been allocated. Allocate a new one.
+          current_node_idx = self.slow_new_dag_node();
           break;
         }
 
         { // Scope of `current_node_mut: &mut DagNode`
-          let current_node_mut = current_node.as_mut_unchecked();
-          if current_node_mut.simple_reuse() {
-            break;
-          }
+          let current_node_mut = self.node_at(current_node_idx).as_mut_unchecked();
           if !current_node_mut.is_marked() {
-            // Not marked, but needs destruction because it's not simple reuse.
-            drop_in_place(current_node_mut);
+            if current_node_mut.needs_destruction() {
+              drop_in_place(current_node_mut);
+            }
             break;
           }
-          // current_node_mut.flags.remove(DagNodeFlag::Marked);
-          current_node_mut.flags = DagNodeFlags::default();
+          current_node_mut.flags.remove(DagNodeFlag::Marked);
+          // current_node_mut.flags = DagNodeFlags::default();
         }
 
-        current_node = current_node.add(1);
+        current_node_idx += 1;
       } // end loop
 
-      current_node.as_mut_unchecked().args = null_mut();
-      self.next_node = current_node.add(1);
+      // initialize/reset
+      let current_node_ptr = self.node_at(current_node_idx);
+      current_node_ptr.as_mut_unchecked().args = null_mut();
+      self.next_node_idx = current_node_idx + 1;
+      
     } // end of unsafe block
 
     increment_active_node_count();
-    current_node
+    self.node_at(current_node_idx)
   }
 
 
   /// Allocates a new arena, adding it to the linked list of arenas, and
   /// returns (a pointer to) the new arena.
-  unsafe fn allocate_new_arena(&mut self) -> *mut Arena {
+  fn allocate_new_arena(&mut self) {
     #[cfg(feature = "gc_debug")]
     {
       debug!(2, "allocate_new_arena()");
       self.dump_memory_variables();
     }
-
-    let arena = Arena::allocate_new_arena();
-    match self.last_arena.as_mut() {
-      None => {
-        // Allocating the first arena
-        self.first_arena = arena;
-      }
-      Some(last_arena) => {
-        last_arena.next_arena = arena;
-      }
-    }
-
-    self.last_arena = arena;
-    self.arena_count += 1;
-
-    arena
+    self.arenas.push(Arena::allocate_new_arena());
   }
 
-  /// Allocate a new `DagNode` when the current arena is (almost) full.
-  unsafe fn slow_new_dag_node(&mut self) -> *mut DagNodeCore {
+  /// Allocate a new `DagNode` when the current arena is (almost) full. Returns the index into the current arena.
+  unsafe fn slow_new_dag_node(&mut self) -> usize {
     #[cfg(feature = "gc_debug")]
     {
       debug!(2, "slow_new_dag_node()");
@@ -216,64 +201,58 @@ impl NodeAllocator {
     }
 
     loop {
-      if self.current_arena.is_null() {
+      if self.arenas.is_empty() {
         // Allocate the first arena
-        self.current_arena = self.allocate_new_arena();
-        let arena          = self.current_arena.as_mut_unchecked();
-        let first_node     = arena.first_node();
+        self.allocate_new_arena();
         // The last arena in the linked list is given a reserve.
-        self.end_pointer   = first_node.add(ARENA_SIZE - RESERVE_SIZE);
+        self.end_idx   = ARENA_SIZE - RESERVE_SIZE;
 
         // These two members are initialized on first call to `NodeAllocator::sweep_arenas()`.
         // self.last_active_arena = arena;
         // self.last_active_node  = first_node;
 
-        return first_node;
+        // The index of the first node in the new arena. Note that `self.current_arena_idx` is already `0`.
+        return 0;
       }
 
-      // Checked for null above.
-      let current_arena = self.current_arena.as_mut_unchecked();
-      let arena         = current_arena.next_arena;
-
-      if arena.is_null() {
+      // If the current arena is the last one
+      if self.current_arena_idx == self.arenas.len() - 1 {
         self.need_to_collect_garbage = true;
-        let end_node = current_arena.first_node().add(ARENA_SIZE);
 
-        if self.end_pointer != end_node {
+        if self.end_idx != ARENA_SIZE {
           // Use up the reserve
-          self.next_node   = self.end_pointer; // Next node is invalid where we are called.
-          self.end_pointer = end_node;
+          self.next_node_idx = self.end_idx; // Next node is invalid where we are called.
+          self.end_idx       = ARENA_SIZE;
         } else {
           // Allocate a new arena
-          if self.current_arena == self.last_active_arena {
+          if self.current_arena_idx == self.last_active_arena_idx {
             self.current_arena_past_active_arena = true;
           }
 
-          self.current_arena = self.allocate_new_arena();
-          let arena          = self.current_arena.as_mut_unchecked();
-          let first_node     = arena.first_node();
-          self.end_pointer   = first_node.add(ARENA_SIZE); // ToDo: Why no reserve here?
+          self.current_arena_idx = self.arenas.len(); 
+          self.allocate_new_arena();
+          self.end_idx   = ARENA_SIZE; // ToDo: Why no reserve here?
 
-          return first_node;
+          // The index of the first node in the new arena
+          return 0;
         }
-      } // end if arena.is_null()
+      } // end if current arena is last
       else {
         // Use next arena
-        if self.current_arena == self.last_active_arena {
+        if self.current_arena_idx == self.last_active_arena_idx {
           self.current_arena_past_active_arena = true;
         }
 
-        self.current_arena = arena;
-        let current_arena  = arena.as_mut_unchecked();
-        self.next_node     = current_arena.first_node();
+        self.current_arena_idx += 1;
+        self.next_node_idx = 0;
 
-        match current_arena.next_arena.is_null() {
+        match self.current_arena_idx == self.arenas.len() - 1 {
           true => {
             // The last arena in the linked list is given a reserve.
-            self.end_pointer = self.next_node.add(ARENA_SIZE - RESERVE_SIZE);
+            self.end_idx = ARENA_SIZE - RESERVE_SIZE;
           }
           false => {
-            self.end_pointer = self.next_node.add(ARENA_SIZE);
+            self.end_idx = ARENA_SIZE;
           }
         }
       }
@@ -284,23 +263,22 @@ impl NodeAllocator {
       // Now execute lazy sweep to actually find a free location. Note that this is the same code as in
       // `allocate_dag_node`, except there is no `slow_new_dag_node` case.
 
-      let end_node   = self.end_pointer;
-      let mut cursor = self.next_node;
-      // Loop over all nodes from self.next_node to self.end_pointer
-      while cursor != end_node {
-        let cursor_mut = cursor.as_mut_unchecked();
+      let arena = self.arenas[self.current_arena_idx].as_mut();
 
-        if cursor_mut.simple_reuse(){
-          return cursor;
-        }
-        if !cursor_mut.is_marked() {
-          drop_in_place(cursor_mut);
-          return cursor;
+      // Loop over all nodes from self.next_node_idx to self.end_idx
+      for cursor_idx in self.next_node_idx..self.end_idx {
+        let cursor_ptr = arena.node_at_mut(cursor_idx);
+        let cursor_mut = cursor_ptr.as_mut_unchecked();
+
+        if !cursor_mut.is_marked(){
+          if cursor_mut.needs_destruction(){
+            drop_in_place(cursor_ptr);
+          }
+          return cursor_idx;
         }
 
         cursor_mut.flags.remove(DagNodeFlag::Marked);
 
-        cursor = cursor.add(1);
       } // end loop over all nodes
     } // end outermost loop
   }
@@ -309,7 +287,7 @@ impl NodeAllocator {
   pub(super) unsafe fn collect_garbage(&mut self) {
     static mut GC_COUNT: u64 = 0;
 
-    if self.first_arena.is_null() {
+    if self.arenas.is_empty() {
       return;
     }
 
@@ -338,19 +316,9 @@ impl NodeAllocator {
     // Garbage Collection for Arenas
     let active_node_count = active_node_count(); // updated during mark phase
 
-    let node_capacity = (self.arena_count as usize) * ARENA_SIZE;
+    let node_capacity = self.arenas.len() * ARENA_SIZE;
 
     if self.show_gc {
-      // println!(
-      //   "Arenas: {}\tNodes: {} ({:.2} MB)\tCollected: {} ({:.2}) MB\tNow: {} ({:.2} MB)",
-      //   self.arena_count,
-      //   node_capacity,
-      //   ((node_capacity * size_of::<DagNode>()) as f64) / (1024.0 * 1024.0),
-      //   old_active_node_count - active_node_count,
-      //   (((old_active_node_count - active_node_count) * size_of::<DagNode>() ) as f64) / (1024.0 * 1024.0),
-      //   active_node_count,
-      //   ((active_node_count * size_of::<DagNode>()) as f64) / (1024.0 * 1024.0),
-      // );
       info!(1,
         "{:<10} {:<10} {:<10} {:<10} {:<13} {:<10} {:<10} {:<10} {:<10}",
         "Arenas",
@@ -365,7 +333,7 @@ impl NodeAllocator {
       );
       info!(1,
         "{:<10} {:<10} {:<10.2} {:<10} {:<13.2} {:<10} {:<10.2} {:<10} {:<10.2}",
-        self.arena_count,
+        self.arenas.len(),
         node_capacity,
         ((node_capacity * size_of::<DagNodeCore>()) as f64) / (1024.0 * 1024.0),
         old_active_node_count,
@@ -391,28 +359,25 @@ impl NodeAllocator {
     }
 
     // Allocate new arenas so that we have capacity for at least slop_factor times the actually used nodes.
-    let ideal_arena_count = (active_node_count as f64 * slop_factor / (ARENA_SIZE as f64)).ceil() as u32;
+    let ideal_arena_count = (active_node_count as f64 * slop_factor / (ARENA_SIZE as f64)).ceil() as usize;
 
     #[cfg(feature = "gc_debug")]
     debug!(2, "ideal_arena_count: {}", ideal_arena_count);
-    while self.arena_count < ideal_arena_count {
+    while self.arenas.len() < ideal_arena_count {
       self.allocate_new_arena();
     }
 
     // Reset state variables
     self.current_arena_past_active_arena = false;
-    self.current_arena = self.first_arena;
-    { // Scope of current_arena
-      let current_arena = self.current_arena.as_mut_unchecked();
-      self.next_node = current_arena.first_node();
-      match current_arena.next_arena.is_null() {
-        true => {
-          // The last arena in the linked list is given a reserve.
-          self.end_pointer = self.next_node.add(ARENA_SIZE - RESERVE_SIZE);
-        },
-        false => {
-          self.end_pointer = self.next_node.add(ARENA_SIZE);
-        }
+    self.current_arena_idx = 0;
+    self.next_node_idx = 0;
+    match self.current_arena_idx == self.arenas.len() - 1 {
+      true => {
+        // The last arena in the linked list is given a reserve.
+        self.end_idx = ARENA_SIZE - RESERVE_SIZE;
+      },
+      false => {
+        self.end_idx = ARENA_SIZE;
       }
     }
     self.need_to_collect_garbage = false;
@@ -432,124 +397,103 @@ impl NodeAllocator {
       self.dump_memory_variables();
     }
 
-    let mut new_last_active_arena = self.current_arena;
+    let mut new_last_active_arena = self.current_arena_idx;
     // self.next_node never points to first node, so subtract 1.
-    let mut new_last_active_node  = self.next_node.sub(1);
+    let mut new_last_active_node  = self.next_node_idx - 1;
 
     // `NodeAllocator::current_arena_past_active_arena` is initialized to `true`, so this whole method
-    // effectively just initializes `last_active_arena` and `last_active_node`.
+    // effectively just initializes `last_active_arena_idx` and `last_active_node_idx`.
     if !self.current_arena_past_active_arena {
       // First tidy arenas from current up to last_active.
-      let mut node_cursor_ptr: *mut DagNodeCore = self.next_node;
-      let mut arena_cursor: *mut Arena = self.current_arena;
+      let mut node_cursor  = self.next_node_idx;
+      let mut arena_cursor = self.current_arena_idx;
 
-      while arena_cursor != self.last_active_arena {
-        let end_node_ptr = arena_cursor.as_mut_unchecked().first_node().add(ARENA_SIZE);
+      while arena_cursor != self.last_active_arena_idx {
+        let end_node_idx = ARENA_SIZE;
 
-        while node_cursor_ptr != end_node_ptr {
+        while node_cursor != end_node_idx {
+          let node_cursor_ptr = self.arenas[arena_cursor].node_at_mut(node_cursor);
           let node_cursor_mut = node_cursor_ptr.as_mut_unchecked();
 
           if node_cursor_mut.is_marked() {
             new_last_active_arena = arena_cursor;
-            new_last_active_node  = node_cursor_ptr;
+            new_last_active_node  = node_cursor;
             node_cursor_mut.flags.remove(DagNodeFlag::Marked);
           }
           else {
             if node_cursor_mut.needs_destruction() {
               drop_in_place(node_cursor_ptr);
             }
-            node_cursor_mut.flags = DagNodeFlags::empty();
+            node_cursor_mut.flags = DagNodeFlags::default();
           }
 
-          node_cursor_ptr = node_cursor_ptr.add(1);
+          node_cursor += 1;
         } // end loop over nodes
 
-        arena_cursor    = arena_cursor.as_mut_unchecked().next_arena;
-        node_cursor_ptr = arena_cursor.as_mut_unchecked().first_node();
-
+        arena_cursor += 1;
+        node_cursor = 0;
       } // end loop over arenas
 
-      // Now tidy last_active_arena from d upto and including last_active_node.
-      let end_node_ptr = self.last_active_node;
+      // Now tidy last_active_arena from d up to and including last_active_node_idx.
+      let end_node_idx = self.last_active_node_idx;
 
-      while node_cursor_ptr <= end_node_ptr {
-        let d_mut = node_cursor_ptr.as_mut_unchecked();
+      while node_cursor <= end_node_idx {
+        let node_cursor_ptr = self.arenas[arena_cursor].node_at_mut(node_cursor);
+        let node_cursor_mut = node_cursor_ptr.as_mut_unchecked();
 
-        if d_mut.is_marked() {
+        if node_cursor_mut.is_marked() {
           new_last_active_arena = arena_cursor;
-          new_last_active_node  = node_cursor_ptr;
-          d_mut.flags.remove(DagNodeFlag::Marked);
+          new_last_active_node  = node_cursor;
+          node_cursor_mut.flags.remove(DagNodeFlag::Marked);
         }
         else {
-          if d_mut.needs_destruction() {
+          if node_cursor_mut.needs_destruction() {
             drop_in_place(node_cursor_ptr);
           }
-          d_mut.flags = DagNodeFlags::empty();
+          node_cursor_mut.flags = DagNodeFlags::default();
         }
 
-        node_cursor_ptr = node_cursor_ptr.add(1);
-      } // end loop overactive nodes
+        node_cursor += 1;
+      } // end loop over active nodes
     }
 
-    self.last_active_arena = new_last_active_arena;
-    self.last_active_node  = new_last_active_node;
+    self.last_active_arena_idx = new_last_active_arena;
+    self.last_active_node_idx  = new_last_active_node;
   }
 
   /// Verify that no `DagNode` objects within the arenas managed by the allocator are in a “marked” state.
   #[cfg(feature = "gc_debug")]
   unsafe fn check_invariant(&self) {
-    let mut arena     = self.first_arena;
-    let mut arena_idx = 0u32;
-
-    while !arena.is_null() {
-      let arena_mut = arena.as_mut_unchecked();
-      let mut d     = arena_mut.first_node();
-
+    for (arena_idx, arena) in self.arenas.iter().enumerate() {
       let bound: usize =
-          match arena == self.current_arena {
+          match arena_idx == self.current_arena_idx {
 
-            true => {
-              ((self.next_node as isize - d as isize) / size_of::<DagNodeCore>() as isize) as usize
-            },
+            true => self.next_node_idx,
 
             false => ARENA_SIZE
 
           };
 
       for node_idx in 0..bound {
-        if d.as_ref_unchecked().is_marked() {
+        if arena.node_at(node_idx).as_ref_unchecked().is_marked() {
           debug!(2, "check_invariant() : MARKED DagNode! arena = {} node = {}", arena_idx, node_idx);
         }
-        d = d.add(1);
       } // end loop over nodes
 
-      if arena == self.current_arena { break; }
-
-      arena = arena_mut.next_arena;
-      arena_idx += 1;
+      if arena_idx == self.current_arena_idx { break; }
     } // end loop over arenas
   }
 
   #[cfg(feature = "gc_debug")]
   unsafe fn check_arenas(&self) {
-    let mut arena     = self.first_arena;
-    let mut arena_idx = 0u32;
-
-    while !arena.is_null() {
-      let arena_mut = arena.as_mut_unchecked();
-      let mut d     = arena_mut.first_node();
-
+    for (arena_idx, arena) in self.arenas.iter().enumerate() {
       for node_idx in 0..ARENA_SIZE {
-        if d.as_ref_unchecked().is_marked() {
+        if arena.node_at(node_idx).as_ref_unchecked().is_marked()  {
           debug!(2, "check_arenas() : MARKED DagNode! arena = {} node = {}", arena_idx, node_idx);
         }
-        d = d.add(1);
       } // end loop over nodes
 
-      if arena == self.current_arena { break; }
-
-      arena = arena_mut.next_arena;
-      arena_idx += 1;
+      if arena_idx == self.current_arena_idx { break; }
     } // end loop over arenas
   }
 
@@ -562,7 +506,7 @@ impl NodeAllocator {
     eprintln!("╭─────────────────────────────────────────────╮");
     eprintln!("│{:<32} {:>12}│", "Variable", "Value");
     eprintln!("├─────────────────────────────────────────────┤");
-    eprintln!("│{:<32} {:>12}│", "arena_count", self.arena_count);
+    eprintln!("│{:<32} {:>12}│", "arena_count", self.arenas.len());
     eprintln!("│{:<32} {:>12}│", "active_node_count", ACTIVE_NODE_COUNT.load(Relaxed));
     eprintln!("│{:<32} {:>12}│", "need_to_collect_garbage", self.need_to_collect_garbage);
     eprintln!(
@@ -576,75 +520,32 @@ impl NodeAllocator {
       self.current_arena_past_active_arena
     );
     eprintln!(
-      "│{:<32} {:>12p}│",
-      "first_arena",
-      self.first_arena
-    );
-    eprintln!(
-      "│{:<32} {:>12p}│",
-      "last_arena",
-      self.last_arena
-    );
-    eprintln!(
-      "│{:<32} {:>12p}│",
+      "│{:<32} {:>12}│",
       "current_arena",
-      self.current_arena
+      self.current_arena_idx
     );
     eprintln!(
-      "│{:<32} {:>12p}│",
+      "│{:<32} {:>12}│",
       "next_node",
-      self.next_node
+      self.next_node_idx
     );
     eprintln!(
-      "│{:<32} {:>12p}│",
+      "│{:<32} {:>12}│",
       "end_pointer",
-      self.end_pointer
+      self.end_idx
     );
     eprintln!(
-      "│{:<32} {:>12p}│",
+      "│{:<32} {:>12}│",
       "last_active_arena",
-      self.last_active_arena
+      self.last_active_arena_idx
     );
     eprintln!(
-      "│{:<32} {:>12p}│",
+      "│{:<32} {:>12}│",
       "last_active_node",
-      self.last_active_node
+      self.last_active_node_idx
     );
     eprintln!("╰─────────────────────────────────────────────╯");
   }
-/*  pub fn dump_memory_variables(&self) {
-    let bucket_needs_collection = acquire_storage_allocator().want_to_collect_garbage();
-    eprintln!("--------------------------------------");
-    eprintln!(
-      "\tarena_count = {}\n\
-            \tactive_node_count = {}\n\
-            \tneed_to_collect_garbage = {}\n\
-            \tneed_to_collect_storage = {}\n\
-            \tcurrent_arena_past_active_arena = {}\n\
-            \tneed_to_collect_garbage = {}\n\
-            \tfirst_arena = {:p}\n\
-            \tlast_arena = {:p}\n\
-            \tcurrent_arena = {:p}\n\
-            \tnext_node = {:p}\n\
-            \tend_pointer = {:p}\n\
-            \tlast_active_arena = {:p}\n\
-            \tlast_active_node = {:p}",
-      self.arena_count,
-      ACTIVE_NODE_COUNT.load(Relaxed),
-      self.need_to_collect_garbage,
-      bucket_needs_collection,
-      self.current_arena_past_active_arena,
-      self.need_to_collect_garbage,
-      self.first_arena,
-      self.last_arena,
-      self.current_arena,
-      self.next_node,
-      self.end_pointer,
-      self.last_active_arena,
-      self.last_active_node
-    );
-  }*/
-
 }
 
 
