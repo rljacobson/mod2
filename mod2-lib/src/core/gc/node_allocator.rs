@@ -308,7 +308,7 @@ impl NodeAllocator {
     };
     if self.show_gc {
       // We moved this up here so that it appears before the bucket storage statistics.
-      println!("Collection: {}", gc_count);
+      println!("Collection {}", gc_count);
     }
 
     self.sweep_arenas();

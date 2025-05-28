@@ -24,33 +24,43 @@ use std::{
   mem::transmute
 };
 
-use mod2_abs::{as_bytes, debug, IString};
-use mod2_abs::hash::hash2;
-use crate::{core::{
-  gc::allocate_dag_node,
-  dag_node_core::{
-    DagNodeCore,
-    DagNodeFlags,
-    DagNodeFlag,
-    ThinDagNodePtr
+use mod2_abs::{
+  as_bytes,
+  debug,
+  IString,
+  hash::hash2
+};
+use crate::{
+  core::{
+    dag_node_core::{
+      DagNodeCore,
+      DagNodeFlags,
+      DagNodeFlag,
+      ThinDagNodePtr
+    },
+    gc::allocate_dag_node,
+    EquationalTheory,
   },
-  EquationalTheory
-}, api::{
-  symbol::SymbolPtr,
-  dag_node::{
-    DagNodeVector,
-    DagNodeVectorRefMut,
-    DagNode,
-    DagNodePtr,
-    arg_to_dag_node,
-    arg_to_node_vec
+  api::{
+    dag_node::{
+      DagNode,
+      DagNodeVectorRefMut,
+      DagNodeVector,
+      DagNodePtr,
+      arg_to_dag_node,
+      arg_to_node_vec
+    },
+    symbol::SymbolPtr,
+    Arity
   },
-  Arity
-}, HashType};
+  HashType,
+};
+
 
 /// The index into `DagNodeCode::inline` at which we store the `index` of `VariableDagNode`.
 const VARIABLE_INDEX_OFFSET: usize = size_of::<IString>();
 
+#[repr(transparent)]
 pub struct VariableDagNode(DagNodeCore);
 
 impl VariableDagNode {

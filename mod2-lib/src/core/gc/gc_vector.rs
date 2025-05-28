@@ -81,7 +81,6 @@ impl<T: Copy + 'static> GCVector<T> {
   pub fn copy_with_capacity(&self, new_capacity: usize) -> GCVectorRefMut<T> {
     if new_capacity > self.capacity {
       let new_vector_mut: GCVectorRefMut<T> = GCVector::with_capacity(new_capacity);
-
       new_vector_mut.length = self.length;
 
       for i in 0..self.length {
@@ -94,7 +93,6 @@ impl<T: Copy + 'static> GCVector<T> {
       // To keep things simple, we copy everything up to `new_capacity` even if
       // `length` is shorter.
       let new_vector = GCVector::from_slice(&self.data[0..new_capacity]);
-
       new_vector.length = min(self.length, new_capacity);
 
       new_vector

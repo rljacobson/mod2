@@ -21,41 +21,49 @@ use std::{
     Ordering
   },
   ops::DerefMut,
-  mem::transmute
+  mem::transmute,
+  marker::PhantomData
 };
-use std::marker::PhantomData;
-use mod2_abs::{as_bytes, IString};
-use mod2_abs::hash::hash2;
-use crate::{core::{
-  dag_node_core::{
-    DagNodeCore,
-    DagNodeFlags,
-    DagNodeFlag,
-    ThinDagNodePtr
+use mod2_abs::{
+  as_bytes,
+  IString,
+  hash::hash2
+};
+use crate::{
+  core::{
+    dag_node_core::{
+      DagNodeFlags,
+      DagNodeCore,
+      DagNodeFlag,
+      ThinDagNodePtr
+    },
+    EquationalTheory,
+    gc::allocate_dag_node
   },
-  EquationalTheory,
-  gc::allocate_dag_node,
-}, api::{
-  Arity,
-  built_in::{
-    NADataType,
-    Float,
-    Integer,
-    NaturalNumber,
-    Bool,
-    StringBuiltIn,
-    get_built_in_symbol,
+  api::{
+    built_in::{
+      NaturalNumber,
+      NADataType,
+      Float,
+      Integer,
+      Bool,
+      StringBuiltIn,
+      get_built_in_symbol
+    },
+    Arity,
+    dag_node::{
+      DagNodeVectorRefMut,
+      DagNodeVector,
+      DagNode,
+      DagNodePtr,
+      arg_to_dag_node,
+      arg_to_node_vec
+    },
+    symbol::SymbolPtr
   },
-  dag_node::{
-    DagNodeVector,
-    DagNodeVectorRefMut,
-    DagNode,
-    DagNodePtr,
-    arg_to_dag_node,
-    arg_to_node_vec
-  },
-  symbol::SymbolPtr,
-}, HashType};
+  HashType
+};
+
 
 pub type BoolDagNode    = NADagNode<Bool>;
 pub type FloatDagNode   = NADagNode<Float>;
@@ -63,6 +71,7 @@ pub type IntegerDagNode = NADagNode<Integer>;
 pub type StringDagNode  = NADagNode<String>;
 pub type NaturalNumberDagNode = NADagNode<NaturalNumber>;
 
+#[repr(transparent)]
 pub struct NADagNode<T: NADataType>(DagNodeCore, PhantomData<T>);
 impl<T: NADataType> NADagNode<T> {
   pub fn value(&self) -> T {

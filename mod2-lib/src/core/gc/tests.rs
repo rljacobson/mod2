@@ -10,21 +10,36 @@ use crate::{
       root_container::RootContainer,
       node_allocator::acquire_node_allocator
     },
-    dag_node_core::{DagNodeCore, ThinDagNodePtr},
-    symbol::{SymbolAttributes, SymbolType},
+    dag_node_core::{
+      DagNodeCore,
+      ThinDagNodePtr
+    },
+    symbol::{
+      SymbolAttributes,
+      SymbolType
+    },
+    EquationalTheory
   },
   api::{
-    dag_node::{DagNode, DagNodePtr},
-    free_theory::{FreeDagNode, FreeSymbol},
+    dag_node::{
+      DagNode,
+      DagNodePtr
+    },
+    free_theory::{
+      FreeDagNode,
+      FreeSymbol
+    },
     symbol::{
       Symbol,
       SymbolPtr
     },
-    Arity
-  },
+    Arity,
+    variable_theory::{
+      VariableDagNode, 
+      VariableSymbol
+    }
+  }
 };
-use crate::api::variable_theory::{VariableDagNode, VariableSymbol};
-use crate::core::EquationalTheory;
 
 // ToDo: Figure out why multithreading breaks the tests.
 // Force GC tests to run serially for consistent behavior.

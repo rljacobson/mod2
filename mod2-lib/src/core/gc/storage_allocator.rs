@@ -8,7 +8,7 @@ The Bucket allocator manages memory by organizing it into buckets, each containi
 can be allocated in smaller chunks. When a program requests memory, the allocator first searches the
 in-use buckets for a free chunk. In the typical case, the current active bucket has the capacity to
 allocate the requested chunk, and so the allocator acts as a "bump" allocator. If no suitable space
-is found, it checks unused buckets (if any exist) or allocates new ones to accommodate the request.
+is found, it checks unused buckets (if any exist) or allocates a new one to accommodate the request.
 
 The garbage collection process in the bucket allocator follows a mark-and-sweep pattern
 with a copying strategy. During the mark phase, the allocator traverses the live data
@@ -44,36 +44,43 @@ use crate::{
 
 
 /// To determine bucket size for huge allocations
-const BUCKET_MULTIPLIER    : usize = 8;              
+const BUCKET_MULTIPLIER: usize = 8;
 /// Bucket size for normal allocations
-const MIN_BUCKET_SIZE      : usize = 256 * 1024 - 8; 
+const MIN_BUCKET_SIZE  : usize = 256 * 1024 - 8;
 /// Just under 8/9 of MIN_BUCKET_SIZE
-const INITIAL_TARGET       : usize = 220 * 1024;     
-const TARGET_MULTIPLIER    : usize = 8;
+const INITIAL_TARGET   : usize = 220 * 1024;
+const TARGET_MULTIPLIER: usize = 8;
 
 static GLOBAL_STORAGE_ALLOCATOR: Lazy<Mutex<StorageAllocator>> = Lazy::new(|| {
   Mutex::new(StorageAllocator::new())
 });
-
 
 pub fn acquire_storage_allocator()  -> MutexGuard<'static, StorageAllocator> {
   GLOBAL_STORAGE_ALLOCATOR.lock().unwrap()
 }
 
 pub struct StorageAllocator {
-  // General settings
-  show_gc_statistics: bool, // Do we report GC stats to user
+  /// Buckets in use
+  buckets_in_use: Vec<Bucket>,
+  /// Unused buckets
+  unused_buckets: Vec<Bucket>,
 
+  /// Buckets in use during mark phase
+  buckets_being_marked: Vec<Bucket>,
+
+  // General settings
+  show_gc: bool, // Do we report GC stats to user
   need_to_collect_garbage: bool,
 
   // Bucket management variables
-  bucket_count  : u32,    // Total number of buckets
-  bucket_list   : Option<NonNull<Bucket>>, // Linked list of "in use" buckets
-  unused_list   : Option<NonNull<Bucket>>, // Linked list of unused buckets
-  storage_in_use: usize,  // Amount of bucket storage in use (bytes)
-  total_bytes_allocated: usize,  // Total amount of bucket storage (bytes)
-  old_storage_in_use   : usize, // A temporary to remember storage use prior to GC.
-  target        : usize,  // Amount to use before GC (bytes)
+  /// Amount of bucket storage in use (bytes)
+  storage_in_use       : usize,
+  /// Total amount of bucket storage (bytes)
+  total_bytes_allocated: usize,
+  /// A temporary to remember storage use prior to GC
+  old_storage_in_use   : usize,
+  /// Amount of storage in use before GC (bytes)
+  target               : usize,
 }
 
 // Access is hidden behind a mutex.
@@ -83,17 +90,17 @@ unsafe impl Send for StorageAllocator {}
 impl StorageAllocator {
   pub fn new() -> Self {
     StorageAllocator {
-      show_gc_statistics: true,
+      buckets_in_use: vec![],
+      unused_buckets: vec![],
+      buckets_being_marked: vec![],
 
+      show_gc: true,
       need_to_collect_garbage: false,
 
-      bucket_count  : 0,
-      bucket_list   : None,
-      unused_list   : None,
-      storage_in_use: 0,
+      storage_in_use       : 0,
       total_bytes_allocated: 0,
       old_storage_in_use   : 0,
-      target        : INITIAL_TARGET,
+      target               : INITIAL_TARGET,
     }
   }
 
@@ -112,97 +119,77 @@ impl StorageAllocator {
       self.need_to_collect_garbage = true;
     }
 
-    let mut b = self.bucket_list;
-
-    while let Some(mut bucket) = b {
-      let bucket = unsafe{ bucket.as_mut() };
-
-      if bucket.bytes_free >= bytes_needed {
+    for bucket in self.buckets_in_use.iter_mut() {
+      if bucket.bytes_free() >= bytes_needed {
         return bucket.allocate(bytes_needed);
       }
-
-      b = bucket.next_bucket;
     }
 
     // No space in any bucket, so we need to allocate a new one.
-    unsafe{ self.slow_allocate_storage(bytes_needed) }
+    self.slow_allocate_storage(bytes_needed)
   }
 
   /// Allocates the given number of bytes by creating more bucket storage.
-  unsafe fn slow_allocate_storage(&mut self, bytes_needed: usize) -> *mut u8 {
+  fn slow_allocate_storage(&mut self, bytes_needed: usize) -> *mut u8 {
     #[cfg(feature = "gc_debug")]
     {
       debug!(2, "slow_allocate_storage()");
     }
-    // Loop through the bucket list
-    let mut prev_bucket: Option<NonNull<Bucket>> = None;
-    let mut maybe_bucket = self.unused_list;
 
-    while let Some(mut bucket) = maybe_bucket {
-      let bucket_mut = bucket.as_mut();
+    // Find an unused bucket with enough storage for the allocation
+    if let Some(bucket_idx) = self.unused_buckets.iter().position(|bucket| bucket.bytes_free() >= bytes_needed) {
+      // Remove from unused list
+      let mut bucket = self.unused_buckets.swap_remove(bucket_idx);
 
-      if bucket_mut.bytes_free >= bytes_needed {
-        // Move bucket from unused list to in use list
+      // Allocate storage from bucket
+      let allocation = bucket.allocate(bytes_needed);
+      // Place bucket in used list
+      self.buckets_in_use.push(bucket);
 
-        if let Some(mut prev_bucket) = prev_bucket {
-          prev_bucket.as_mut().next_bucket = bucket_mut.next_bucket;
-        } else {
-          self.unused_list = bucket_mut.next_bucket;
-        }
-
-        bucket_mut.next_bucket = self.bucket_list;
-        self.bucket_list       = maybe_bucket;
-
-        // Allocate storage from bucket
-        return bucket_mut.allocate(bytes_needed);
-      }
-
-      prev_bucket  = maybe_bucket;
-      maybe_bucket = bucket_mut.next_bucket
+      return allocation;
     }
 
-    // Create a new bucket.
-    // ToDo: This should be a static method on Bucket.
-    let mut size = BUCKET_MULTIPLIER * bytes_needed;
-    size         = size.max(MIN_BUCKET_SIZE);
+    // No suitable unused bucket found. Create a new bucket.
 
-    let mut new_bucket = Bucket::with_capacity(size);
-    let t              = new_bucket.allocate(bytes_needed);
+    let new_bucket_size = usize::max(BUCKET_MULTIPLIER * bytes_needed, MIN_BUCKET_SIZE);
+    let mut new_bucket  = Bucket::with_capacity(new_bucket_size);
+    let allocation      = new_bucket.allocate(bytes_needed);
 
-    self.bucket_count          += 1;
-    self.total_bytes_allocated += size;
+    self.total_bytes_allocated += new_bucket_size;
+    self.buckets_in_use.push(new_bucket);
 
-    // Put it at the head of the bucket linked list
-    new_bucket.next_bucket = self.bucket_list;
-    self.bucket_list       = Some(NonNull::new_unchecked(heap_construct!(new_bucket)));
-
-    t
+    allocation
   }
 
   /// Prepare bucket storage for mark phase of GC
   pub(crate) fn _prepare_to_mark(&mut self) {
     self.old_storage_in_use = self.storage_in_use;
-    self.bucket_list        = self.unused_list;
-    self.unused_list        = None;
-    self.storage_in_use     = 0;
+    // Buckets being marked is empty before this swap.
+    std::mem::swap(&mut self.buckets_in_use, &mut self.buckets_being_marked);
 
+    // New allocations occur from whatever buckets are in unused list. We rely on the usual
+    // `slow_allocate_storage()` algorithm to draw buckets from the unused list as needed.
+
+    self.storage_in_use          = 0;
     self.need_to_collect_garbage = false;
   }
 
   /// Garbage Collection for Buckets, called after mark completes
   pub(crate) fn _sweep_garbage(&mut self) {
-    let mut maybe_bucket = self.bucket_list;
+    // Now we sweep all buckets in `self.buckets_being_marked`.
 
-    // Reset all formerly active buckets
-    self.unused_list = maybe_bucket;
-    while let Some(mut bucket) = maybe_bucket {
-      let bucket_mut = unsafe{ bucket.as_mut() };
-      bucket_mut.reset();
-      maybe_bucket = bucket_mut.next_bucket;
-    }
+    // Reset all formerly active buckets and move them to the list of unused buckets.
+    self.unused_buckets.extend(
+      self.buckets_being_marked
+          .drain(..)
+          .map(|mut bucket| { bucket.reset(); bucket })
+    );
+    // Now `self.buckets_being_marked` is back to being empty, ready for the next collection.
     self.target = max(self.target, TARGET_MULTIPLIER*self.storage_in_use);
 
-    if self.show_gc_statistics {
+    if self.show_gc {
+      let bucket_count = self.buckets_in_use.len() + self.unused_buckets.len();
+
       info!(1,
         "{:<10} {:<10} {:<10} {:<10} {:<13} {:<10} {:<10} {:<10} {:<10}",
         "Buckets",
@@ -217,7 +204,7 @@ impl StorageAllocator {
       );
       info!(1,
         "{:<10} {:<10} {:<10.2} {:<10} {:<13.2} {:<10} {:<10.2} {:<10.2} {:<10.2}",
-        self.bucket_count,
+        bucket_count,
         self.total_bytes_allocated,
         (self.total_bytes_allocated as f64) / (1024.0 * 1024.0),
         self.old_storage_in_use,

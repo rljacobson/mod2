@@ -2,58 +2,48 @@
 
 A `Bucket` is a small arena. We might use bumpalo or something instead.
 
+Note that as long as the data itself isn't moved, bucket can be moved.
+
 */
 
 use std::ptr::{null_mut, NonNull};
-
-pub type Void = u8;
+use crate::core::Byte;
 
 pub struct Bucket {
-  pub(crate) data: Box<[Void]>,
-  pub(crate) bytes_free : usize,
-  pub(crate) next_free  : *mut Void,
-  pub(crate) next_bucket: Option<NonNull<Bucket>>,
+  pub(crate) data         : Box<[Byte]>,
+  pub(crate) next_free_idx: usize,
 }
 
 impl Bucket {
   pub fn with_capacity(capacity: usize) -> Self {
-    let mut bucket = Bucket {
-      data       : vec![0; capacity].into_boxed_slice(),
-      bytes_free : capacity,
-      next_free  : null_mut(),
-      next_bucket: None,
-    };
-    bucket.next_free = bucket.data.as_mut_ptr();
-
-    bucket
+    Bucket {
+      data         : vec![0; capacity].into_boxed_slice(),
+      next_free_idx: 0,
+    }
+  }
+  
+  pub fn bytes_free(&self) -> usize {
+    if self.next_free_idx <= self.data.len(){
+      self.data.len() - self.next_free_idx
+    } else {
+      0
+    }
   }
 
-  pub fn allocate(&mut self, bytes_needed: usize) -> *mut Void {
-    assert!(self.bytes_free >= bytes_needed);
+  pub fn allocate(&mut self, bytes_needed: usize) -> *mut Byte {
+    assert!(self.bytes_free() >= bytes_needed);
+    let allocation = self.next_free_idx;
+    
+    // `self.next_free_idx` is always aligned on an 8 byte boundary. If the offset would escape the allocation, 
+    // `align_offset` returns `usize::MAX`, `bytes_used` is saturated, and thus `self.next_free_idx`.
+    let align_offset = (&self.data[self.next_free_idx + bytes_needed] as *const Byte).align_offset(8);
+    let bytes_used   = bytes_needed + align_offset;
+    self.next_free_idx += bytes_used;
 
-    let allocation    = self.next_free;
-    let new_next_free = unsafe { self.next_free.add(bytes_needed) };
-    let align_offset  = new_next_free.align_offset(8);
-    if align_offset == usize::MAX {
-      panic!("Cannot align memory to 8 byte boundary")
-    }
-
-    // next_free is always aligned on an 8 byte boundary.
-    self.next_free = unsafe { new_next_free.add(align_offset) };
-    let bytes_used = bytes_needed + align_offset;
-    if bytes_used > self.bytes_free {
-      // This probably should happen due to how capacity for new buckets is
-      // computed, but it's conceivable.
-      self.bytes_free = 0;
-    } else {
-      self.bytes_free -= bytes_used;
-    }
-
-    allocation
+    &mut self.data[allocation]
   }
 
   pub fn reset(&mut self) {
-    self.next_free  = self.data.as_mut_ptr();
-    self.bytes_free = self.data.len()
+    self.next_free_idx = 0;
   }
 }

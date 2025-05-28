@@ -399,6 +399,7 @@ pub trait DagNode {
     } // The vector case
     else if self.core().needs_destruction() {
       {
+        // Scope for mutable reference.
         let node_vector: DagNodeVectorRefMut = arg_to_node_vec(self.core().args);
 
         for node in node_vector.iter_mut() {

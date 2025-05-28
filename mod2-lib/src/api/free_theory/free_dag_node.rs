@@ -7,29 +7,35 @@ use std::{
   ops::DerefMut
 };
 use mod2_abs::hash::hash2;
-use crate::{core::{
-  gc::allocate_dag_node,
-  dag_node_core::{
-    DagNodeCore,
-    DagNodeFlags,
-    DagNodeFlag,
-    ThinDagNodePtr
+use crate::{
+  core::{
+    gc::allocate_dag_node,
+    dag_node_core::{
+      DagNodeFlags,
+      DagNodeCore,
+      DagNodeFlag,
+      ThinDagNodePtr
+    },
+    EquationalTheory
   },
-  EquationalTheory
-}, api::{
-  Arity,
-  dag_node::{
-    DagNodeVector,
-    DagNodeVectorRefMut,
-    DagNode,
-    DagNodePtr,
-    arg_to_dag_node,
-    arg_to_node_vec
+  api::{
+    dag_node::{
+      DagNodeVectorRefMut,
+      DagNodeVector,
+      DagNode,
+      DagNodePtr,
+      arg_to_dag_node,
+      arg_to_node_vec
+    },
+    Arity,
+    symbol::SymbolPtr,
+    term::Term
   },
-  symbol::SymbolPtr,
-  term::Term,
-}, HashType};
+  HashType
+};
 
+
+#[repr(transparent)]
 pub struct FreeDagNode(DagNodeCore);
 
 impl FreeDagNode {
