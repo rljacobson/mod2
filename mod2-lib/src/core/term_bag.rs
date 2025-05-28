@@ -31,13 +31,15 @@ use mod2_abs::{
   HashMap,
   warning
 };
-use crate::api::term::{TermPtr};
+use crate::{
+  api::term::{TermPtr},
+  HashType
+};
 
 
 // region TermHashSet
 /// For use with `TermHashSet` below.
-type HashValueType = u32;
-type TermHashSet = HashMap<HashValueType, TermPtr>;
+type TermHashSet = HashMap<HashType, TermPtr>;
 
 /// A trait extension of `HashMap<TermPtr>`. We use a `HashMap` so that we have access to the hash value (the key)
 trait TermHashSetExt {
@@ -45,13 +47,13 @@ trait TermHashSetExt {
   /// `existing_value` already exists in the map. An existing value is never replaced.
   fn insert_no_replace(&mut self, value: TermPtr) -> Option<TermPtr>;
   /// Fetches the value from the set, returning `None` if it is not present.
-  fn find_for_hash(&self, hash: HashValueType) -> Option<TermPtr>;
+  fn find_for_hash(&self, hash: HashType) -> Option<TermPtr>;
   /// Finds the provided term, if it is in the set.
-  fn find(&self, value: TermPtr) -> Option<(TermPtr, HashValueType)>;
+  fn find(&self, value: TermPtr) -> Option<(TermPtr, HashType)>;
   fn contains(&self, value: TermPtr) -> bool;
 }
 
-impl TermHashSetExt for HashMap<HashValueType, TermPtr> {
+impl TermHashSetExt for HashMap<HashType, TermPtr> {
   fn insert_no_replace(&mut self, value: TermPtr) -> Option<TermPtr> {
     match self.entry(value.deref().structural_hash()) {
       Entry::Occupied(entry) => {
@@ -64,11 +66,11 @@ impl TermHashSetExt for HashMap<HashValueType, TermPtr> {
     }
   }
 
-  fn find_for_hash(&self, hash: HashValueType) -> Option<TermPtr> {
+  fn find_for_hash(&self, hash: HashType) -> Option<TermPtr> {
     self.get(&hash).cloned()
   }
 
-  fn find(&self, value: TermPtr) -> Option<(TermPtr, HashValueType)> {
+  fn find(&self, value: TermPtr) -> Option<(TermPtr, HashType)> {
     let key = value.deref().structural_hash();
     self.find_for_hash(key).map(|v| (v, key))
 
@@ -146,7 +148,7 @@ impl TermBag {
 
   /// Finds the provided term in the term bag, returning `None` if it is not present.
   #[inline(always)]
-  pub fn find(&self, term: TermPtr, eager_context: bool) -> Option<(TermPtr, HashValueType)>
+  pub fn find(&self, term: TermPtr, eager_context: bool) -> Option<(TermPtr, HashType)>
   {
     if eager_context {
       self.terms_usable_in_eager_context.find(term)
@@ -157,7 +159,7 @@ impl TermBag {
 
   /// Fetches  the value from the set, returning `None` if it is not present.
   #[inline(always)]
-  pub fn find_for_hash(&self, hash: HashValueType, eager_context: bool) -> Option<TermPtr> {
+  pub fn find_for_hash(&self, hash: HashType, eager_context: bool) -> Option<TermPtr> {
     if eager_context {
       self.terms_usable_in_eager_context.find_for_hash(hash)
     } else {

@@ -1,35 +1,16 @@
-/*!
-
-A `RootContainer` is a link in the linked list of roots of garbage collected DAG node objects.
-
-The implementation is very efficient in the typical case of storing a single `DagNodePtr`, which it stores inline.
-However, if many `DagNodePtr` root objects have the same lifetime, they can be stored in the same `RootContainer`, and
-the implementation will fall back to a growable vector for storage.
-
-A `RootContainer` dereferences to `SmallVec<DagNodePtr, _>`, so it can be treated like a vector.
-
-*/
-
-use std::{
-  ops::{Deref, DerefMut},
-  ptr::NonNull,
-  sync::{
-    atomic::{
-      AtomicPtr,
-      Ordering
-    },
-    Mutex,
-    MutexGuard
-  },
-};
+use std::ops::{Deref, DerefMut};
+use std::ptr::NonNull;
+use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::{Mutex, MutexGuard};
 use mod2_abs::{smallvec, SmallVec};
 use crate::api::dag_node::{DagNode, DagNodePtr};
+use crate::core::gc::root_container::root_map::RootMap;
 
-/// Private global linked list of root nodes
-static LIST_HEAD: Mutex<AtomicPtr<RootContainer>> = Mutex::new(AtomicPtr::new(std::ptr::null_mut()));
+/// Global linked list of `RootVec` nodes
+static LIST_HEAD: Mutex<AtomicPtr<RootVec>> = Mutex::new(AtomicPtr::new(std::ptr::null_mut()));
 
-/// Private utility to acquire the root list 
-fn acquire_root_list() -> MutexGuard<'static, AtomicPtr<RootContainer>> {
+/// Private utility to acquire the root list
+pub fn acquire_root_list() -> MutexGuard<'static, AtomicPtr<RootVec>> {
   match LIST_HEAD.try_lock() {
     Ok(lock) => { lock }
     Err(_) => {
@@ -38,17 +19,17 @@ fn acquire_root_list() -> MutexGuard<'static, AtomicPtr<RootContainer>> {
   }
 }
 
-/// Marks all roots in the linked list of `RootContainer`s.
-pub fn mark_roots() {
+/// Mark all roots contained in all root vectors
+pub(super) fn mark_roots() {
   let list_head = acquire_root_list();
   let mut root = unsafe {
     list_head.load(Ordering::Relaxed)
              .as_mut()
-             .map(|head| NonNull::new(head as *mut RootContainer).unwrap())
+             .map(|head| NonNull::new(head as *mut RootVec).unwrap())
   };
 
   while let Some(mut root_ptr) = root {
-    let root_ref = unsafe{ root_ptr.as_mut() };
+    let root_ref = unsafe { root_ptr.as_mut() };
     root_ref.mark();
     root = root_ref.next;
   }
@@ -57,24 +38,23 @@ pub fn mark_roots() {
 // Local convenience type
 type SmallNodeVec = SmallVec<DagNodePtr, 1>;
 
-
-pub struct RootContainer {
-  /// The next `RootContainer` in the linked list
-  next: Option<NonNull<RootContainer>>,
-  /// The previous `RootContainer` in the linked list
-  prev: Option<NonNull<RootContainer>>,
+pub struct RootVec {
+  /// The next root container in the linked list
+  pub(super) next: Option<NonNull<RootVec>>,
+  /// The previous root container in the linked list
+  pub(super) prev: Option<NonNull<RootVec>>,
   /// The vector of root nodes stored in this container
   nodes: SmallNodeVec,
-  
+
   /// Opt out of `Unpin`
   _pin: std::marker::PhantomPinned,
 }
 
-unsafe impl Send for RootContainer {}
+unsafe impl Send for RootVec {}
 
-impl RootContainer {
-  pub fn new() -> Box<RootContainer> {
-    let mut container = Box::new(RootContainer {
+impl RootVec {
+  pub fn new() -> Box<RootVec> {
+    let mut container = Box::new(RootVec {
       next : None,
       prev : None,
       nodes: SmallVec::new(),
@@ -83,10 +63,10 @@ impl RootContainer {
     container.link();
     container
   }
-  
-  /// Construct a new `RootContainer` containing the given node
-  pub fn with_node(node: DagNodePtr) -> Box<RootContainer> {
-    let mut container = Box::new(RootContainer {
+
+  /// Construct a new root container containing the given node
+  pub fn with_node(node: DagNodePtr) -> Box<RootVec> {
+    let mut container = Box::new(RootVec {
       next : None,
       prev : None,
       nodes: smallvec![node],
@@ -96,7 +76,7 @@ impl RootContainer {
     container
   }
 
-  /// Mark the nodes contained in this `RootContainer` as live (during the GC mark phase) 
+  /// Mark the nodes contained in this root container as live (during the GC mark phase)
   pub fn mark(&mut self) {
     for node in &mut self.nodes {
       node.mark();
@@ -138,13 +118,13 @@ impl RootContainer {
 
 }
 
-impl Drop for RootContainer {
+impl Drop for RootVec {
   fn drop(&mut self) {
     self.unlink();
   }
 }
 
-impl Deref for RootContainer {
+impl Deref for RootVec {
   type Target = SmallNodeVec;
 
   fn deref(&self) -> &Self::Target {
@@ -152,7 +132,7 @@ impl Deref for RootContainer {
   }
 }
 
-impl DerefMut for RootContainer {
+impl DerefMut for RootVec {
   fn deref_mut(&mut self) -> &mut Self::Target {
     &mut self.nodes
   }

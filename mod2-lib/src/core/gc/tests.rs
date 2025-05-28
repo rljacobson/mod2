@@ -4,22 +4,6 @@ use rand::Rng;
 use mod2_abs::{heap_construct, IString};
 
 use crate::{
-  core::{
-    gc::{
-      allocate_dag_node,
-      root_container::RootContainer,
-      node_allocator::acquire_node_allocator
-    },
-    dag_node_core::{
-      DagNodeCore,
-      ThinDagNodePtr
-    },
-    symbol::{
-      SymbolAttributes,
-      SymbolType
-    },
-    EquationalTheory
-  },
   api::{
     dag_node::{
       DagNode,
@@ -33,13 +17,26 @@ use crate::{
       Symbol,
       SymbolPtr
     },
-    Arity,
     variable_theory::{
-      VariableDagNode, 
+      VariableDagNode,
       VariableSymbol
-    }
+    },
+    Arity
+  },
+  core::{
+    dag_node_core::{
+      DagNodeCore,
+      ThinDagNodePtr
+    },
+    gc::{
+      allocate_dag_node,
+      node_allocator::acquire_node_allocator,
+      root_container::RootVec
+    },
+    EquationalTheory
   }
 };
+
 
 // ToDo: Figure out why multithreading breaks the tests.
 // Force GC tests to run serially for consistent behavior.
@@ -182,7 +179,7 @@ fn test_dag_creation() {
   let mut symbols = make_symbols();
 
   let root = FreeDagNode::new(symbols[3]);
-  let _root_container = RootContainer::with_node(root);
+  let _root_container = RootVec::with_node(root);
 
   // Maximum tree height
   let max_height: usize = 6;
@@ -207,7 +204,7 @@ fn test_garbage_collection() {
 
     for _ in 0..10 {
       let root: DagNodePtr = DagNodeCore::new(symbols[4]);
-      let root_container = RootContainer::with_node(root);
+      let root_container = RootVec::with_node(root);
       root_vec.push(root_container);
 
       // Maximum tree height
@@ -234,7 +231,7 @@ fn test_arena_exhaustion() {
   let root: DagNodePtr = DagNodeCore::new(symbol_ptr);
   println!("root: {}", root);
 
-  let _root_container = RootContainer::with_node(root);
+  let _root_container = RootVec::with_node(root);
 
   let mut last_node = root;
 

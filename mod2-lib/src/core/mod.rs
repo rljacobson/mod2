@@ -24,6 +24,7 @@ pub(crate) mod strategy;
 pub(crate) mod substitution;
 mod redex_position;
 mod interpreter;
+mod hash_cons_set;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
@@ -36,7 +37,7 @@ pub use theory::*;
 
 
 #[allow(unused_imports)]
-pub use gc::root_container::RootContainer;
+pub use gc::root_container::RootVec;
 
 /// A `*mut Void` is a pointer to a `u8`
 // ToDo: Should this be `()`?
