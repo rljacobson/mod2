@@ -47,7 +47,8 @@ use crate::{
         GCVectorRefMut
       }
     },
-    sort::SortPtr
+    sort::SortPtr,
+    HashConsSet
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -372,6 +373,7 @@ pub trait DagNode {
     Ordering::Equal
   }
 
+  /// Checks pointer equality first, then compares symbols for equality recursively.
   fn equals(&self, other: DagNodePtr) -> bool {
     std::ptr::addr_eq(self, other.as_ptr())
       || (
@@ -379,8 +381,21 @@ pub trait DagNode {
           && self.compare_arguments(other) == Ordering::Equal
       )
   }
+  
+  // endregion Comparison
+  
+  // region Copy Constructors
 
-  // endregion
+  /// For hash consing, recursively checks child nodes to determine if a canonical copy needs to be made.
+  fn make_canonical(&self, hash_cons_set: &mut HashConsSet) -> DagNodePtr;
+
+  /// For hash consing unreduced nodes, recursively creates a canonical copy.
+  fn make_canonical_copy(&self, hash_cons_set: &mut HashConsSet) -> DagNodePtr;
+  
+  /// Makes a shallow clone of this node.
+  fn make_clone(&self) -> DagNodePtr;
+
+  // endregion Copy Constructors
 
   // region GC related methods
 

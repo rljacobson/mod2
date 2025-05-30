@@ -22,7 +22,10 @@ use crate::{
     NarrowingVariableInfo,
     VariableInfo
   },
-  api::dag_node::DagNodePtr,
+  api::{
+    dag_node::DagNodePtr,
+    variable_theory::VariableIndex
+  }
 };
 
 pub type MaybeDagNode = Option<DagNodePtr>;
@@ -79,14 +82,14 @@ impl Substitution {
   /// wasn't converted from an `i32` that was `NONE`.
   #[inline(always)]
   pub fn value(&self, index: usize) -> MaybeDagNode {
-    self.get(index as i8)
+    self.get(index as VariableIndex)
   }
 
   // Todo: Is this the best way to implement a getter? I think we did it this way so it returned a value.
-  // ToDo: Should this take an i8?
+  // ToDo: Should this take an VariableIndex?
   /// This getter takes an `i32` so it can check for negative indices, i.e. `NONE`.
   #[inline(always)]
-  pub fn get(&self, index: i8) -> MaybeDagNode {
+  pub fn get(&self, index: VariableIndex) -> MaybeDagNode {
     assert!(index >= 0, "-ve index {}", index);
     assert!(
       (index as usize) < self.bindings.len(),
@@ -115,7 +118,7 @@ impl Substitution {
       assert!(j.is_none() || i == j, "substitution inconsistency at index {}", idx);
       if let (Some(a), Some(b)) = (i, j) {
         if !a.addr_eq(*b) {
-          local_bindings.add_binding(idx as i8, *a);
+          local_bindings.add_binding(idx as VariableIndex, *a);
         }
       }
     }
@@ -141,7 +144,7 @@ impl Substitution {
   */
 
   #[inline(always)]
-  pub fn bind(&mut self, index: i8, maybe_value: Option<DagNodePtr>) {
+  pub fn bind(&mut self, index: VariableIndex, maybe_value: Option<DagNodePtr>) {
     assert!(index >= 0, "Negative index {}", index);
     assert!(
       (index as usize) < self.bindings.len(),
@@ -203,7 +206,7 @@ pub fn print_substitution_with_ignored(substitution: &Substitution, var_info: &V
     if ignored_indices.contains(i) {
       continue;
     }
-    let var = var_info.index_to_variable(i as i8);
+    let var = var_info.index_to_variable(i as VariableIndex);
     debug_assert!(var.is_some(), "null variable");
     let var = var.unwrap();
     print!("{} --> ", var);

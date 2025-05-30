@@ -6,24 +6,29 @@ Information about a variable that gets passed down through the compilation funct
 
 use std::ops::{Deref, Index};
 use mod2_abs::{NatSet, Graph, debug};
-use crate::api::term::{MaybeTerm, TermPtr};
+use crate::{
+  api::{
+    term::{MaybeTerm, TermPtr},
+    variable_theory::VariableIndex
+  }
+};
 
 /// This is the boundary between real and virtual variables. An `index` represents a real variable
 /// iff `index < MAX_NR_PROTECTED_VARIABLES`.
-const MAX_PROTECTED_VARIABLE_COUNT: i32 = 10_000_000;
+const MAX_PROTECTED_VARIABLE_COUNT: VariableIndex = 10_000_000;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, Default)]
 struct ConstructionIndex {
   last_use_time:     u32,
   assigned_fragment: i16,
   last_use_fragment: i16,
-  new_index:         i32,
+  new_index:         VariableIndex,
 }
 
 #[derive(Default)]
 pub struct VariableInfo {
   variables:                    Vec<MaybeTerm>,
-  protected_variable_count:     i32,
+  protected_variable_count:     VariableIndex,
   fragment_number:              i16,
   construction_indices:         Vec<ConstructionIndex>,
   condition_variables:          NatSet,
@@ -44,12 +49,12 @@ impl VariableInfo {
   }
 
   #[inline(always)]
-  pub fn protected_variable_count(&self) -> i32 {
+  pub fn protected_variable_count(&self) -> VariableIndex {
     self.protected_variable_count
   }
 
   #[inline(always)]
-  pub(crate) fn index_to_variable(&self, index: i8) -> MaybeTerm {
+  pub(crate) fn index_to_variable(&self, index: VariableIndex) -> MaybeTerm {
     if index >= 0 {
       if let Some(d) = self.variables.get(index as usize) {
         return d.clone();
@@ -58,7 +63,7 @@ impl VariableInfo {
     None
   }
 
-  pub(crate) fn variable_to_index(&mut self, variable: TermPtr) -> i32 {
+  pub(crate) fn variable_to_index(&mut self, variable: TermPtr) -> VariableIndex {
     assert_eq!(
       self.variables.len(), 
       self.protected_variable_count as usize, 
@@ -69,25 +74,25 @@ impl VariableInfo {
         .iter()
         .position(|v| v.as_ref().map_or(false, |d| d.compare(variable.deref()).is_eq()))
         // If the variable isn't found, add it and return its index.
-        .map(|i| i as i32)
+        .map(|i| i as VariableIndex)
         .unwrap_or_else(|| {
           self.variables.push(Some(variable));
           self.protected_variable_count += 1;
-          (self.variables.len() - 1) as i32
+          (self.variables.len() - 1) as VariableIndex
         })
   }
 
   /// The phrase "remap index" is a noun. This method is a const getter and does not actually compute the remapping. Use
   /// `compute_index_remapping` to compute the remap index.
-  pub fn remap_index(&self, original: i32) -> i32 {
+  pub fn remap_index(&self, original: VariableIndex) -> VariableIndex {
     if original >= MAX_PROTECTED_VARIABLE_COUNT {
       self.construction_indices[(original - MAX_PROTECTED_VARIABLE_COUNT) as usize].new_index
     } else {
-      original as i32
+      original as VariableIndex
     }
   }
 
-  pub(crate) fn make_construction_index(&mut self) -> i32 {
+  pub(crate) fn make_construction_index(&mut self) -> VariableIndex {
     let construction_index_count = self.construction_indices.len();
 
     self.construction_indices.push(ConstructionIndex {
@@ -96,11 +101,11 @@ impl VariableInfo {
       ..ConstructionIndex::default()
     });
 
-    MAX_PROTECTED_VARIABLE_COUNT as i32 + construction_index_count as i32
+    MAX_PROTECTED_VARIABLE_COUNT as VariableIndex + construction_index_count as VariableIndex
   }
 
   #[inline(always)]
-  pub fn make_protected_variable(&mut self) -> i32 {
+  pub fn make_protected_variable(&mut self) -> VariableIndex {
     self.protected_variable_count += 1;
     self.protected_variable_count - 1
   }
@@ -110,7 +115,7 @@ impl VariableInfo {
     self.fragment_number += 1;
   }
 
-  pub fn use_index(&mut self, index: i32) {
+  pub fn use_index(&mut self, index: VariableIndex) {
     // ToDo: What if `index < 0`? Added condition that `index>=0` to avoid negative index.
     if index >= 0 && index >= MAX_PROTECTED_VARIABLE_COUNT {
       let index = (index - MAX_PROTECTED_VARIABLE_COUNT) as usize;

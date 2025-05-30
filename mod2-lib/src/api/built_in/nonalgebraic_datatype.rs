@@ -48,11 +48,10 @@ pub trait NADataType: Any + Clone + Display + Sized {
   // Default impl for types that are `Copy`
   fn value_from_dag_node(node: &NADagNode<Self>) -> Self {
     // Reconstitute the value from its raw bytes
-    let slice = node.core().inline;
-    let value: Self = unsafe {
-      std::ptr::read_unaligned(slice.as_ptr() as *const Self)
-    };
-    value
+    let ptr = node.core().inline.as_ptr() as *const Self;
+    unsafe {
+      std::ptr::read_unaligned(ptr)
+    }
   }
 
   fn make_dag_node(value: Self) -> DagNodePtr;
@@ -120,19 +119,21 @@ impl NADataType for StringBuiltIn {
   fn finalize_dag_node(node: &mut dyn DagNode) {
     #[cfg(feature = "gc_debug")]
     debug!(5, "Finalizing StringDagNode");
+    
     // Reconstitute the string so its destructor can be called.
-    let (ptr, length, capacity): (*mut u8, usize, usize) = unsafe{ transmute(node.core().inline) };
-    let droppable_string: StringBuiltIn = unsafe { StringBuiltIn::from_raw_parts(ptr, length, capacity) };
+    let ptr = node.core().inline.as_ptr() as *const Self;
+    let droppable_string = unsafe { std::ptr::read_unaligned(ptr) };
+
     drop(droppable_string)
   }
 
   fn value_from_dag_node(node: &NADagNode<Self>) -> StringBuiltIn {
     // Reconstitute the string so its destructor can be called.
-    let (ptr, length, capacity): (*mut u8, usize, usize) = unsafe{ transmute(node.core().inline) };
-    let cloneable_string: StringBuiltIn = unsafe { StringBuiltIn::from_raw_parts(ptr, length, capacity) };
+    let ptr = node.core().inline.as_ptr() as *const Self;
+    let cloneable_string = unsafe { std::ptr::read_unaligned(ptr) };
 
     let value = cloneable_string.clone();
-    // Do not call destructor on `cloneable_string`
+    // Do not call destructor on `cloneable_string`.
     std::mem::forget(cloneable_string);
 
     value

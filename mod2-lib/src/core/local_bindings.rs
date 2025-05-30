@@ -8,11 +8,17 @@ other validation is performed.
 */
 
 
-use crate::{core::substitution::Substitution, api::dag_node::DagNodePtr};
+use crate::{
+  core::substitution::Substitution,
+  api::{
+    dag_node::DagNodePtr,
+    variable_theory::VariableIndex
+  }
+};
 
 pub struct Binding {
   active:         bool,
-  variable_index: i8,
+  variable_index: VariableIndex,
   value:          DagNodePtr,
 }
 
@@ -26,7 +32,7 @@ impl LocalBindings {
     Self::default()
   }
 
-  pub fn add_binding(&mut self, index: i8, value: DagNodePtr) {
+  pub fn add_binding(&mut self, index: VariableIndex, value: DagNodePtr) {
     self.bindings.push(Binding {
       active: false,
       variable_index: index,

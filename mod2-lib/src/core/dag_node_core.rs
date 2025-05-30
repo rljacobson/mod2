@@ -82,6 +82,7 @@ pub type ThinDagNodePtr = *mut DagNodeCore;
 
 /// The `DagNodeCore::inline` field needs to be large enough to hold the largest data value that will be stored there.
 /// The largest value is a `Vec<u8>` or `String` (which are the same size), 24 bytes on most 64-bit systems.
+// ToDo: Replace this with a const max of all sizes.
 const INLINE_BYTE_COUNT: usize = size_of::<StringBuiltIn>();
 
 
@@ -145,6 +146,25 @@ pub struct DagNodeCore {
   ///   - `NADataType` values for `NADagNode<T: NADataType>`, usually 64 bits
   ///   - A fat pointer for `ACUDagNode::runs_buffer: Vec<usize>`
   ///   - `IString` for `VariableDagNode`
+  /// 
+  /// You can store and retrieve raw data from this field by emulating this example from `VariableDagNode`:
+  /// ```ignore
+  /// #[inline(always)]
+  ///  pub fn index(&self) -> VariableIndex {
+  ///    unsafe {
+  ///      let ptr = self.core().inline.as_ptr().add(VARIABLE_INDEX_OFFSET) as *const VariableIndex;
+  ///      std::ptr::read_unaligned(ptr)
+  ///    }
+  ///  }
+  ///
+  ///  #[inline(always)]
+  ///  pub fn set_index(&mut self, index: VariableIndex) {
+  ///    unsafe {
+  ///      let ptr = self.core_mut().inline.as_mut_ptr().add(VARIABLE_INDEX_OFFSET) as *mut VariableIndex;
+  ///      std::ptr::write_unaligned(ptr, index);
+  ///    }
+  ///  }
+  /// ``` 
   // ToDo: Can we use the `args` field for this purpose?
   pub(crate) inline: [u8; INLINE_BYTE_COUNT],
   
@@ -154,7 +174,7 @@ pub struct DagNodeCore {
   /// The problem with having an `args` member on `DagNodeCore` is that different theories will store different
   /// types in `args`, like `(DagNodePtr, Multiplicity)`. The low-level `args` details can be shifted to
   /// the theory node types, but then every theory would need to reimplement them. Likewise with `mark()` and
-  /// the destructor.
+  /// the destructor/finalizer.
   pub(crate) args      : *mut u8,
   pub(crate) sort_index: i8, // sort index within kind
   pub(crate) theory_tag: EquationalTheory,

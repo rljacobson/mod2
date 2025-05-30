@@ -40,6 +40,7 @@ use crate::{
     },
     gc::allocate_dag_node,
     EquationalTheory,
+    HashConsSet,
   },
   api::{
     dag_node::{
@@ -51,6 +52,7 @@ use crate::{
       arg_to_node_vec
     },
     symbol::SymbolPtr,
+    variable_theory::VariableIndex,
     Arity
   },
   HashType,
@@ -65,28 +67,27 @@ pub struct VariableDagNode(DagNodeCore);
 
 impl VariableDagNode {
 
-  pub fn new(symbol: SymbolPtr, name: IString, index: i8) -> DagNodePtr {
+  pub fn new(symbol: SymbolPtr, name: IString, index: VariableIndex) -> DagNodePtr {
     let mut node = DagNodeCore::with_theory(symbol, EquationalTheory::Variable);
-    node.core_mut().inline[VARIABLE_INDEX_OFFSET] = index as u8;
-
+    {
+      // Scope of this as `VariableDagNode`,
+      let node_mut = node.as_any_mut().downcast_mut::<VariableDagNode>().unwrap();
+      node_mut.set_name(name);
+      node_mut.set_index(index);
+    }
     // Needs destruction to drop the `IString` in `DagNodeCode::inline`, which decrements the `IString`'s internal
     // reference count.
-    // ToDo: Decouple `DagNodeVector` ownership from `NeedsDestruction` flag.
+    // ToDo: Decouple `DagNodeVector` ownership from `NeedsDestruction` flag. For now this is ok because 
+    //       `DagNodeCore.args` is null for all cases (so far) in which the `NeedsDestruction` flag is set but
+    //       which have no argument vector.
     node.set_flags(DagNodeFlag::NeedsDestruction.into());
-
-    // Store the raw bytes of `name` in `inline`
-    node.core_mut()
-        .inline[..size_of::<IString>()]
-        .copy_from_slice(&as_bytes(&name));
-    // Don't drop the `IString`
-    std::mem::forget(name);
-
+    
     node
   }
 
   pub fn name(&self) -> IString {
     // Reconstitute the `IString` from its raw bytes so we can clone it.
-    let slice = &self.core().inline; //[..size_of::<IString>()];
+    let slice = &self.core().inline; // The name starts at offset 0.
     let name: IString = unsafe {
       std::ptr::read_unaligned(slice.as_ptr() as *const IString)
     };
@@ -97,15 +98,29 @@ impl VariableDagNode {
 
     cloned_name
   }
-
-  #[inline(always)]
-  pub fn index(&self) -> i8 {
-    self.core().inline[VARIABLE_INDEX_OFFSET] as i8
+  
+  // Store the raw bytes of `name` in `self.inline`; `name` is consumed and it's `drop` method is *not* called.
+  fn set_name(&mut self, name: IString) {
+    let base = self.core_mut().inline.as_mut_ptr().cast::<IString>();
+    unsafe {
+      std::ptr::write_unaligned(base, name);
+    }
   }
 
   #[inline(always)]
-  pub fn set_index(&mut self, index: i8) {
-    self.core_mut().inline[VARIABLE_INDEX_OFFSET] = index as u8;
+  pub fn index(&self) -> VariableIndex {
+    unsafe {
+      let ptr = self.core().inline.as_ptr().add(VARIABLE_INDEX_OFFSET) as *const VariableIndex;
+      std::ptr::read_unaligned(ptr)
+    }
+  }
+
+  #[inline(always)]
+  pub fn set_index(&mut self, index: VariableIndex) {
+    unsafe {
+      let ptr = self.core_mut().inline.as_mut_ptr().add(VARIABLE_INDEX_OFFSET) as *mut VariableIndex;
+      std::ptr::write_unaligned(ptr, index);
+    }
   }
 
 }
@@ -144,11 +159,30 @@ impl DagNode for VariableDagNode {
     Box::new(std::iter::empty::<DagNodePtr>())
   }
 
+  fn make_canonical(&self, _hash_cons_set: &mut HashConsSet) -> DagNodePtr {
+    self.as_ptr()
+  }
+
+  fn make_canonical_copy(&self, _hash_cons_set: &mut HashConsSet) -> DagNodePtr {
+    // In principle variable could rewrite to something else.
+    self.make_clone()
+  }
+
+  fn make_clone(&self) -> DagNodePtr {
+    let mut new_node  = VariableDagNode::new(self.symbol(), self.name(), self.index());
+    // Copy over just the rewriting flags
+    let rewrite_flags = self.flags() & DagNodeFlag::RewritingFlags;
+    new_node.set_flags(rewrite_flags);
+    new_node.set_sort_index(self.sort_index());
+
+    new_node
+  }
+
   fn finalize(&mut self) {
     #[cfg(feature = "gc_debug")]
     debug!(5, "Finalizing VariableDagNode");
     // Reconstitute the `IString` from its raw bytes so its destructor can be executed.
-    let slice = &self.core().inline[..size_of::<IString>()];
+    let slice = &self.core().inline;
     let droppable_istring: IString = unsafe {
       std::ptr::read_unaligned(slice.as_ptr() as *const IString)
     };

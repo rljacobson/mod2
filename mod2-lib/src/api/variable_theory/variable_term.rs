@@ -8,22 +8,36 @@ use rand::seq::index::IndexVec;
 use mod2_abs::{IString, NatSet, hash::hash2, PartialOrdering};
 
 use crate::{
-  core::{
-    format::{FormatStyle, Formattable},
-    term_core::TermCore,
-    TermBag,
-    substitution::Substitution
-  },
   api::{
-    variable_theory::{VariableType, VariableDagNode},
-    term::{Term, TermPtr, BxTerm},
     symbol::SymbolPtr,
-    dag_node::{DagNode, DagNodePtr},
+    term::{
+      BxTerm,
+      Term,
+      TermPtr
+    },
     dag_node_cache::DagNodeCache,
+    dag_node::{
+      DagNodePtr,
+      DagNode
+    },
+    variable_theory::{
+      VariableDagNode,
+      VariableIndex,
+      VariableType
+    }
   },
-  impl_display_debug_for_formattable,
+  core::{
+    TermBag,
+    format::{
+      FormatStyle,
+      Formattable
+    },
+    substitution::Substitution,
+    term_core::TermCore
+  },
   HashType,
   UNDEFINED,
+  impl_display_debug_for_formattable
 };
 
 
@@ -32,7 +46,9 @@ pub struct VariableTerm {
   pub core         : TermCore,
   pub name         : IString,
   pub variable_type: VariableType,
-  pub index        : i8,           // Set in `Term::index_variables()`
+  /// Variables are tracked in a `VariableInfo` structure that maintains the environment. 
+  /// The value of `index` is set in `Term::index_variables()` as part of compilation.
+  pub index        : VariableIndex,
 }
 
 impl VariableTerm {
@@ -41,7 +57,7 @@ impl VariableTerm {
       core         : TermCore::new(symbol),
       name,
       variable_type: VariableType::Blank,
-      index        : UNDEFINED as i8, // Set in `Term::index_variables()`
+      index        : UNDEFINED as VariableIndex, // Set in `Term::index_variables()`
     }
   }
 }
