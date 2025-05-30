@@ -31,6 +31,8 @@ pub(crate) use local_bindings::LocalBindings;
 pub(crate) use narrowing_variable_info::NarrowingVariableInfo;
 pub(crate) use variable_info::VariableInfo;
 pub(crate) use term_bag::TermBag;
+pub(crate) use hash_cons_set::HashConsSet;
+
 // Public API
 pub use module::*;
 pub use theory::*;

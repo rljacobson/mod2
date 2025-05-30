@@ -13,7 +13,10 @@ use mod2_abs::{
   tracing::warn
 };
 use crate::{
-  api::term::BxTerm,
+  api::{
+    term::BxTerm,
+    variable_theory::VariableIndex
+  },
   core::{
     pre_equation::{
       condition::Conditions,
@@ -51,7 +54,7 @@ pub fn new(name: Option<IString>, lhs_term: BxTerm, sort: SortPtr, condition: Co
 pub(crate) fn check(this: &mut PreEquation) {
   if !this.is_nonexec() && !this.variable_info.unbound_variables.is_empty() {
     let mindex = this.variable_info.unbound_variables.min_value().unwrap();
-    let min_variable = this.variable_info.index_to_variable(mindex as i8).unwrap();
+    let min_variable = this.variable_info.index_to_variable(mindex as VariableIndex).unwrap();
     let mut this_repr = String::new();
     this.repr(&mut this_repr, FormatStyle::Simple).unwrap();
     

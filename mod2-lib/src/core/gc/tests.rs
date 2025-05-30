@@ -2,7 +2,7 @@ use std::sync::{LazyLock, Mutex};
 use rand::Rng;
 
 use mod2_abs::{heap_construct, IString};
-
+use mod2_abs::log::set_global_logging_threshold;
 use crate::{
   api::{
     dag_node::{
@@ -257,6 +257,7 @@ fn test_arena_exhaustion() {
 #[test]
 fn create_destroy_variable_dag_node() {
   let name = IString::from("Hello");
+  set_global_logging_threshold(5);
   {
     let symbol = VariableSymbol::with_name(name.clone());
     {

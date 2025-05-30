@@ -38,7 +38,8 @@ use crate::{
       ThinDagNodePtr
     },
     EquationalTheory,
-    gc::allocate_dag_node
+    gc::allocate_dag_node,
+    HashConsSet
   },
   api::{
     built_in::{
@@ -61,9 +62,8 @@ use crate::{
     },
     symbol::SymbolPtr
   },
-  HashType
+  HashType,
 };
-
 
 pub type BoolDagNode    = NADagNode<Bool>;
 pub type FloatDagNode   = NADagNode<Float>;
@@ -75,6 +75,7 @@ pub type NaturalNumberDagNode = NADagNode<NaturalNumber>;
 pub struct NADagNode<T: NADataType>(DagNodeCore, PhantomData<T>);
 impl<T: NADataType> NADagNode<T> {
   pub fn value(&self) -> T {
+    // Specialized because not all values are copy, and some might be ref counted.
     T::value_from_dag_node(self)
   }
 }
@@ -86,9 +87,15 @@ macro_rules! impl_na_dag_node {
         pub fn new(value: $natype) -> DagNodePtr {
           let symbol   = unsafe{ get_built_in_symbol(stringify!($natype)).unwrap_unchecked() };
           let mut node = DagNodeCore::with_theory(symbol, <$natype as NADataType>::THEORY);
+          // The unwrap is guaranteed to succeed by construction.
+          node.as_any_mut().downcast_mut::<Self>().unwrap().set_value(value);
 
-          node.core_mut().inline[..(size_of::<$natype>())].copy_from_slice(as_bytes(&value));
           node
+        }
+
+        fn set_value(&mut self, value: $natype) {
+          let ptr = self.core_mut().inline.as_mut_ptr() as *mut $natype;
+          unsafe{ std::ptr::write_unaligned(ptr, value); }
         }
       }
     };
@@ -108,9 +115,17 @@ impl NADagNode<Bool> {
       unsafe { get_built_in_symbol("false").unwrap_unchecked() }
     };
     let mut node = DagNodeCore::with_theory(symbol, <Bool as NADataType>::THEORY);
+    // The unwrap is guaranteed to succeed by construction.
+    node.as_any_mut().downcast_mut::<Self>().unwrap().set_value(value);
 
-    node.core_mut().inline[..(size_of::<Bool>())].copy_from_slice(as_bytes(&value));
     node
+  }
+
+  fn set_value(self: &mut Self, value: Bool) {
+    let ptr = self.core_mut().inline.as_mut_ptr() as *mut Bool;
+    unsafe{
+      std::ptr::write_unaligned(ptr, value);
+    }
   }
 }
 
@@ -122,10 +137,17 @@ impl NADagNode<StringBuiltIn> {
 
     // Needs destruction to drop the `String` in `DagNodeCode::inline`.
     node.set_flags(DagNodeFlag::NeedsDestruction.into());
+    // The unwrap is guaranteed to succeed by construction.
+    node.as_any_mut().downcast_mut::<Self>().unwrap().set_value(value);
 
-    // let (ptr, length, capacity) = value.into_raw_parts();
-    node.core_mut().inline =  unsafe{ transmute(value.into_raw_parts()) };
     node
+  }
+
+  fn set_value(self: &mut Self, value: StringBuiltIn) {
+    let ptr = self.core_mut().inline.as_mut_ptr() as *mut StringBuiltIn;
+    unsafe{
+      std::ptr::write_unaligned(ptr, value);
+    }
   }
 }
 
@@ -165,7 +187,26 @@ impl<T: NADataType> DagNode for NADagNode<T> {
     Box::new(std::iter::empty::<DagNodePtr>())
   }
 
-  // Only called for `NADataType` that needs to release resources, which is only `StringBuiltIn`
+  fn make_canonical(&self, _hash_cons_set: &mut HashConsSet) -> DagNodePtr {
+    self.as_ptr()
+  }
+
+  fn make_canonical_copy(&self, _hash_cons_set: &mut HashConsSet) -> DagNodePtr {
+    self.make_clone()
+  }
+
+  fn make_clone(&self) -> DagNodePtr {
+    let mut new_node = T::make_dag_node(self.value());
+
+    // Copy over just the rewriting flags
+    let rewrite_flags = self.flags() & DagNodeFlag::RewritingFlags;
+    new_node.set_flags(rewrite_flags);
+    new_node.set_sort_index(self.sort_index());
+
+    new_node
+  }
+
+  // Only needed for `NADataType` that needs to release resources, which is only `StringBuiltIn`
   #[inline(always)]
   fn finalize(&mut self) {
     T::finalize_dag_node(self);
@@ -243,7 +284,7 @@ mod tests {
 
     assert_eq!(value_from_node, value);
   }
-  
+
   #[test]
   fn create_string_dag_node() {
     let value = String::from("Hello, world!");

@@ -43,8 +43,8 @@ set_global_logging_threshold(3);
 println!("The global logging threshold is {}", get_global_logging_threshold());
 // Messages logged at levels greater than 3 will not be emitted until the verbosity is set to another value.
 // ...
-// (Re)set the verbosity to 5.
-set_global_logging_threshold(5);
+// (Re)set the verbosity to 0.
+set_global_logging_threshold(0);
 // Messages logged at any nonnegative level will now be emitted from here on.
 ```
 
