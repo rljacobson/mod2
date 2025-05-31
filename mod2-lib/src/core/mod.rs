@@ -25,6 +25,7 @@ pub(crate) mod substitution;
 mod redex_position;
 mod interpreter;
 mod hash_cons_set;
+mod memo_map;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
