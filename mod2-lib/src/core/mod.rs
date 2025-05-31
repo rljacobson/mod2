@@ -26,6 +26,7 @@ mod redex_position;
 mod interpreter;
 mod hash_cons_set;
 mod memo_map;
+mod rewriting_context;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
@@ -37,10 +38,6 @@ pub(crate) use hash_cons_set::HashConsSet;
 // Public API
 pub use module::*;
 pub use theory::*;
-
-
-#[allow(unused_imports)]
-pub use gc::root_container::RootVec;
 
 /// A `*mut Void` is a pointer to a `u8`
 // ToDo: Should this be `()`?

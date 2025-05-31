@@ -284,6 +284,11 @@ pub trait DagNode {
   }
 
   #[inline(always)]
+  fn is_reduced(&self) -> bool {
+    self.core().flags.contains(DagNodeFlag::Reduced)
+  }
+
+  #[inline(always)]
   fn set_flags(&mut self, flags: DagNodeFlags) {
     self.core_mut().flags.insert(flags);
   }
@@ -395,6 +400,24 @@ pub trait DagNode {
   /// Makes a shallow clone of this node.
   fn make_clone(&self) -> DagNodePtr;
 
+  /// Overwrites other with a clone of self. Invalidates existing fat pointers.
+  /// MUST be overridden for nonstandard args or inline data that needs to be cloned.
+  fn overwrite_with_clone(&mut self, mut other: DagNodePtr) -> DagNodePtr {
+    let node_mut = other.core_mut();
+
+    // Overwrite all `DagNodeCore` fields. 
+    node_mut.args       = self.shallow_copy_args();
+    node_mut.inline     = self.core().inline;
+    node_mut.theory_tag = self.core().theory_tag;
+    node_mut.symbol     = self.symbol();
+    node_mut.sort_index = self.sort_index();
+    // Copy over just the rewriting flags
+    let rewrite_flags   = self.flags() & DagNodeFlag::RewritingFlags;
+    node_mut.flags      = rewrite_flags;
+
+    DagNodeCore::upgrade(node_mut)
+  }
+
   // endregion Copy Constructors
 
   // region GC related methods
@@ -432,6 +455,18 @@ pub trait DagNode {
       node.mark();
     }
   } // end fn mark
+  
+  fn shallow_copy_args(&self) -> *mut u8 {
+    if !self.core().args.is_null() && self.core().needs_destruction() {
+      // Reallocate
+      let node_vector: DagNodeVectorRefMut = arg_to_node_vec(self.core().args);
+      (node_vector.copy() as *mut DagNodeVector) as *mut u8
+    } // The empty or singleton case
+    else {
+      // Be careful: 
+      self.core().args
+    }
+  }
 
   /// Finalize is run when this node is swept during garbage collection if its `NeedsDestruction` flag is set. The
   /// finalizer should only release whatever it is directly responsible for and cannot assume any of its children exist.

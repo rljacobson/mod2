@@ -92,7 +92,7 @@ impl DagNode for FreeDagNode {
   }
 
   /// For hash consing, recursively checks child nodes to determine if a canonical copy needs to be made.
-  /// 
+  ///
   /// Note: Does not add the canonical-ized self to `hash_cons_set`. This avoids an infinite recursion
   ///       in `HashConsSet::insert`.
   fn make_canonical(&self, hash_cons_set: &mut HashConsSet) -> DagNodePtr {
@@ -104,8 +104,8 @@ impl DagNode for FreeDagNode {
         continue;
       }
 
-      // Detected a non-canonical argument, need to make a new copy. It is convenient to 
-      // copy the arguments first. Everything up to `idx` is already canonical, so just 
+      // Detected a non-canonical argument, need to make a new copy. It is convenient to
+      // copy the arguments first. Everything up to `idx` is already canonical, so just
       // copy those to the new node.
       let mut new_args = Vec::with_capacity(self.arity().as_numeric() as usize);
       new_args.extend(self.iter_args().take(idx-1));
@@ -113,14 +113,14 @@ impl DagNode for FreeDagNode {
       new_args.push(canonical_dag_node);
       // From `idx` on, we still need to make canonical.
       new_args.extend(self.iter_args().skip(idx).map(|d| hash_cons_set.insert(d)));
-      
+
       // Now create a new copy of self with these args.
       let mut new_node  = FreeDagNode::with_args(self.symbol(), &mut new_args);
       // Copy over just the rewriting flags
       let rewrite_flags = self.flags() & DagNodeFlag::RewritingFlags;
       new_node.set_flags(rewrite_flags);
       new_node.set_sort_index(self.sort_index());
-      
+
       return new_node;
     }
 
@@ -144,7 +144,7 @@ impl DagNode for FreeDagNode {
     new_node
   }
 
-  /// Constructs a shallow copy of this node. 
+  /// Constructs a shallow copy of this node.
   fn make_clone(&self) -> DagNodePtr {
     // It is convenient to copy the arguments first. We only copy the pointers; we don't clone them.
     let mut new_args = Vec::with_capacity(self.arity().as_numeric() as usize);

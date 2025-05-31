@@ -1,7 +1,7 @@
 /*!
 
-A `RootVec` is a link in the linked list of roots of garbage collected DAG node objects. A `RootSet` is similar 
-but stores its roots in a `HashSet` rather than a `SmallVec`. A `RootMap` likewise stores its roots in a `HashMap`. 
+A `RootVec` is a link in the linked list of roots of garbage collected DAG node objects. A `RootSet` is similar
+but stores its roots in a `HashSet` rather than a `SmallVec`. A `RootMap` likewise stores its roots in a `HashMap`.
 
 # `RootVec`
 
@@ -32,9 +32,13 @@ use std::{
 };
 use crate::api::dag_node::DagNode;
 
+// These always need to be boxed
 pub use root_map::RootMap;
 pub use root_set::RootSet;
 pub use root_vec::RootVec;
+pub type BxRootMap = Box<RootMap>;
+pub type BxRootSet = Box<RootSet>;
+pub type BxRootVec = Box<RootVec>;
 
 /// Marks all roots in the linked lists of root containers.
 pub fn mark_roots() {

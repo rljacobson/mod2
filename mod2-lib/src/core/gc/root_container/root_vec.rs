@@ -75,6 +75,12 @@ impl RootVec {
     container.link();
     container
   }
+  
+  /// Because this structure is so often used to hold a single node, this convenience method gives direct access to 
+  /// the first node in `self.nodes`.
+  pub fn node(&self) -> DagNodePtr {
+    *self.nodes.first().unwrap()
+  }
 
   /// Mark the nodes contained in this root container as live (during the GC mark phase)
   pub fn mark(&mut self) {

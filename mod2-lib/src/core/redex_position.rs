@@ -17,6 +17,7 @@ pub enum RedexPositionFlags {
 use RedexPositionFlags::{Eager, Stale};
 
 pub struct RedexPosition {
+  // ToDo: These need to be marked!
   pub dag_node:     DagNodePtr,
   pub parent_index: i32, // These indices can be UNDEFINED/NONE
   pub arg_index:    i32,
