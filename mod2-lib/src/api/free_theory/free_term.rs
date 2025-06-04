@@ -45,15 +45,17 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
+use crate::api::automaton::BxLHSAutomaton;
+use crate::core::automata::RHSBuilder;
 
 pub struct FreeTerm{
   core                 : TermCore,
-  pub args             : Vec<BxTerm>,
+  pub args             : Vec<TermPtr>,
   pub(crate) slot_index: i32,
 }
 
 impl FreeTerm {
-  pub fn new(symbol: SymbolPtr, args: Vec<BxTerm>) -> Self {
+  pub fn new(symbol: SymbolPtr, args: Vec<TermPtr>) -> Self {
     Self {
       core      : TermCore::new(symbol),
       args,
@@ -103,13 +105,14 @@ impl Term for FreeTerm {
     TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  fn copy(&self) -> BxTerm {
+  fn copy(&self) -> TermPtr {
     let term = FreeTerm{
       core: self.core.clone(),
       args: self.args.iter().map(|t| t.copy()).collect(),
       slot_index: self.slot_index.clone(),
     };
-    Box::new(term)
+    
+    TermPtr::new(Box::into_raw(Box::new(term)))
   }
 
 
@@ -118,7 +121,7 @@ impl Term for FreeTerm {
   }
 
   /// In sync with `FreeDagNode::structural_hash()`
-  fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType) {
+  fn normalize(&mut self, full: bool) -> (Option<TermPtr>, bool, HashType) {
     let mut changed   : bool     = false;
     let mut hash_value: HashType = self.symbol().hash();
 
@@ -149,7 +152,7 @@ impl Term for FreeTerm {
   }
 
   fn iter_args(&self) -> Box<dyn Iterator<Item=TermPtr> + '_> {
-    Box::new(self.args.iter().map(|arg| { Term::as_ptr(arg.as_ref()) } ))
+    Box::new(self.args.iter().copied())
   }
 
   // region Comparison Methods
@@ -158,8 +161,8 @@ impl Term for FreeTerm {
     assert_eq!(&self.symbol(), &other.symbol(), "symbols differ");
 
     if let Some(other) = other.as_any().downcast_ref::<FreeTerm>() {
-      for (arg_self, arg_other) in self.args.iter().zip(other.args.iter()) {
-        let r = arg_self.compare(arg_other.as_ref());
+      for (&arg_self, &arg_other) in self.args.iter().zip(other.args.iter()) {
+        let r = arg_self.compare(arg_other.deref());
         if r.is_ne() {
           return r;
         }
@@ -236,7 +239,7 @@ impl Term for FreeTerm {
 
     new_node
   }
-  /*
+  
     // region Compiler-related
     #[inline(always)]
     fn compile_lhs(
@@ -244,8 +247,9 @@ impl Term for FreeTerm {
       match_at_top: bool,
       variable_info: &VariableInfo,
       bound_uniquely: &mut NatSet,
-    ) -> (RcLHSAutomaton, bool) {
-      FreeTerm::compile_lhs(self, match_at_top, variable_info, bound_uniquely)
+    ) -> (BxLHSAutomaton, bool) {
+      todo!("Implement FreeTerm::compile_lhs");
+      // FreeTerm::compile_lhs(self, match_at_top, variable_info, bound_uniquely)
     }
 
     /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
@@ -258,9 +262,9 @@ impl Term for FreeTerm {
       available_terms: &mut TermBag,
       eager_context: bool,
     ) -> i32 {
-      FreeTerm::compile_rhs_aux(&mut self, rhs_builder, variable_info, available_terms, eager_context)
+      todo!("Implement FreeTerm::compile_rhs_aux");
+      // FreeTerm::compile_rhs_aux(&mut self, rhs_builder, variable_info, available_terms, eager_context)
     }
-    */
 
 
   fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {
@@ -363,7 +367,7 @@ impl FreeTerm {
       if let Some(f) = t.as_any_mut().downcast_mut::<FreeTerm>() {
         f.scan_free_skeleton(free_symbols, other_symbols, our_position, i as i32);
       } else {
-        let occurrence = FreeOccurrence::new(our_position, i as i32, t.as_ptr());
+        let occurrence = FreeOccurrence::new(our_position, i as i32, *t);
         other_symbols.push(occurrence);
       }
     }

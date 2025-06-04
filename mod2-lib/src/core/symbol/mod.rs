@@ -12,7 +12,7 @@ mod sort_table;
 pub(self) mod op_declaration;
 
 pub use symbol_core::SymbolCore;
-pub use sort_table::SortTable;
+pub use sort_table::{SortTable, BxSortTable};
 pub use op_declaration::*;
 
 

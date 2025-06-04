@@ -115,5 +115,7 @@ pub mod kind;
 pub mod sort;
 pub mod collection;
 pub mod kind_error;
+mod sort_index;
 
 pub use sort::*;
+pub use sort_index::SortIndex;

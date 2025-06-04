@@ -115,6 +115,11 @@ impl RewritingContext {
   }
 
   #[inline(always)]
+  pub fn finished(&mut self) {
+    self.substitution.finished()
+  }
+
+  #[inline(always)]
   pub fn trace_abort(&self) -> bool {
     let attribute = ContextAttribute::Abort;
     self.attributes.contains(attribute)

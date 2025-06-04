@@ -1,6 +1,7 @@
 mod free_term;
 mod free_dag_node;
 mod free_symbol;
+// mod compiler;
 
 use std::ops::{Deref, DerefMut};
 use crate::{
@@ -116,12 +117,12 @@ mod tests {
       (None, true, hash) => {
         println!("h term changed: {}, hash: {}", h_term, hash);
         assert_eq!(h_term.structural_hash(), hash);
-        Box::new(h_term)
+        TermPtr::new(Box::into_raw(Box::new(h_term)))
       }
       (_, _, hash) => {
         println!("h term hash: {}", hash);
         assert_eq!(h_term.structural_hash(), hash);
-        Box::new(h_term)
+        TermPtr::new(Box::into_raw(Box::new(h_term)))
       }
     };
 
@@ -135,12 +136,12 @@ mod tests {
       (None, true, hash) => {
         println!("g term changed: {}, hash: {}", g_term, hash);
         assert_eq!(g_term.structural_hash(), hash);
-        Box::new(g_term)
+        TermPtr::new(Box::into_raw(Box::new(g_term)))
       }
       (_, _, hash) => {
         println!("g term hash: {}", hash);
         assert_eq!(g_term.structural_hash(), hash);
-        Box::new(g_term)
+        TermPtr::new(Box::into_raw(Box::new(g_term)))
       }
     };
 
@@ -154,12 +155,12 @@ mod tests {
       (None, true, hash) => {
         println!("f term changed: {}, hash: {}", f_term, hash);
         assert_eq!(f_term.structural_hash(), hash);
-        Box::new(f_term)
+        TermPtr::new(Box::into_raw(Box::new(f_term)))
       }
       (_, _, hash) => {
         println!("f term hash: {}", hash);
         assert_eq!(f_term.structural_hash(), hash);
-        Box::new(f_term)
+        TermPtr::new(Box::into_raw(Box::new(f_term)))
       }
     };
 
@@ -180,11 +181,11 @@ mod tests {
       }
       (None, true, hash) => {
         println!("h term changed: {}, hash: {}", h_term, hash);
-        Box::new(h_term)
+        TermPtr::new(Box::into_raw(Box::new(h_term)))
       }
       (_, _, hash) => {
         println!("h term hash: {}", hash);
-        Box::new(h_term) 
+        TermPtr::new(Box::into_raw(Box::new(h_term)))
       }
     };
     
@@ -198,12 +199,12 @@ mod tests {
       (None, true, hash) => {
         println!("g term changed: {}, hash: {}", g_term, hash);
         assert_eq!(g_term.structural_hash(), hash);
-        Box::new(g_term)
+        TermPtr::new(Box::into_raw(Box::new(g_term)))
       }
       (_, _, hash) => {
         println!("g term hash: {}", hash);
         assert_eq!(g_term.structural_hash(), hash);
-        Box::new(g_term)
+        TermPtr::new(Box::into_raw(Box::new(g_term)))
       }
     };
     
@@ -217,12 +218,12 @@ mod tests {
       (None, true, hash) => {
         println!("f term changed: {}, hash: {}", f_term, hash);
         assert_eq!(f_term.structural_hash(), hash);
-        Box::new(f_term)
+        TermPtr::new(Box::into_raw(Box::new(f_term)))
       }
       (_, _, hash) => {
         println!("f term hash: {}", hash);
         assert_eq!(f_term.structural_hash(), hash);
-        Box::new(f_term)
+        TermPtr::new(Box::into_raw(Box::new(f_term)))
       }
     };
     

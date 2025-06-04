@@ -1,29 +1,24 @@
 /*!
 
 
-ToDo: The sort indexes are stored as `i32` values here, but in Maude, `Term::sortIndex` is a `short` == `i16`.
 
 */
 
 use std::{
-  collections::{HashMap, HashSet},
   fmt::Write
 };
 
-use mod2_abs::{
-  numeric::{
-    traits::{One, Zero},
-    BigInt,
-  },
-  debug, NatSet, tracing::warn, error,
-};
+use mod2_abs::{numeric::{
+  traits::{One, Zero},
+  BigInt,
+}, debug, NatSet, tracing::warn, error, HashSet, HashMap, warning};
 
 use crate::{
   core::{
     sort::{
+      SortIndex,
       SortPtr,
-      SpecialSort,
-      kind::KindPtr
+      kind::KindPtr,
     },
     symbol::op_declaration::{ConstructorStatus, OpDeclaration}
   },
@@ -33,6 +28,9 @@ use crate::{
   },
 };
 
+
+pub type BxSortTable = Box<SortTable>;
+
 // ToDo: Most of these vectors are likely to be small. Benchmark with tiny_vec.
 #[derive(PartialEq, Eq)]
 pub struct SortTable {
@@ -41,9 +39,9 @@ pub struct SortTable {
   arg_count                : i16,
   op_declarations          : Vec<OpDeclaration>,
   arg_kinds                : Vec<KindPtr>,       // "component vector"
-  pub sort_diagram         : Vec<i32>,
+  pub sort_diagram         : Vec<SortIndex>,
   single_non_error_sort    : Option<SortPtr>,    // if we can only generate one non-error sort
-  constructor_diagram      : Vec<i32>,
+  constructor_diagram      : Vec<SortIndex>,
   maximal_op_decl_set_table: Vec<NatSet>,        // indices of maximal op decls with range <= each sort
 }
 
@@ -103,7 +101,7 @@ impl SortTable {
     if self.maximal_op_decl_set_table.is_empty() {
       self.compute_maximal_op_decl_set_table();
     }
-    &self.maximal_op_decl_set_table[target.index_within_kind as usize]
+    &self.maximal_op_decl_set_table[target.index_within_kind.idx_unchecked()]
   }
 
   #[inline(always)]
@@ -176,15 +174,13 @@ impl SortTable {
   }
 
   #[inline(always)]
-  pub fn traverse(&self, position: usize, sort_index: usize) -> i32 {
-    // ToDo: Do we need a bounds check?
-    self.sort_diagram[position + sort_index]
+  pub fn traverse(&self, position: usize, sort_index: SortIndex) -> SortIndex {
+    self.sort_diagram[position + sort_index.idx_unchecked()]
   }
 
   #[inline(always)]
-  pub fn constructor_traverse(&self, position: usize, sort_index: usize) -> i32 {
-    // ToDo: Do we need a bounds check?
-    self.constructor_diagram[position + sort_index]
+  pub fn constructor_traverse(&self, position: usize, sort_index: SortIndex) -> SortIndex {
+    self.constructor_diagram[position + sort_index.idx_unchecked()]
   }
 
   pub fn domain_subsumes(&self, subsumer: usize, victim: usize) -> bool {
@@ -208,7 +204,7 @@ impl SortTable {
         .resize(sort_count, NatSet::new());
 
     for i in 0..sort_count {
-      let target = range.sort(i);
+      let target = range.sort( SortIndex::try_from(i).unwrap() );
 
       for j in 0..declaration_count {
         if (&self.op_declarations[j])[self.arg_count as usize].leq(target) {
@@ -274,17 +270,15 @@ impl SortTable {
     if self.arg_count == 0 {
       let (sort_index, unique) = self.find_min_sort_index(all);
       assert!(unique, "sort declarations for constant do not have a unique least sort.");
-      self.sort_diagram.push(sort_index as i32);
-      self.single_non_error_sort = Some(self.arg_kinds[0].sort(sort_index as usize));
+      self.sort_diagram.push(sort_index);
+      self.single_non_error_sort = Some(self.arg_kinds[0].sort(sort_index));
       return;
     }
 
-    const UNINITIALIZED: i32            = 0;
-    const IMPOSSIBLE   : i32            = -1;
-    let mut single_non_error_sort_index = UNINITIALIZED;
+    let mut single_non_error_sort_index = SortIndex::UNINITIALIZED;
     let mut next_states                 = Vec::new();
     let mut current_base                = 0;
-    let mut bad_terminals               = std::collections::HashSet::new();
+    let mut bad_terminals               = HashSet::new();
 
     for i in 0..self.arg_count as usize {
       let component         = self.arg_kinds[i];
@@ -292,7 +286,7 @@ impl SortTable {
       let nr_current_states = current_states.len();
 
       let next_base = current_base + nr_sorts * nr_current_states;
-      self.sort_diagram.resize(next_base, 0);
+      self.sort_diagram.resize(next_base, SortIndex::ZERO);
 
       let nr_next_sorts = if i == (self.arg_count - 1) as  usize {
         0
@@ -301,7 +295,7 @@ impl SortTable {
       };
 
       for j in 0..nr_sorts {
-        let s = component.sort(j);
+        let s = component.sort(j.try_into().unwrap());
         let mut viable = NatSet::new();
 
         for (k, decl) in self.op_declarations.iter().enumerate() {
@@ -316,22 +310,22 @@ impl SortTable {
 
           if nr_next_sorts == 0 {
             let (sort_index, unique) = self.find_min_sort_index(&next_state);
-            let sort_index           = sort_index as i32;
             self.sort_diagram[index] = sort_index;
             if !unique {
-              bad_terminals.insert(index);
+              bad_terminals.insert(index.try_into().unwrap());
             }
-            if sort_index > 0 {
-              if single_non_error_sort_index == UNINITIALIZED {
+            if sort_index.is_positive() {
+              if single_non_error_sort_index == SortIndex::UNINITIALIZED {
                 single_non_error_sort_index = sort_index;
               } else if single_non_error_sort_index != sort_index {
-                single_non_error_sort_index = IMPOSSIBLE;
+                single_non_error_sort_index = SortIndex::IMPOSSIBLE;
               }
             }
           } else {
             self.minimize(&mut next_state, i + 1);
             let state_num            = SortTable::find_state_number(&mut next_states, next_state);
-            self.sort_diagram[index] = (next_base + nr_next_sorts * state_num) as i32;
+            let new_state            = next_base + nr_next_sorts * state_num;
+            self.sort_diagram[index] = new_state.try_into().unwrap();
           }
         }
       }
@@ -341,9 +335,9 @@ impl SortTable {
       current_base = next_base;
     }
 
-    if single_non_error_sort_index > 0 {
+    if single_non_error_sort_index.is_positive() {
       self.single_non_error_sort = Some(
-        self.arg_kinds[self.arg_count as usize].sort(single_non_error_sort_index as usize),
+        self.arg_kinds[self.arg_count as usize].sort(single_non_error_sort_index),
       );
     }
 
@@ -359,11 +353,11 @@ impl SortTable {
   /// that is consistent with all declarations in the set. The index of the minimal sort
   /// and a bool to indicate whether the minimal sort is unambiguous. Used to determine
   /// the result sort for a given combination of argument sorts in the sort diagram.
-  fn find_min_sort_index(&self, state: &NatSet) -> (u32, bool) {
+  fn find_min_sort_index(&self, state: &NatSet) -> (SortIndex, bool) {
     let arg_count = self.arg_count as usize;
 
     // Start with the error sort
-    let mut min_sort   = self.arg_kinds[arg_count].sort(SpecialSort::ErrorSort.into());
+    let mut min_sort   = self.arg_kinds[arg_count].sort(SortIndex::ERROR);
     let mut inf_so_far = min_sort.leq_sorts.clone();
 
     for i in state.iter() {
@@ -453,7 +447,7 @@ impl SortTable {
   /// ambiguous or conflicting sort declarations. It builds a spanning tree from the sort
   /// diagram to trace sort tuples that lead to errors, computes how many such tuples exist,
   /// and identifies the first encountered problematic tuple to provide meaningful diagnostics.
-  fn sort_error_analysis(&self, prereg_problem: bool, bad_terminals: &HashSet<usize>) {
+  fn sort_error_analysis(&self, prereg_problem: bool, bad_terminals: &HashSet<SortIndex>) {
     // First we build a spanning tree with a path count, parent node and sort index (from parent)
     // for each node. Nonterminal nodes are named by their start index in the diagram vector
     // while terminals are named by the absolute index of the terminal in the diagram vector.
@@ -462,8 +456,8 @@ impl SortTable {
     #[derive(Default)]
     struct Node {
       path_count: BigInt,
-      parent    : Option<usize>,
-      sort_index: Option<usize>,
+      parent    : SortIndex,
+      sort_index: SortIndex,
     }
 
     let diagram = if prereg_problem { &self.sort_diagram } else { &self.constructor_diagram };
@@ -472,16 +466,16 @@ impl SortTable {
     let mut spanning_tree: HashMap<usize, Node> = HashMap::new();
     spanning_tree.insert(0, Node {
       path_count: BigInt::one(),
-      parent    : None,
-      sort_index: None,
+      parent    : SortIndex::UNKNOWN,
+      sort_index: SortIndex::UNKNOWN,
     });
 
     let mut product       = BigInt::one();
     let mut bad_count     = BigInt::zero();
-    let mut first_bad     = vec![0; nr_args];
+    let mut first_bad     = vec![SortIndex::ZERO; nr_args];
     let mut current_nodes = HashSet::new();
 
-    current_nodes.insert(0);
+    current_nodes.insert(SortIndex::ZERO);
 
     for i in 0..nr_args {
       let component       = self.arg_kinds[i];
@@ -490,7 +484,7 @@ impl SortTable {
       product            *= nr_sorts;
 
       for &parent in &current_nodes {
-        let path_count = spanning_tree[&parent].path_count.clone();
+        let path_count = spanning_tree[&parent.idx_unchecked()].path_count.clone();
 
         for k in 0..nr_sorts {
           let index = parent + k;
@@ -500,13 +494,13 @@ impl SortTable {
             if bad_terminals.contains(&index) {
               if bad_count.is_zero() {
                 bad_count = path_count.clone();
-                first_bad[nr_args - 1] = k;
+                first_bad[nr_args - 1] = k.try_into().unwrap();
 
                 let mut n = parent;
                 for l in (0..nr_args - 1).rev() {
-                  if let Some(node) = spanning_tree.get(&n) {
-                    first_bad[l] = node.sort_index.expect("missing sort index");
-                    n = node.parent.expect("missing parent");
+                  if let Some(node) = spanning_tree.get(&n.idx_unchecked()) {
+                    first_bad[l] = node.sort_index;
+                    n = node.parent;
                   } else {
                     panic!("missing node in spanning tree");
                   }
@@ -517,13 +511,13 @@ impl SortTable {
             }
           } else {
             // Non-terminal node
-            let target = diagram[index] as usize;
-            let entry  = spanning_tree.entry(target).or_insert_with(Node::default);
+            let target = diagram[index.idx_unchecked()];
+            let entry  = spanning_tree.entry(target.idx_unchecked()).or_insert_with(Node::default);
 
             if entry.path_count.is_zero() {
               entry.path_count = path_count.clone();
-              entry.parent     = Some(parent);
-              entry.sort_index = Some(k);
+              entry.parent     = parent;
+              entry.sort_index = k.try_into().unwrap();
               next_nodes.insert(target);
             } else {
               entry.path_count += path_count.clone();
@@ -539,7 +533,8 @@ impl SortTable {
     let kind  = if prereg_problem { "sort" } else { "constructor" };
     let check = if prereg_problem { "preregularity" } else { "constructor consistency" };
 
-    warn!(
+    warning!(
+      0,
       "{} declarations for operator symbol failed {} check on {} out of {} sort tuples. First such tuple is ({}).",
       kind,
       check,
@@ -547,7 +542,7 @@ impl SortTable {
       product,
       first_bad.iter()
                .enumerate()
-               .map(|(i, &idx)| format!("{}", self.arg_kinds[i].sort(idx)))
+               .map(|(i, &idx)| format!("{}", self.arg_kinds[i].sort(idx.try_into().unwrap())))
                .collect::<Vec<_>>()
                .join(", ")
     );
@@ -565,8 +560,8 @@ impl SortTable {
 
     writeln!(f, "{}Begin{{SortDiagram}}", " ".repeat(indent_level))?;
     let indent_level = indent_level + 2;
-    let mut nodes: HashSet<usize> = HashSet::new();
-    nodes.insert(0);
+    let mut nodes: HashSet<SortIndex> = HashSet::new();
+    nodes.insert(SortIndex::ZERO);
 
     let range = self.arg_kinds[self.arg_count as usize]; // Result component
 
@@ -577,7 +572,7 @@ impl SortTable {
         "{}node 0 -> sort {} ({})",
         " ".repeat(indent_level - 1),
         target,
-        range.sort(target as usize)
+        range.sort(target)
       )?;
       return Ok(());
     }
@@ -598,14 +593,14 @@ impl SortTable {
 
         for k in 0..nr_sorts {
           let index = node + k;
-          let target = self.sort_diagram[index];
+          let target = self.sort_diagram[index.idx_unchecked()];
 
           write!(
             f,
             "{}sort {} ({}) -> ",
             " ".repeat(indent_level),
             k,
-            component.sort(k)
+            component.sort(k.try_into().unwrap())
           )?;
 
           if i == self.arg_count as usize - 1 {
@@ -613,11 +608,11 @@ impl SortTable {
               f,
               "sort {} ({})",
               target,
-              range.sort(target as usize)
+              range.sort(target)
             )?;
           } else {
             writeln!(f, "node {}", target)?;
-            next_nodes.insert(target as usize);
+            next_nodes.insert(target);
           }
         }
       }

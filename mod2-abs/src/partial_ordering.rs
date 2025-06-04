@@ -1,5 +1,7 @@
 /*!
 
+Provides `PartialOrdering` and `Outcome` types that have an `Unknown` variant.
+
 We need a version of `std::cmp::Ordering` that also has an `Unknown` or `Undecided` variant. In the Maude source, this 
 enum is called `ReturnValue`.
 
@@ -8,6 +10,27 @@ on the sign of the number.
 
 */
 use std::cmp::Ordering;
+
+// Todo: Should we use Option<bool>?
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum Outcome {
+  Success,
+  Failure,
+  Undecided, // Unknown
+}
+
+
+impl From<bool> for Outcome {
+  fn from(value: bool) -> Self {
+    if value {
+      Outcome::Success
+    } else {
+      Outcome::Failure
+    }
+  }
+}
+
+
 
 #[allow(non_snake_case)]
 pub mod PartialOrdering {

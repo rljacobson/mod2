@@ -7,22 +7,32 @@ implemented.) The subclass is implemented as enum `PreEquationKind`.
 
 pub mod condition;
 mod membership;
+mod sort_constraint_table;
 
 use std::fmt::{Display, Formatter};
 
 use enumflags2::{bitflags, BitFlags};
-use mod2_abs::{join_string, IString};
+use mod2_abs::{join_string, warning, IString, NatSet, UnsafePtr};
 
-use crate::{core::{
-  pre_equation::condition::Conditions,
-  VariableInfo
-}, api::{
-  term::BxTerm,
-  dag_node::DagNodePtr
-}, impl_display_debug_for_formattable};
-use crate::core::format::{FormatStyle, Formattable};
+use crate::{
+  impl_display_debug_for_formattable,
+  api::{
+    dag_node::DagNodePtr,
+    term::BxTerm
+  },
+  core::{
+    pre_equation::condition::Conditions,
+    VariableInfo,
+    format::{FormatStyle, Formattable},
+    interpreter::InterpreterAttribute
+  }
+};
 use super::sort::SortPtr;
+pub use sort_constraint_table::{SortConstraintTable, BxSortConstraintTable};
 
+
+pub type BxPreEquation = Box<PreEquation>;
+pub type PreEquationPtr = UnsafePtr<PreEquation>;
 
 #[bitflags]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -77,7 +87,7 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
-use crate::core::interpreter::InterpreterAttribute;
+use crate::api::automaton::BxLHSAutomaton;
 
 impl PreEquationKind {
   pub fn noun(&self) -> &'static str {
@@ -106,7 +116,7 @@ pub struct PreEquation {
   pub pe_kind      : PreEquationKind,
   pub conditions   : Conditions,
   pub lhs_term     : BxTerm,
-  // pub lhs_automaton: Option<RcLHSAutomaton>,
+  pub lhs_automaton: Option<BxLHSAutomaton>,
   pub lhs_dag      : Option<DagNodePtr>,
   pub variable_info: VariableInfo,
 
@@ -131,6 +141,7 @@ impl PreEquation {
       attributes,
       conditions,
       lhs_term,
+      lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
       pe_kind      : Rule{ rhs_term },
@@ -150,6 +161,7 @@ impl PreEquation {
       attributes,
       conditions,
       lhs_term,
+      lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
       pe_kind      : Equation{ rhs_term, fast_variable_count: 0 },
@@ -169,6 +181,7 @@ impl PreEquation {
       attributes,
       conditions,
       lhs_term,
+      lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
       pe_kind      : Membership{ sort: rhs_sort },
@@ -179,7 +192,7 @@ impl PreEquation {
   // endregion Constructors
   
   // Common implementation
-  // fn trace_begin_trial(&self, subject: RcDagNode, context: RcRewritingContext) -> Option<i32> {
+  // fn trace_begin_trial(&self, subject: DagNodePtr, context: RcRewritingContext) -> Option<i32> {
   //   context.borrow_mut().trace_begin_trial(subject, self)
   // }
 
@@ -194,36 +207,6 @@ impl PreEquation {
     self.index_within_parent_module
   }
 
-  /*
-  #[inline(always)]
-  fn lhs_term(&self) -> RcTerm{
-    self.lhs_term.clone()
-  }
-  #[inline(always)]
-  fn lhs_automaton(&self) -> RcLHSAutomaton{
-    self.lhs_automaton.as_ref().unwrap().clone()
-  }
-  #[inline(always)]
-  fn lhs_dag(&self) -> RcDagNode{
-    self.lhs_dag.as_ref().unwrap().clone()
-  }
-  #[inline(always)]
-  fn condition_mut(&mut self) -> &mut Condition {
-    &mut self.condition
-  }
-  #[inline(always)]
-  pub(crate) fn variable_info(&self) -> &VariableInfo{
-    &self.variable_info
-  }
-  #[inline(always)]
-  fn variable_info_mut(&mut self) -> &mut VariableInfo{
-    &mut self.variable_info
-  }
-  #[inline(always)]
-  fn name(&self) -> Option<IString> {
-    self.name.clone()
-  }
-  */
   //endregion
 
   // region  Attributes
@@ -264,6 +247,170 @@ impl PreEquation {
   }
 
   // endregion
+  
+  // region Compiler related methods
+  
+  
+  // endregion Compiler related methods
+  
+  // region `check*` methods
+
+  /// Normalize lhs and recursively collect the indices and occurs sets of this term and its descendants
+  fn check(&mut self) {
+    self.lhs_term.as_mut().normalize(true);
+    index_variables(&self.lhs_term, &mut self.variable_info);
+
+    let mut bound_variables: NatSet = self.lhs_term.occurs_below().clone(); // Deep copy
+
+    for mut condition_fragment in self.conditions {
+      condition_fragment.as_mut().check(&mut self.variable_info, &mut bound_variables);
+    }
+
+    match &mut self.pe_kind {
+      
+      Equation { rhs_term, .. } => {
+        {
+          rhs_term.as_mut().normalize(false);
+        }
+        index_variables(rhs_term, &mut self.variable_info);
+
+        let mut unbound_variables = rhs_term.as_mut().occurs_below_mut();
+        unbound_variables.difference_in_place(&bound_variables);
+        self.variable_info.add_unbound_variables(unbound_variables);
+        
+      }
+      
+      Rule { rhs_term, .. } => {
+        rhs_term.as_mut().normalize(false);
+        index_variables(rhs_term, &mut self.variable_info);
+
+        let mut unbound_variables = rhs_term.as_mut().occurs_below().difference(&bound_variables);
+        self.variable_info.add_unbound_variables(&unbound_variables);
+
+        if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
+          let mindex = self.variable_info.unbound_variables.min_value().unwrap();
+          let min_variable = self.variable_info.index_to_variable(mindex).unwrap();
+
+          let mut self_string_simple: String = "".to_string();
+          let mut self_string_default: String = "".to_string();
+          self.repr(&mut self_string_simple, FormatStyle::Simple).unwrap();
+          self.repr(&mut self_string_default, FormatStyle::Default).unwrap();
+          warning!(
+            1,
+            "{}: variable {} is used before it is bound in {}:\n{}",
+            self_string_simple,
+            min_variable,
+            self.pe_kind.noun(),
+            self_string_default
+          );
+
+          // Rules with variables used before they are bound have a legitimate purpose - they can be used with metaApply()
+          // and a substitution. So we just make the rule nonexec rather than marking it as bad.
+
+          self.set_nonexec();
+        }
+      }
+      
+      SortConstraint { .. } => {
+        // Doesn't use bound_variables.
+        sort_constraint::check(self);
+      }
+      
+      // StrategyDefinition { .. } => {
+      //   unimplemented!()
+      // }
+    }
+  }
+
+  ///  This is the most general condition checking function that allows multiple distinct successes; caller must provide
+  ///  trial_ref variable and condition state stack in order to preserve this information between calls.
+  pub(crate) fn check_condition_find_first(
+    &mut self,
+    mut find_first: bool,
+    subject: DagNodePtr,
+    context: RcRewritingContext,
+    mut subproblem: MaybeSubproblem,
+    trial_ref: &mut Option<i32>,
+    state: &mut Vec<ConditionState>,
+  ) -> bool
+  {
+    assert_ne!(self.conditions.len(), 0, "no condition");
+    assert!(!find_first || state.is_empty(), "non-empty condition state stack");
+
+    if find_first {
+      *trial_ref = None;
+    }
+
+    loop {
+      if trace_status() {
+        if find_first {
+          *trial_ref = self.trace_begin_trial(subject.clone(), context.clone());
+        }
+        if context.borrow().trace_abort() {
+          state.clear();
+          // return false since condition variables may be unbound
+          return false;
+        }
+      }
+
+      let success: bool = self.solve_condition(find_first, trial_ref, context.clone(), state);
+
+      if trace_status() {
+        if context.borrow().trace_abort() {
+          state.clear();
+          return false; // return false since condition variables may be unbound
+        }
+
+        context.borrow_mut().trace_end_trial(*trial_ref, success);
+      }
+
+      if success {
+        return true;
+      }
+      assert!(state.is_empty(), "non-empty condition state stack");
+      find_first = true;
+      *trial_ref = None;
+
+      // Condition evaluation may create nodes without doing rewrites so run GC safe point.
+      // MemoryCell::ok_to_collect_garbage();
+      if let Some(subproblem) = &mut subproblem {
+        if !subproblem.solve(false, context.clone()) {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    if trace_status() && trial_ref.is_some() {
+      context.borrow().trace_exhausted(*trial_ref);
+    }
+    false
+  }
+
+  /// Simplified interface to `check_condition_find_first(…)` for the common case where we only care
+  /// if a condition succeeds at least once or fails.
+  pub(crate) fn check_condition(
+    &mut self,
+    subject: DagNodePtr,
+    context: RcRewritingContext,
+    subproblem: MaybeSubproblem,
+  ) -> bool
+  {
+    let mut trial_ref: Option<i32> = None;
+    let mut state: Vec<ConditionState> = Vec::new();
+
+    let result = self.check_condition_find_first(true, subject, context, subproblem, &mut trial_ref, &mut state);
+
+    assert!(result || state.is_empty(), "non-empty condition state stack");
+    // state drops its elements when it goes out of scope.
+    // state.clear();
+
+    result
+  }
+
+
+  // endregion `check*` methods
+  
 }
 
 impl Formattable for PreEquation {

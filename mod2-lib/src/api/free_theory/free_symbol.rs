@@ -20,6 +20,7 @@ use crate::{
   },
   impl_display_debug_for_formattable,
 };
+use crate::api::term::TermPtr;
 
 pub struct FreeSymbol {
   core: SymbolCore
@@ -50,8 +51,8 @@ impl Symbol for FreeSymbol {
     SymbolPtr::new(self as *const dyn Symbol as *mut dyn Symbol)
   }
 
-  fn make_term(&self, args: Vec<BxTerm>) -> BxTerm {
-    Box::new(FreeTerm::new(self.as_ptr(), args))
+  fn make_term(&self, args: Vec<TermPtr>) -> TermPtr {
+    TermPtr::new(Box::into_raw(Box::new(FreeTerm::new(self.as_ptr(), args))))
   }
 
   fn core(&self) -> &SymbolCore {

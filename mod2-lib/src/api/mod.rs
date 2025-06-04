@@ -12,6 +12,7 @@ pub mod variable_theory;
 pub mod free_theory;
 pub mod built_in;
 mod dag_node_cache;
+pub mod automaton;
 
 
 // Small utility types used throughout

@@ -7,12 +7,12 @@ version.workspace    = true
 edition.workspace    = true
 license.workspace    = true
 publish.workspace    = true
-readme      = "README.md"
-keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-rewriting", "equational-logic"]
-categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
+readme     = "README.md"
+keywords   = ["pattern-matching", "matching-algorithms", "unification", "term-rewriting", "equational-logic"]
+categories = ["algorithms", "compilers", "mathematics", "science", "parsing"]
 
 [features]
-default  = ["gc_debug", "debug", "profiling"]
+default = ["gc_debug", "debug", "profiling"]
 
 debug         = []
 gc_debug      = []
@@ -20,7 +20,7 @@ multithreaded = []
 profiling     = []
 
 [dependencies]
-mod2-abs = { path = "../mod2-abs" }
+mod2-abs.workspace = true
 
 ordered-float.workspace = true
 paste.workspace         = true

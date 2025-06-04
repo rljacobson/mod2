@@ -1,9 +1,19 @@
 # In Progress
 
+- `check*` methods on `PreEquation` 
+- compileLHS / compileRHS
+
+- `Kind::sort(idx)` indexes into `self.sorts`
+- `sortIndex` is used as an array index in `SortTable::get_maximal_op_decl_set()`
+- `index_variables` free function in `pre_equation/mod.rs`
+
 # Next Steps
 
 - compiler
    - `Term::compile_lhs`, `Term::compile_rhs`
+   - Implement `FreeTerm::compile_lhs`
+   - uncomment `api/free_theory/compiler.rs`
+   - `core::automata::*` - uncomment `binding_lhs_automaton`, `copy_rhs_automaton`, and `trivial_rhs_automata`.
  
 - rewriter
   - rewriting methods on `core::rewriting_context::context::RewritingContext`

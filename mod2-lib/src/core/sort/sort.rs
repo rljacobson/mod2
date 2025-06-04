@@ -24,46 +24,31 @@ section titled, "Optimizations for Computing a Subsort Relation at Runtime."
 
 */
 
-use std::fmt::Write;
-use mod2_abs::{NatSet, IString, UnsafePtr};
+use std::{
+  fmt::Write,
+  ops::Deref
+};
+use mod2_abs::{
+  NatSet,
+  IString,
+  UnsafePtr,
+};
 use crate::{
   api::{built_in::get_built_in_sort, Arity},
   core::{
-    sort::kind::KindPtr,
-    format::{FormatStyle, Formattable}
+    sort::{
+      kind::KindPtr,
+      sort_index::SortIndex
+    },
+    format::{FormatStyle, Formattable},
   },
   impl_display_debug_for_formattable,
 };
 
+
 /// A pointer to a sort. No ownership is assumed.
-pub type SortPtr  = UnsafePtr<Sort>;
-
-/// A `SpecialSort` is just a more user-friendly way to represent special values of `sort_index_within_kind`.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-#[repr(i8)]
-pub enum SpecialSort {
-  Kind          =  0,
-  // ErrorSort     = 0, Defined below
-  FirstUserSort =  1,
-  Unknown       = -1,
-}
-
-impl SpecialSort {
-  // An alias of an existing variant:
-  //    `SpecialSort::Kind==SpecialSort::ErrorSort`
-  #[allow(non_upper_case_globals)]
-  pub const ErrorSort: SpecialSort = SpecialSort::Kind;
-}
-
-impl From<SpecialSort> for usize {
-  fn from(value: SpecialSort) -> Self {
-    match value {
-      SpecialSort::Kind => 0,
-      SpecialSort::FirstUserSort => 1,
-      SpecialSort::Unknown => panic!("Sort::Unknown cannot be converted to usize"),
-    }
-  }
-}
+pub type SortPtr        = UnsafePtr<Sort>;
+pub type MaybeSortIndex = Option<SortIndex>;
 
 
 #[derive(Eq, PartialEq, Clone)]
@@ -75,10 +60,10 @@ pub struct Sort {
   /// supersorts have been assigned an `index_within_kind` can this `Sort`'s `index_within_kind`
   /// be assigned, which only occurs when `unresolved_supersort_count` reaches zero. Therefore,
   /// we also use this field for `unresolved_supersort_count` as an optimization for subsort computations.
-  pub index_within_kind: u32,
+  pub index_within_kind: SortIndex,
 
   /// This is the index for which all sorts with `index >= fast_compare_index` are subsorts.
-  fast_compare_index: u32,
+  fast_compare_index: SortIndex,
 
   /// Adjacency lists, generally only immediately adjacent sorts. Besides sorts that
   /// are subsorts (resp supersorts) via transitivity, there may be sorts within the
@@ -103,8 +88,8 @@ impl Default for Sort {
   fn default() -> Self {
     Sort {
       name                      : IString::default(),
-      index_within_kind         : 0, // Also used for `unresolved_supersort_count` during kind construction
-      fast_compare_index        : 0,
+      index_within_kind         : SortIndex::default(), // Also used for `unresolved_supersort_count` during kind construction
+      fast_compare_index        : SortIndex::default(),
       subsorts                  : Vec::<SortPtr>::default(),
       supersorts                : Vec::<SortPtr>::default(),
       leq_sorts                 : NatSet::default(),
@@ -151,7 +136,7 @@ impl Sort {
   /// guaranteed by how `sort.register_connected_sorts` is called. Used during subsort relation closure, during `Kind`
   /// construction.
   pub fn compute_leq_sorts(&mut self) {
-    self.leq_sorts.insert(self.index_within_kind as usize);
+    self.leq_sorts.insert(self.index_within_kind.idx_unchecked());
     for subsort in self.subsorts.iter() {
       let subsort_leq_sorts: &NatSet = &subsort.leq_sorts;
       self.leq_sorts.union_in_place(subsort_leq_sorts);
@@ -159,10 +144,10 @@ impl Sort {
 
     // Now determine `fast_compare_index`, the index for which all sorts with `index >= fast_compare_index` are subsorts.
     self.fast_compare_index = self.index_within_kind;
-    let total_sort_count    = unsafe {self.kind.unwrap_unchecked().sorts.len() as u32};
-    for i in (self.index_within_kind..total_sort_count).rev() {
-      if !self.leq_sorts.contains(i as usize) {
-        self.fast_compare_index = i + 1;
+    let total_sort_count    = unsafe {self.kind.unwrap_unchecked().sorts.len()};
+    for i in (self.index_within_kind.idx_unchecked()..total_sort_count).rev() {
+      if !self.leq_sorts.contains(i) {
+        self.fast_compare_index = SortIndex::try_from(i + 1).unwrap();
         break;
       }
     }
@@ -171,14 +156,14 @@ impl Sort {
   /// Determines if self <= other. 
   #[inline(always)]
   pub fn leq(&self, other: SortPtr) -> bool {
-    other.leq_sorts.contains(self.index_within_kind as usize)
+    other.leq_sorts.contains(self.index_within_kind.idx_unchecked())
   }
 }
 
 
 impl Formattable for Sort {
   fn repr(&self, out: &mut dyn Write, _style: FormatStyle) -> std::fmt::Result {
-    if self.index_within_kind == 0 {
+    if self.index_within_kind == SortIndex::ZERO {
       write!(out, "[{}]", self.name)
     } else { 
       write!(out, "{}", self.name)
@@ -187,3 +172,26 @@ impl Formattable for Sort {
 }
 
 impl_display_debug_for_formattable!(Sort);
+
+
+
+#[inline(always)]
+pub fn index_leq_sort(index: SortIndex, sort: &Sort) -> bool {
+  assert_ne!(index, SortIndex::UNKNOWN, "unknown sort");
+  if index >= sort.fast_compare_index {
+    true
+  } else { 
+    sort.leq_sorts.contains(index.idx_unchecked())
+  }
+}
+
+#[inline(always)]
+pub fn sort_leq_index(sort: &Sort, index: SortIndex) -> bool {
+  index_leq_sort(
+    sort.index_within_kind,
+    sort.kind
+        .unwrap()
+        .sort(index)
+        .deref(),
+  )
+}

@@ -6,32 +6,30 @@ use std::{
 use mod2_abs::{int_to_subscript, IString};
 
 use crate::{
-  api::{
-    Arity,
-    symbol::SymbolPtr
-  },
+  api::{Arity, symbol::SymbolPtr},
   core::{
     symbol::{
       SortTable,
       SymbolAttributes,
       SymbolType,
-      OpDeclaration
+      OpDeclaration,
+      sort_table::BxSortTable
     },
     format::{FormatStyle, Formattable},
     strategy::Strategy,
+    pre_equation::{SortConstraintTable, BxSortConstraintTable},
   },
   HashType,
 };
 
-
-#[derive(Eq, PartialEq)]
 pub struct SymbolCore {
   pub name       : IString,
   pub arity      : Arity,
   pub attributes : SymbolAttributes,
   pub symbol_type: SymbolType,
 
-  pub sort_table: Option<SortTable>,
+  pub sort_table: Option<BxSortTable>,
+  pub sort_constraint_table: Option<BxSortConstraintTable>,
 
   /// Unique integer for comparing symbols, also called order. In Maude, the `order`
   /// has lower bits equal to the value of an integer that is incremented every time
@@ -70,6 +68,7 @@ impl SymbolCore {
       attributes,
       symbol_type,
       sort_table: None,
+      sort_constraint_table: None,
       hash_value,
       strategy: Default::default(),
     };
@@ -107,7 +106,7 @@ impl SymbolCore {
     match &mut self.sort_table {
       
       None => {
-        let mut sort_table = SortTable::new(symbol_ptr);
+        let mut sort_table = Box::new(SortTable::new(symbol_ptr));
         sort_table.add_op_declaration(op_declaration);
         self.sort_table = Some(sort_table);
       }

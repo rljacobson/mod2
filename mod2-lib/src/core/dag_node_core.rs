@@ -51,6 +51,7 @@ use crate::{
     theory::EquationalTheory
   }
 };
+use crate::core::sort::SortIndex;
 
 /// Create vtable pointers for concrete `DagNode` types
 macro_rules! make_dag_node_vtable {
@@ -176,7 +177,7 @@ pub struct DagNodeCore {
   /// the theory node types, but then every theory would need to reimplement them. Likewise with `mark()` and
   /// the destructor/finalizer.
   pub(crate) args      : *mut u8,
-  pub(crate) sort_index: i8, // sort index within kind
+  pub(crate) sort_index: SortIndex, // sort index within kind
   pub(crate) theory_tag: EquationalTheory,
   pub(crate) flags     : DagNodeFlags,
 

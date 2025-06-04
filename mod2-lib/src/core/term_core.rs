@@ -17,8 +17,10 @@ use std::{
 
 use enumflags2::{bitflags, BitFlags};
 
-use mod2_abs::NatSet;
-
+use mod2_abs::{
+  NatSet,
+  optimizable_int::OptU32
+};
 use crate::{
   api::{
     symbol::{
@@ -27,11 +29,17 @@ use crate::{
       Symbol
     }
   },
-  core::sort::kind::KindPtr,
+  core::{
+    sort::{
+      kind::KindPtr,
+      MaybeSortIndex,
+      SortIndex
+    }
+  },
   HashType,
-  UNDEFINED
 };
 
+pub type SaveIndex = OptU32;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TermType {
@@ -71,14 +79,14 @@ pub struct TermCore {
   pub(crate) kind            : Option<KindPtr>,
   pub(crate) collapse_symbols: SymbolSet,
   pub(crate) attributes      : TermAttributes,
-  pub(crate) sort_index      : i8,
+  pub(crate) sort_index      : SortIndex,
   pub(crate) term_type       : TermType,
-  pub(crate) save_index      : i32,      // NoneIndex = -1
+  pub(crate) save_index      : Option<SaveIndex>,
   /// Stores the structural hash computed in `Term::normalize()`
   pub(crate) hash_value      : HashType, // Set in `Term::normalize()`
 
   /// The number of nodes in the term tree
-  pub(crate) cached_size:  Cell<i32>,
+  pub(crate) cached_size:  Cell<Option<OptU32>>,
 }
 
 impl TermCore {
@@ -90,11 +98,11 @@ impl TermCore {
       kind            : None,                 // ToDo: Initialize to `symbol.range_kind()` ?
       collapse_symbols: Default::default(),
       attributes      : TermAttributes::default(),
-      sort_index      : UNDEFINED as i8,
+      sort_index      : SortIndex::default(),
       term_type       : TermType::Free,
-      save_index      : 0,
+      save_index      : None,
       hash_value      : 0,                    // Set in `Term::normalize()`
-      cached_size     : Cell::new(UNDEFINED),
+      cached_size     : Cell::new(None),
     }
   }
 

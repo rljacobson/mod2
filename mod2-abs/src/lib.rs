@@ -1,4 +1,5 @@
 #![feature(ptr_metadata)]
+#![feature(nonzero_internals)]
 #![allow(unused)]
 /*!
 
@@ -52,6 +53,10 @@ pub use partial_ordering::*;
 
 // Arbitrary precision arithmetic
 pub mod numeric;
+
+// Nonnegative integer types which allow the same optimizations as `NonZero<T>` but which allow
+// zero values.
+pub mod optimizable_int;
 
 // region Hashing data structures
 use std::collections::HashSet as StdHashSet;

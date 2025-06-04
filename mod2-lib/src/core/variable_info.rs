@@ -19,10 +19,10 @@ const MAX_PROTECTED_VARIABLE_COUNT: VariableIndex = 10_000_000;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, Default)]
 struct ConstructionIndex {
+  new_index:         VariableIndex,
   last_use_time:     u32,
   assigned_fragment: i16,
   last_use_fragment: i16,
-  new_index:         VariableIndex,
 }
 
 #[derive(Default)]
@@ -197,12 +197,12 @@ impl VariableInfo {
     let color_count = conflicts.color(&mut coloring);
     for i in 0..construction_indices_count {
       if self.construction_indices[i].assigned_fragment == self.construction_indices[i].last_use_fragment {
-        self.construction_indices[i].new_index = self.protected_variable_count + coloring[i];
+        self.construction_indices[i].new_index = self.protected_variable_count + coloring[i] as VariableIndex;
       }
     }
 
     // Finally, we need to return the minimum size of substitution needed.
-    self.protected_variable_count + color_count
+    self.protected_variable_count as i32 + color_count
     /*
     DebugAdvisory("nrProtectedVariables = " << nrProtectedVariables <<
                   "\tnrColors = " << nrColors);

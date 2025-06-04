@@ -68,11 +68,11 @@ impl<T: ?Sized> UnsafePtr<T> {
   }
 
   /// If `self` and `rhs` are both pointers to the same dyn trait type, this method can tell you if they have the same
-  /// concrete type. Warning: This is not reliable for determining if the concrete types are different. 
+  /// concrete type. Warning: This is not reliable for determining if the concrete types are different.
   pub fn vtable_eq(&self, rhs: UnsafePtr<T>) -> bool {
     std::ptr::metadata(self.ptr.as_ptr()) == std::ptr::metadata(rhs.ptr.as_ptr())
   }
-  
+
   pub fn ptr_hash(&self) -> u64 {
     let ptr_addr = self.as_ptr() as *const () as usize;
     (ptr_addr as u64) >> 3

@@ -37,16 +37,16 @@ pub fn new(name: Option<IString>, lhs_term: BxTerm, sort: SortPtr, condition: Co
   PreEquation {
     name,
     attributes: Default::default(),
-    
+
     pe_kind: PreEquationKind::Membership {
       sort
     },
     conditions   : condition,
     lhs_term,
-    // lhs_automaton: None,
+    lhs_automaton: None,
     lhs_dag      : None,
     variable_info: Default::default(),
-    
+
     index_within_parent_module: UNDEFINED,
   }
 }
@@ -57,7 +57,7 @@ pub(crate) fn check(this: &mut PreEquation) {
     let min_variable = this.variable_info.index_to_variable(mindex as VariableIndex).unwrap();
     let mut this_repr = String::new();
     this.repr(&mut this_repr, FormatStyle::Simple).unwrap();
-    
+
     // ToDo: Figure out reporting of language errors.
     let warning = format!(
       "{}: variable {} is used before it is bound in {}:\n{}",

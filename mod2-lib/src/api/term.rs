@@ -17,10 +17,16 @@ use std::{
   ops::Deref
 };
 
-use mod2_abs::{decl_as_any_ptr_fns, NatSet, RcCell, UnsafePtr};
-
+use mod2_abs::{
+  decl_as_any_ptr_fns,
+  NatSet,
+  RcCell,
+  UnsafePtr,
+  optimizable_int::OptU32
+};
 use crate::{
   api::{
+    automaton::BxLHSAutomaton,
     symbol::{
       Symbol,
       SymbolPtr,
@@ -39,14 +45,17 @@ use crate::{
     VariableInfo,
     TermBag,
     format::Formattable,
-    sort::kind::KindPtr,
+    sort::{
+      kind::KindPtr,
+      SortIndex
+    },
     substitution::Substitution,
     term_core::{
       TermAttribute,
       TermCore
-    }
+    },
+    automata::RHSBuilder,
   },
-  UNDEFINED
 };
 
 pub type BxTerm    = Box<dyn Term>;
@@ -60,7 +69,7 @@ pub trait Term: Formattable {
   fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
   /// This is very unsafe. Make sure this term is heap allocated and pinned before calling.
   fn as_ptr(&self) -> TermPtr;
-  fn copy(&self) -> BxTerm;
+  fn copy(&self) -> TermPtr;
 
   /// Returns the structural hash computed in `Term::normalize()`
   fn structural_hash(&self) -> HashType { self.core().hash_value }
@@ -73,7 +82,7 @@ pub trait Term: Formattable {
   /// Note: The structural hash value of a term is first set in this method. The algorithm used
   ///       to compute this hash should be kept in sync with the corresponding implementation
   ///       of `DagNode::structural_hash()`.
-  fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType);
+  fn normalize(&mut self, full: bool) -> (Option<TermPtr>, bool, HashType);
 
   fn core(&self)         -> &TermCore;
   fn core_mut(&mut self) -> &mut TermCore;
@@ -150,11 +159,10 @@ pub trait Term: Formattable {
   }
 
   /// Compute the number of nodes in the term tree
-  fn compute_size(&self) -> i32 {
-    let cached_size: i32 = self.core().cached_size.get();
-
-    if cached_size != UNDEFINED {
-      cached_size
+  fn compute_size(&self) -> u32 {
+    // let cached_size: i32 = self.core().cached_size.get();
+    if let Some(cached_size) = self.core().cached_size.get() {
+      cached_size.get()
     }
     else {
       let mut size = 1; // Count self.
@@ -162,7 +170,7 @@ pub trait Term: Formattable {
         size += arg.compute_size();
       }
 
-      self.core().cached_size.set(size);
+      self.core().cached_size.set(Some(OptU32::new_unchecked(size)));
       size
     }
   }
@@ -261,7 +269,7 @@ pub trait Term: Formattable {
     let mut dag_node = self.dagify_aux(node_cache);
 
     if node_cache.set_sort_info {
-      assert_ne!(self.core().sort_index, UNDEFINED as i8, "missing sort info");
+      assert!(self.core().sort_index.is_none(), "missing sort info");
       dag_node.set_sort_index(self.core().sort_index);
       dag_node.set_reduced();
     }
@@ -278,14 +286,13 @@ pub trait Term: Formattable {
 
   // region Compiler-related Function
 
-/*
   /// Compiles the LHS automaton, returning the tuple `(lhs_automaton, subproblem_likely): (RcLHSAutomaton, bool)`
   fn compile_lhs(
     &self,
     match_at_top: bool,
     variable_info: &VariableInfo,
     bound_uniquely: &mut NatSet,
-  ) -> (RcLHSAutomaton, bool);
+  ) -> (BxLHSAutomaton, bool);
 
   /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
   /// the `save_index`.
@@ -296,7 +303,6 @@ pub trait Term: Formattable {
     available_terms: &mut TermBag,
     eager_context: bool,
   ) -> i32;
-*/
 
   // A subterm "honors ground out match" if its matching algorithm guarantees never to return a matching subproblem
   // when all the terms variables are already bound.
@@ -354,18 +360,18 @@ pub trait Term: Formattable {
   /// symbol's sort declarations, validating them against the symbol's expected input and output
   /// types (domain and range components). (This is a method on `Symbol` in Maude.)
   fn fill_in_sort_info(&mut self) {
-    let symbol = self.symbol();
+    let symbol     = self.symbol();
     let sort_table = symbol.deref().sort_table().as_ref();
     assert!(sort_table.is_some(), "couldn't get component");
     let sort_table = sort_table.unwrap();
-    let kind = sort_table.range_kind(); // should be const
+    let kind       = sort_table.range_kind(); // should be const
 
     if symbol.arity() == Arity::Value(0) {
-      self.set_sort_info(kind.clone(), sort_table.traverse(0, 0)); // HACK
+      self.set_sort_info(kind.clone(), sort_table.traverse(0, SortIndex::ZERO)); // HACK
       return;
     }
 
-    let mut step = 0;
+    let mut step = SortIndex::ZERO;
     let mut seen_args_count = 0;
 
     for mut term in self.iter_args() {
@@ -377,7 +383,7 @@ pub trait Term: Formattable {
         seen_args_count,
         self.symbol()
       );
-      step = sort_table.traverse(step as usize, term.core().sort_index as usize);
+      step = sort_table.traverse(step.idx_unchecked(), term.core().sort_index);
       seen_args_count += 1;
     }
 
@@ -387,10 +393,10 @@ pub trait Term: Formattable {
   }
 
   /// Sets the kind and the sort index of this term.
-  fn set_sort_info(&mut self, kind: KindPtr, sort_index: i32) {
+  fn set_sort_info(&mut self, kind: KindPtr, sort_index: SortIndex) {
     let core  = self.core_mut();
     core.kind = Some(kind);
-    core.sort_index = sort_index as i8;
+    core.sort_index = sort_index;
   }
 
   /// Recursively collects the terms in a set for structural sharing.

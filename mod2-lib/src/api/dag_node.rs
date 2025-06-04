@@ -22,7 +22,7 @@ use std::{
   ops::Deref,
   sync::atomic::Ordering::Relaxed,
 };
-use mod2_abs::UnsafePtr;
+use mod2_abs::{Outcome, UnsafePtr};
 use crate::{
   api::{
     symbol::SymbolPtr,
@@ -47,7 +47,7 @@ use crate::{
         GCVectorRefMut
       }
     },
-    sort::SortPtr,
+    sort::{SortPtr, SortIndex},
     HashConsSet
   },
   impl_display_debug_for_formattable,
@@ -226,13 +226,13 @@ pub trait DagNode {
 
 
   #[inline(always)]
-  fn set_sort_index(&mut self, sort_index: i8) {
+  fn set_sort_index(&mut self, sort_index: SortIndex) {
     self.core_mut().sort_index = sort_index;
   }
 
 
   #[inline(always)]
-  fn sort_index(&self) -> i8 {
+  fn sort_index(&self) -> SortIndex {
     self.core().sort_index
   }
 
@@ -245,15 +245,24 @@ pub trait DagNode {
     //    SORT_UNKNOWN, valid-sort -> valid-sort
     //    valid-sort, SORT_UNKNOWN -> valid-sort
     //    valid-sort,  valid-sort -> valid-sort
-    //
-    //  We can do it with a bitwise AND trick because valid sorts should
-    //  always be in agreement and SORT_UNKNOWN is represented by -1, i.e.
-    //  all 1 bits.
-    self.set_sort_index(self.sort_index() & other.sort_index())
+    match (self.sort_index(), other.sort_index()) {
+      (SortIndex::UNKNOWN, SortIndex::UNKNOWN) => {
+        self.set_sort_index(SortIndex::UNKNOWN);
+      }
+      (SortIndex::UNKNOWN, sort_index) => {
+        self.set_sort_index(sort_index);
+      }
+      (sort_index, SortIndex::UNKNOWN) => {
+        self.set_sort_index(sort_index);
+      }
+      (sort_index, _sort_index_other) => {
+        self.set_sort_index(sort_index);
+      }
+    }
   }
 
 
-  /// MUST be overriden if `Self::args` is not a `DagNodeVec`
+  /// MUST be overridden if `Self::args` is not a `DagNodeVec`
   fn len(&self) -> usize {
     // The empty case
     if self.core().args.is_null() {
@@ -387,6 +396,12 @@ pub trait DagNode {
       )
   }
   
+  /// Tests whether `self`'s sort is less than or equal to other's sort
+  fn leq_sort(&self, sort: SortPtr) -> bool {
+    assert_ne!(self.sort_index(), SortIndex::UNKNOWN, "unknown sort");
+    self.get_sort().unwrap().leq(sort)
+  }
+  
   // endregion Comparison
   
   // region Copy Constructors
@@ -475,12 +490,43 @@ pub trait DagNode {
   }
 
   // endregion GC related methods
+  
+  // region Compiler related methods
+
+  /// Sets the sort_index of self. This is a method on Symbol in Maude.
+  fn compute_base_sort(&mut self) -> i32;
+
+  fn check_sort(&mut self, bound_sort: SortPtr) -> (Outcome, MaybeSubproblem) {
+    if self.get_sort().is_some() {
+      return (self.leq_sort(bound_sort).into(), None);
+    }
+
+    self.compute_base_sort();
+
+    if self.leq_sort(bound_sort) {
+      if !self.symbol().sort_constraint_free() {
+        self.set_sort_index(SortIndex::UNKNOWN);
+      }
+    } else {
+      if self.symbol().sort_constraint_free() {
+        return (Outcome::Failure, None);
+      }
+      self.set_sort_index(SortIndex::UNKNOWN);
+      // Todo: Implement `SortCheckSubproblem`.
+      // let returned_subproblem = SortCheckSubproblem::new(this, bound_sort);
+      // return (Outcome::Success, Some(returned_subproblem))
+    }
+
+    return (Outcome::Success, None);
+  }
+  // endregion Compiler related methods
+  
 }
 
 // region trait impls for DagNode
 
 // ToDo: Revisit whether `semantic_hash` is appropriate for the `Hash` trait.
-// Use the `DagNode::compute_hash(…)` hash for `HashSet`s and friends.
+// Use the `DagNode::structural_hash(…)` hash for `HashSet`s and friends.
 impl Hash for dyn DagNode {
   fn hash<H: Hasher>(&self, state: &mut H) {
     state.write_u32(self.structural_hash())

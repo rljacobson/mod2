@@ -1,28 +1,45 @@
-use std::{assert_matches::assert_matches, cmp::Ordering};
+/*!
 
-use tiny_logger::{log, Channel};
+Membership constraints, also called sort constraints, specify subsort relationships. 
 
-use super::{PreEquation as SortConstraint, PreEquationKind, RcPreEquation as RcSortConstraint};
+*/
+
+use std::{
+  cmp::Ordering,
+  ops::{Deref, DerefMut}
+};
+use mod2_abs::warning;
 use crate::{
   core::{
-    rewrite_context::{trace::trace_status, RewriteType, RewritingContext},
-    sort::{index_leq_sort, sort_leq_index},
+    sort::{sort_leq_index, index_leq_sort},
+    rewriting_context::RewritingContext,
   },
-  theory::{DagNode, MaybeSubproblem, RcDagNode, RcSubproblem, Subproblem},
+  api::dag_node::DagNodePtr,
 };
-use crate::core::rewrite_context::RcRewritingContext;
+use super::{
+  PreEquation as SortConstraint,
+  PreEquationKind,
+  PreEquationPtr as SortConstraintPtr
+};
+
+
 
 #[derive(Default)]
 pub struct SortConstraintTable {
-  constraints: Vec<Option<RcSortConstraint>>,
-  complete:    bool,
+  constraints: Vec<SortConstraintPtr>,
+  complete   : bool,
 }
 
 impl SortConstraintTable {
+  pub fn new() -> SortConstraintTable {
+    SortConstraintTable::default()
+  }
+  
+  
   #[inline(always)]
-  pub fn offer_sort_constraint(&mut self, sort_constraint: RcSortConstraint) {
-    if self.accept_sort_constraint(sort_constraint.clone()) {
-      self.constraints.push(Some(sort_constraint));
+  pub fn offer_sort_constraint(&mut self, sort_constraint: SortConstraintPtr) {
+    if self.accept_sort_constraint(sort_constraint) {
+      self.constraints.push(sort_constraint);
     }
   }
 
@@ -31,28 +48,19 @@ impl SortConstraintTable {
     self.constraints.is_empty()
   }
 
-  // This is identical to `constrain_to_smaller_sort`.
-  // #[inline(always)]
-  // pub fn constrain_to_exact_sort(&mut self, subject: RcDagNode, context: &mut RewritingContext) {
-  //   if !self.sort_constraint_free() {
-  //     self.constrain_to_smaller_sort(subject, context);
-  //   }
-  // }
-
-
   #[inline(always)]
   pub fn safe_to_inspect_sort_constraints(&self) -> bool {
     self.complete
   }
 
-  // Sort constraints are sorted in the order: largest index (smallest sort) first
-  fn sort_constraint_lt(lhs: &SortConstraint, rhs: &SortConstraint) -> Ordering {
-    if let PreEquationKind::SortConstraint { sort: lhs_sort, .. } = &lhs.kind {
-      if let PreEquationKind::SortConstraint { sort: rhs_sort, .. } = &rhs.kind {
+  /// Sort constraints are sorted in the order: largest index (smallest sort) first
+  fn sort_constraint_lt(lhs: SortConstraintPtr, rhs: SortConstraintPtr) -> Ordering {
+    if let PreEquationKind::Membership { sort: lhs_sort, .. } = &lhs.pe_kind {
+      if let PreEquationKind::Membership { sort: rhs_sort, .. } = &rhs.pe_kind {
         // reverse order: large index --> small sort
-        return rhs_sort.borrow().sort_index.cmp(&lhs_sort.borrow().sort_index);
+        return rhs_sort.index_within_kind.cmp(&lhs_sort.index_within_kind);
         // IDEA: might want to weaken comparison and do a stable_sort()
-        // BUT: stable_sort() requires a strict weak ordering - much stronger that
+        // BUT: stable_sort() requires a strict weak ordering - much stronger than
         // the partial ordering we have on sorts.
       }
     }
@@ -60,18 +68,21 @@ impl SortConstraintTable {
   }
 
   fn order_sort_constraints(&mut self) {
-    // sort_constraints may contain sort constraints with variable lhs which have
+    // `self.constraints` may contain sort constraints with variable lhs which have
     // too low a sort to ever match our symbol. However the sort of our symbol
     // is itself affected by sort constraints. So we "comb" out usable sort
     // constraints in successive passes; this is inefficient but we expect the number
     // of sort constraints to be very small so it's not worth doing anything smarter.
-    self.complete = true; // not really complete until we've finished, but pretend it is
+    self.complete = true; // Not really complete until we've finished, but pretend it is.
     let sort_constraint_count = self.constraints.len();
     if sort_constraint_count == 0 {
       return;
     }
-    let mut all = std::mem::take(&mut self.constraints);
-    let mut added_sort_constraint;
+    let mut all: Vec<Option<SortConstraintPtr>> = Vec::with_capacity(sort_constraint_count);
+    all.extend(self.constraints.drain(..).map(Some));
+    let mut added_sort_constraint: bool;
+    
+    // Repeatedly loop over the `all` vector until we no longer add a sort constraint.
     loop {
       added_sort_constraint = false;
       for i in 0..sort_constraint_count {
@@ -79,11 +90,10 @@ impl SortConstraintTable {
           // Because we set table_complete = true; accept_sort_constraint() may
           // inspect the table of sort_constraints accepted so far and make
           // a finer distinction than it could in offer_sort_constraint().
-          if self.accept_sort_constraint(sc.clone()) {
-            self.constraints.push(Some(sc.clone()));
+          if self.accept_sort_constraint(*sc) {
+            self.constraints.push(*sc);
+            all[i] = None;
             added_sort_constraint = true;
-          } else {
-            all[i] = Some(sc.clone());
           }
         }
       }
@@ -91,42 +101,25 @@ impl SortConstraintTable {
         break;
       }
     }
-    self
-      .constraints
-      .sort_by(
-        |a, b| {
-          // This rigmarole is necessary to get at references to the value contained in the `Option`.
-          match (&a, &b) {
-            (None, None) => {
-              Ordering::Equal
-            }
-            (None, _) => {
-              Ordering::Less
-            }
-            (_, None) => {
-              Ordering::Greater
-            }
-            (Some(a), Some(b)) => {
-              Self::sort_constraint_lt(&*a.borrow(), &*b.borrow())
-            }
-          }
-        }
-      );
+    self.constraints
+        .sort_by(|a, b| { Self::sort_constraint_lt(*a, *b) });
   }
 
+  /*
   #[inline(always)]
   fn compile_sort_constraints(&mut self) {
     for constraint in self.constraints {
-      constraint.unwrap().borrow_mut().compile(true);
+      constraint.compile(true);
     }
   }
+  */
 
   // Placeholder for the actual implementations of these methods
-  fn accept_sort_constraint(&self, _sort_constraint: RcSortConstraint) -> bool {
+  fn accept_sort_constraint(&self, _sort_constraint: SortConstraintPtr) -> bool {
     unimplemented!()
   }
 
-  pub(crate) fn constrain_to_smaller_sort(&mut self, subject: RcDagNode, context: &mut RewritingContext) {
+  pub(crate) fn constrain_to_smaller_sort(&mut self, mut subject: DagNodePtr, context: &mut RewritingContext) {
     if self.sort_constraint_free() {
       return;
     }
@@ -134,19 +127,11 @@ impl SortConstraintTable {
     if context.is_limited() {
       // Limited rewriting contexts don't support sort constraint application and
       // are only used for functionality that doesn't support sort constraints.
-      log(
-        Channel::Warning,
-        1,
-        format!(
-          "ignoring sort constraints for {} because context is limited",
-          subject.borrow()
-        )
-        .as_str(),
-      );
+      warning!(1, "ignoring sort constraints for {} because context is limited", subject);
       return;
     }
 
-    let mut current_sort_index = subject.borrow().get_sort_index();
+    let mut current_sort_index = subject.sort_index();
 
     // We try sort constraints, smallest sort first until one applies or
     // all remaining sort constraints have sort >= than our current sort.
@@ -154,24 +139,22 @@ impl SortConstraintTable {
     // with the new sort, because earlier sort constraints (via collapse
     // or variable lhs patterns) may be able to test this new sort.
     'retry: loop {
-      for sort_constraint in self.constraints {
-        let sort_constraint =&mut *sort_constraint.unwrap().borrow_mut();
-
-        if let PreEquationKind::SortConstraint { sort, .. } = &sort_constraint.kind {
-          if index_leq_sort(current_sort_index, sort.as_ref()) {
+      for mut sort_constraint in self.constraints.iter_mut() {
+        if let PreEquationKind::Membership { sort, .. } = &sort_constraint.pe_kind {
+          if index_leq_sort(current_sort_index, sort) {
             // Done!
             return;
           }
 
-          if sort_leq_index(sort.as_ref(), current_sort_index) {
+          if sort_leq_index(sort, current_sort_index) {
             // not equal because of previous test
             let variable_count = sort_constraint.variable_info.protected_variable_count();
             context.substitution.clear_first_n(variable_count as usize);
 
-            if let Some(lhs_automaton) = &sort_constraint.lhs_automaton
+            if let Some(mut lhs_automaton) = &sort_constraint.deref_mut().lhs_automaton
             {
               if let (true, mut subproblem) = lhs_automaton
-                  .borrow_mut()
+                  .as_mut()
                   .match_(subject.clone(), &mut context.substitution)
               {
                 if subproblem.is_none() || subproblem.as_mut().unwrap().solve(true, context) {
@@ -186,6 +169,7 @@ impl SortConstraintTable {
                       || sort_constraint.check_condition(subject.clone(), context, subproblem)
                   {
                     subproblem.take(); // equivalent to delete sp in C++
+                    /* ToDo: Implement tracing
                     if trace_status() {
                       context.trace_pre_eq_application(
                         Some(subject.clone()),
@@ -197,11 +181,12 @@ impl SortConstraintTable {
                         return;
                       }
                     }
-                    context.mb_count += 1;
+                    */
+                    context.membership_count += 1;
                     context.finished();
 
-                    current_sort_index = sort.borrow().sort_index;
-                    subject.borrow_mut().set_sort_index(current_sort_index);
+                    current_sort_index = sort.index_within_kind;
+                    subject.set_sort_index(current_sort_index);
                     continue 'retry;
                   }
                 }

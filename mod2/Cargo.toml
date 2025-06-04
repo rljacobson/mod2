@@ -13,12 +13,10 @@ keywords    = ["pattern-matching", "matching-algorithms", "unification", "term-r
 categories  = ["algorithms", "compilers", "mathematics", "science", "parsing"]
 
 [build-dependencies]
-lalrpop = "0.22.1" # Parser
+lalrpop.workspace = true
 
 [dependencies]
-mod2-abs = { path = "../mod2-abs" }
-mod2-lib = { path = "../mod2-lib" }
+mod2-abs.workspace = true
+mod2-lib.workspace = true
 
-#pratt        = { path = "../pratt", default-features = false, features = ["ustr"] }
 lalrpop-util.workspace = true
-enumflags2.workspace   = true

@@ -14,7 +14,13 @@ use std::{
 use mod2_abs::{decl_as_any_ptr_fns, IString, Set, UnsafePtr};
 
 use crate::{
-  api::{Arity, term::BxTerm},
+  api::{
+    Arity,
+    term::{
+      BxTerm,
+      TermPtr
+    }
+  },
   core::{
     format::{FormatStyle, Formattable},
     symbol::{
@@ -28,6 +34,7 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
+use crate::core::symbol::BxSortTable;
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;
@@ -39,7 +46,7 @@ pub trait Symbol {
   fn as_ptr(&self) -> SymbolPtr;
 
   /// A type-erased way of asking a symbol to make a term of compatible type.
-  fn make_term(&self, args: Vec<BxTerm>) -> BxTerm;
+  fn make_term(&self, args: Vec<TermPtr>) -> TermPtr;
 
   // region Member Getters and Setters
   /// Trait level access to members for shared implementation
@@ -70,12 +77,12 @@ pub trait Symbol {
   }
 
   #[inline(always)]
-  fn sort_table(&self) -> &Option<SortTable> {
+  fn sort_table(&self) -> &Option<BxSortTable> {
     &self.core().sort_table
   }
 
   #[inline(always)]
-  fn sort_table_mut(&mut self) -> &mut Option<SortTable> {
+  fn sort_table_mut(&mut self) -> &mut Option<BxSortTable> {
     &mut self.core_mut().sort_table
   }
 
@@ -94,6 +101,15 @@ pub trait Symbol {
   #[inline(always)]
   fn strategy(&self) -> &Strategy {
     &self.core().strategy
+  }
+  
+  #[inline(always)]
+  fn sort_constraint_free(&self) -> bool {
+    if let Some(sort_constraint_table) = self.core().sort_constraint_table {
+      sort_constraint_table.sort_constraint_free()
+    } else { 
+      true 
+    }
   }
 
   // endregion Accessors

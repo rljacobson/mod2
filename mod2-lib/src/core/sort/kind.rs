@@ -55,7 +55,7 @@ use std::{
   },
   ops::Deref
 };
-
+use std::ops::SubAssign;
 use mod2_abs::{heap_construct, join_iter, UnsafePtr};
 
 use crate::{
@@ -66,7 +66,7 @@ use crate::{
     }
   }
 };
-use crate::core::sort::Sort;
+use crate::core::sort::{Sort, SortIndex};
 
 // Convenience types
 /// Each `Sort` holds a `KindPtr` to its `Kind`. However, it isn't clear if the `KindPtr` is ever dereferenced,
@@ -184,7 +184,7 @@ impl Kind {
       if supersort_count == 0 {
         sort.index_within_kind = self.append_sort(sort);
       } else {
-        sort.index_within_kind = supersort_count as u32;
+        sort.index_within_kind = supersort_count.try_into().unwrap();
         for &s in sort.supersorts.iter() {
           if s.kind.is_none() {
             self.register_connected_sorts(s, visited_sort_count);
@@ -202,7 +202,7 @@ impl Kind {
       // time to add the subsort to its kind. This ensures all supersorts
       // of that subsort have been "resolved" before the subsort is added.
       subsort.index_within_kind -= 1;
-      if subsort.index_within_kind == 0 {
+      if subsort.index_within_kind == SortIndex::ZERO {
         // All supersorts resolved, so add to kind. There is a symmetric statement
         // for subsorts in `Kind::register_connected_sorts`
         subsort.index_within_kind = self.append_sort(*subsort);
@@ -211,9 +211,9 @@ impl Kind {
   }
 
   /// Pushes the sort onto `self.sorts`, returning the index of the sort in `self.sorts`.
-  pub fn append_sort(&mut self, sort: SortPtr) -> u32 {
+  pub fn append_sort(&mut self, sort: SortPtr) -> SortIndex {
     self.sorts.push(sort);
-    (self.sorts.len() - 1) as u32
+    (self.sorts.len() - 1).try_into().unwrap()
   }
 
   // region Accessors
@@ -222,8 +222,8 @@ impl Kind {
     self.sorts.len()
   }
 
-  pub fn sort(&self, idx: usize) -> SortPtr {
-    self.sorts[idx]
+  pub fn sort(&self, idx: SortIndex) -> SortPtr {
+    self.sorts[idx.idx_unchecked()]
   }
 
   // endregion Accessors
