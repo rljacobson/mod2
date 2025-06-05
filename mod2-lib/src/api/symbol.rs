@@ -34,7 +34,6 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
-use crate::core::symbol::BxSortTable;
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;
@@ -77,25 +76,23 @@ pub trait Symbol {
   }
 
   #[inline(always)]
-  fn sort_table(&self) -> &Option<BxSortTable> {
+  fn sort_table(&self) -> &SortTable {
     &self.core().sort_table
   }
 
   #[inline(always)]
-  fn sort_table_mut(&mut self) -> &mut Option<BxSortTable> {
+  fn sort_table_mut(&mut self) -> &mut SortTable {
     &mut self.core_mut().sort_table
   }
 
   #[inline(always)]
   fn domain_kind(&self, idx: usize) -> KindPtr {
-    let sort_table = self.sort_table().as_ref().expect("cannot fetch domain kind of symbol with no sort table");
-    sort_table.domain_component(idx)
+    self.sort_table().domain_component(idx)
   }
 
   #[inline(always)]
   fn range_kind(&self) -> KindPtr {
-    let sort_table = self.sort_table().as_ref().expect("cannot fetch range kind of symbol with no sort table");
-    sort_table.range_kind()
+    self.sort_table().range_kind()
   }
 
   #[inline(always)]
@@ -105,11 +102,7 @@ pub trait Symbol {
   
   #[inline(always)]
   fn sort_constraint_free(&self) -> bool {
-    if let Some(sort_constraint_table) = self.core().sort_constraint_table {
-      sort_constraint_table.sort_constraint_free()
-    } else { 
-      true 
-    }
+    self.core().sort_constraint_table.sort_constraint_free()
   }
 
   // endregion Accessors
@@ -120,16 +113,15 @@ pub trait Symbol {
   }
 
   #[inline(always)]
-  fn add_op_declaration(&mut self, self_ptr: SymbolPtr, op_declaration: OpDeclaration) {
-    self.core_mut().add_op_declaration(self_ptr, op_declaration);
+  fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
+    self.core_mut().add_op_declaration(op_declaration);
   }
 
   /// Called from `Module::close_theory()`
   #[inline(always)]
   fn compile_op_declarations(&mut self) {
-    if let  Some(sort_table) = self.core_mut().sort_table.as_mut() {
-      sort_table.compile_op_declaration()
-    }
+    let symbol_ptr = self.as_ptr();
+    self.core_mut().sort_table.compile_op_declaration(symbol_ptr)
   }
 }
 

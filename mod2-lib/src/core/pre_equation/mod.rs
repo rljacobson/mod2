@@ -18,21 +18,29 @@ use crate::{
   impl_display_debug_for_formattable,
   api::{
     dag_node::DagNodePtr,
-    term::BxTerm
+    term::BxTerm,
+    automaton::BxLHSAutomaton,
+    subproblem::MaybeSubproblem
   },
   core::{
-    pre_equation::condition::Conditions,
+    gc::ok_to_collect_garbage,
+    pre_equation::{
+      condition::Conditions,
+      condition::ConditionState
+    },
     VariableInfo,
     format::{FormatStyle, Formattable},
-    interpreter::InterpreterAttribute
+    interpreter::InterpreterAttribute,
+    rewriting_context::RewritingContext
   }
 };
 use super::sort::SortPtr;
-pub use sort_constraint_table::{SortConstraintTable, BxSortConstraintTable};
+pub use sort_constraint_table::SortConstraintTable;
 
 
 pub type BxPreEquation = Box<PreEquation>;
 pub type PreEquationPtr = UnsafePtr<PreEquation>;
+
 
 #[bitflags]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -87,7 +95,6 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
-use crate::api::automaton::BxLHSAutomaton;
 
 impl PreEquationKind {
   pub fn noun(&self) -> &'static str {
@@ -257,34 +264,30 @@ impl PreEquation {
 
   /// Normalize lhs and recursively collect the indices and occurs sets of this term and its descendants
   fn check(&mut self) {
-    self.lhs_term.as_mut().normalize(true);
-    index_variables(&self.lhs_term, &mut self.variable_info);
+    self.lhs_term.normalize(true);
+    self.lhs_term.index_variables(&mut self.variable_info);
 
     let mut bound_variables: NatSet = self.lhs_term.occurs_below().clone(); // Deep copy
 
-    for mut condition_fragment in self.conditions {
-      condition_fragment.as_mut().check(&mut self.variable_info, &mut bound_variables);
+    for condition_fragment in self.conditions.iter_mut() {
+      condition_fragment.check(&mut self.variable_info, &mut bound_variables);
     }
 
     match &mut self.pe_kind {
-      
       Equation { rhs_term, .. } => {
-        {
-          rhs_term.as_mut().normalize(false);
-        }
-        index_variables(rhs_term, &mut self.variable_info);
+        rhs_term.normalize(false);
+        rhs_term.index_variables(&mut self.variable_info);
 
-        let mut unbound_variables = rhs_term.as_mut().occurs_below_mut();
+        let unbound_variables = rhs_term.occurs_below_mut();
         unbound_variables.difference_in_place(&bound_variables);
         self.variable_info.add_unbound_variables(unbound_variables);
-        
       }
-      
-      Rule { rhs_term, .. } => {
-        rhs_term.as_mut().normalize(false);
-        index_variables(rhs_term, &mut self.variable_info);
 
-        let mut unbound_variables = rhs_term.as_mut().occurs_below().difference(&bound_variables);
+      Rule { rhs_term, .. } => {
+        rhs_term.normalize(false);
+        rhs_term.index_variables(&mut self.variable_info);
+
+        let unbound_variables = rhs_term.occurs_below().difference(&bound_variables);
         self.variable_info.add_unbound_variables(&unbound_variables);
 
         if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
@@ -310,15 +313,31 @@ impl PreEquation {
           self.set_nonexec();
         }
       }
-      
-      SortConstraint { .. } => {
+
+      Membership { .. } => {
         // Doesn't use bound_variables.
-        sort_constraint::check(self);
+        if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
+          let mindex = self.variable_info.unbound_variables.min_value().unwrap();
+          let min_variable = self.variable_info.index_to_variable(mindex).unwrap();
+
+          let mut self_string_simple: String = "".to_string();
+          let mut self_string_default: String = "".to_string();
+          self.repr(&mut self_string_simple, FormatStyle::Simple).unwrap();
+          self.repr(&mut self_string_default, FormatStyle::Default).unwrap();
+          warning!(
+            1,
+            "{}: variable {} is used before it is bound in {}:\n{}",
+            self_string_simple,
+            min_variable,
+            self.pe_kind.noun(),
+            self_string_default
+          );
+
+          // No legitimate use for such sort constraints so mark it as bad.
+          self.attributes.insert(PreEquationAttribute::Bad);
+        }
+        
       }
-      
-      // StrategyDefinition { .. } => {
-      //   unimplemented!()
-      // }
     }
   }
 
@@ -327,11 +346,11 @@ impl PreEquation {
   pub(crate) fn check_condition_find_first(
     &mut self,
     mut find_first: bool,
-    subject: DagNodePtr,
-    context: RcRewritingContext,
+    subject       : DagNodePtr, // Used only for tracing
+    context       : &mut RewritingContext,
     mut subproblem: MaybeSubproblem,
-    trial_ref: &mut Option<i32>,
-    state: &mut Vec<ConditionState>,
+    trial_ref     : &mut Option<i32>,
+    state         : &mut Vec<ConditionState>,
   ) -> bool
   {
     assert_ne!(self.conditions.len(), 0, "no condition");
@@ -342,27 +361,28 @@ impl PreEquation {
     }
 
     loop {
-      if trace_status() {
-        if find_first {
-          *trial_ref = self.trace_begin_trial(subject.clone(), context.clone());
-        }
-        if context.borrow().trace_abort() {
-          state.clear();
-          // return false since condition variables may be unbound
-          return false;
-        }
-      }
+      // ToDo: Implement trace status
+      // if trace_status() {
+      //   if find_first {
+      //     *trial_ref = self.trace_begin_trial(subject.clone(), context.clone());
+      //   }
+      //   if context.borrow().trace_abort() {
+      //     state.clear();
+      //     // return false since condition variables may be unbound
+      //     return false;
+      //   }
+      // }
 
-      let success: bool = self.solve_condition(find_first, trial_ref, context.clone(), state);
+      let success: bool = self.solve_condition(find_first, trial_ref, context, state);
 
-      if trace_status() {
-        if context.borrow().trace_abort() {
-          state.clear();
-          return false; // return false since condition variables may be unbound
-        }
-
-        context.borrow_mut().trace_end_trial(*trial_ref, success);
-      }
+      // if trace_status() {
+      //   if context.borrow().trace_abort() {
+      //     state.clear();
+      //     return false; // return false since condition variables may be unbound
+      //   }
+      // 
+      //   context.borrow_mut().trace_end_trial(*trial_ref, success);
+      // }
 
       if success {
         return true;
@@ -372,18 +392,18 @@ impl PreEquation {
       *trial_ref = None;
 
       // Condition evaluation may create nodes without doing rewrites so run GC safe point.
-      // MemoryCell::ok_to_collect_garbage();
+      ok_to_collect_garbage();
       if let Some(subproblem) = &mut subproblem {
-        if !subproblem.solve(false, context.clone()) {
+        if !subproblem.solve(false, context) {
           break;
         }
       } else {
         break;
       }
     }
-    if trace_status() && trial_ref.is_some() {
-      context.borrow().trace_exhausted(*trial_ref);
-    }
+    // if trace_status() && trial_ref.is_some() {
+    //   context.borrow().trace_exhausted(*trial_ref);
+    // }
     false
   }
 
@@ -391,8 +411,8 @@ impl PreEquation {
   /// if a condition succeeds at least once or fails.
   pub(crate) fn check_condition(
     &mut self,
-    subject: DagNodePtr,
-    context: RcRewritingContext,
+    subject   : DagNodePtr,
+    context   : &mut RewritingContext,
     subproblem: MaybeSubproblem,
   ) -> bool
   {
@@ -406,6 +426,57 @@ impl PreEquation {
     // state.clear();
 
     result
+  }
+
+  fn solve_condition(
+    &mut self,
+    mut find_first: bool,
+    trial_ref: &mut Option<i32>,
+    solution: &mut RewritingContext,
+    state: &mut Vec<ConditionState>,
+  ) -> bool {
+    let fragment_count = self.conditions.len();
+    let mut i = if find_first {
+      0
+    } else {
+      fragment_count - 1
+    };
+
+    loop {
+      // if trace_status() {
+      //   if solution.borrow().trace_abort() {
+      //     return false; // ToDo: This doesn't look right.
+      //   }
+      //   solution.borrow().trace_begin_fragment(*trial_ref, self.conditions[i].as_ref(), find_first);
+      // }
+
+      // A cute way to do backtracking.
+      find_first = self.conditions[i].solve(find_first, solution, state);
+
+      // if trace_status() {
+      //   if solution.borrow().trace_abort() {
+      //     return false; // ToDo: This doesn't look right.
+      //   }
+      //   solution.borrow_mut().trace_end_fragment(
+      //     *trial_ref, self, //.condition[i].as_ref(),
+      //     i, find_first,
+      //   );
+      // }
+
+      if find_first {
+        if i == fragment_count - 1 {
+          break;
+        }
+        i += 1;
+      } else {
+        if i == 0 {
+          break;
+        }
+        i -= 1;
+      }
+    }
+
+    find_first
   }
 
 

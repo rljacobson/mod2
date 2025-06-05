@@ -13,7 +13,7 @@ pub mod free_theory;
 pub mod built_in;
 mod dag_node_cache;
 pub mod automaton;
-
+pub mod subproblem;
 
 // Small utility types used throughout
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]

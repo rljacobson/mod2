@@ -26,8 +26,14 @@ mod redex_position;
 mod interpreter;
 mod hash_cons_set;
 mod memo_map;
-mod rewriting_context;
+pub(crate) mod rewriting_context;
 pub(crate) mod automata;
+
+
+// Stubs
+pub(crate) struct StateTransitionGraph;
+
+
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;

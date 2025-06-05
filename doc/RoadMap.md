@@ -17,6 +17,7 @@
  
 - rewriter
   - rewriting methods on `core::rewriting_context::context::RewritingContext`
+  - `StateTransitionGraph`
 
 # Saved for later
 

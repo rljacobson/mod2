@@ -494,7 +494,7 @@ pub trait DagNode {
   // region Compiler related methods
 
   /// Sets the sort_index of self. This is a method on Symbol in Maude.
-  fn compute_base_sort(&mut self) -> i32;
+  fn compute_base_sort(&mut self) -> SortIndex;
 
   fn check_sort(&mut self, bound_sort: SortPtr) -> (Outcome, MaybeSubproblem) {
     if self.get_sort().is_some() {

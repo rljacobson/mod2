@@ -309,7 +309,7 @@ impl Term for FreeTerm {
   }
 
     #[inline(always)]
-    fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
+    fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
       if self.ground() {
         return;
       }
@@ -319,7 +319,7 @@ impl Term for FreeTerm {
 
       if at_top {
         for i in 0..arg_count {
-          self.args[i].find_available_terms(
+          self.args[i].find_available_terms_aux(
             available_terms,
             eager_context && symbol.strategy().eager_argument(i),
             false,
@@ -328,7 +328,7 @@ impl Term for FreeTerm {
       } else {
         available_terms.insert_matched_term(self.as_ptr(), eager_context);
         for i in 0..arg_count {
-          self.args[i].find_available_terms(
+          self.args[i].find_available_terms_aux(
             available_terms,
             eager_context && symbol.strategy().evaluated_argument(i),
             false,

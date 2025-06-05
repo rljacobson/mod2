@@ -243,7 +243,7 @@ impl<T: NADataType> Term for NATerm<T> {
     /* nothing to do */
   }
 
-  fn find_available_terms(&self, _available_terms: &mut TermBag, _eager_context: bool, _at_top: bool) {
+  fn find_available_terms_aux(&self, _available_terms: &mut TermBag, _eager_context: bool, _at_top: bool) {
     /* nothing to do */
   }
 }

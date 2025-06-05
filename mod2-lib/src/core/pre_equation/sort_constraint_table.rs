@@ -139,36 +139,31 @@ impl SortConstraintTable {
     // with the new sort, because earlier sort constraints (via collapse
     // or variable lhs patterns) may be able to test this new sort.
     'retry: loop {
-      for mut sort_constraint in self.constraints.iter_mut() {
-        if let PreEquationKind::Membership { sort, .. } = &sort_constraint.pe_kind {
-          if index_leq_sort(current_sort_index, sort) {
+      for sort_constraint in self.constraints.iter_mut() {
+        if let PreEquationKind::Membership { sort, .. } = sort_constraint.pe_kind {
+          if index_leq_sort(current_sort_index, &sort) {
             // Done!
             return;
           }
 
-          if sort_leq_index(sort, current_sort_index) {
-            // not equal because of previous test
-            let variable_count = sort_constraint.variable_info.protected_variable_count();
-            context.substitution.clear_first_n(variable_count as usize);
-
-            if let Some(mut lhs_automaton) = &sort_constraint.deref_mut().lhs_automaton
+          if sort_leq_index(&sort, current_sort_index) {
+            {
+              // not equal because of previous test
+              let variable_count = sort_constraint.variable_info.protected_variable_count();
+              context.substitution.clear_first_n(variable_count as usize);
+            }
+            if let Some(lhs_automaton) = sort_constraint.lhs_automaton.as_mut()
             {
               if let (true, mut subproblem) = lhs_automaton
                   .as_mut()
                   .match_(subject.clone(), &mut context.substitution)
               {
                 if subproblem.is_none() || subproblem.as_mut().unwrap().solve(true, context) {
-                  // `subproblem` needs to be repackaged for `check_condition`.
-                  let mut subproblem = if let Some(mut boxed_sp) = subproblem {
-                    Some(*boxed_sp)
-                  } else {
-                    None
-                  };
-
+                  
                   if !sort_constraint.has_condition()
                       || sort_constraint.check_condition(subject.clone(), context, subproblem)
                   {
-                    subproblem.take(); // equivalent to delete sp in C++
+                    // subproblem.take(); // equivalent to delete sp in C++
                     /* ToDo: Implement tracing
                     if trace_status() {
                       context.trace_pre_eq_application(

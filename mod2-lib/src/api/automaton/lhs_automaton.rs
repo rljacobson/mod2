@@ -7,11 +7,15 @@ The automaton that matches the LHS.
 use std::rc::Rc;
 use mod2_abs::Outcome;
 use crate::{
-  api::dag_node::DagNodePtr,
+  api::{
+    dag_node::DagNodePtr,
+    subproblem::MaybeSubproblem,
+    variable_theory::VariableIndex,
+  },
   core::{
+    sort::SortPtr,
     substitution::Substitution,
-    sort::SortPtr
-  }
+  },
 };
 
 pub type BxLHSAutomaton = Box<dyn LHSAutomaton>;
@@ -19,7 +23,7 @@ pub type BxLHSAutomaton = Box<dyn LHSAutomaton>;
 pub trait LHSAutomaton {
   fn match_(
     &mut self,
-    subject: DagNodePtr,
+    subject : DagNodePtr,
     solution: &mut Substitution,
     // returned_subproblem: Option<&mut dyn Subproblem>,
     // extension_info: Option<&mut dyn ExtensionInfo>,
@@ -29,18 +33,18 @@ pub trait LHSAutomaton {
   // In Maude this is a method on DagNode.
   fn match_variable(
     &self,
-    dag_node: DagNodePtr,
-    index: i32,
-    sort: SortPtr,
+    mut dag_node             : DagNodePtr,
+    index                    : VariableIndex,
+    sort                     : SortPtr,
     copy_to_avoid_overwriting: bool,
-    solution: &mut Substitution,
+    solution                 : &mut Substitution,
     // extension_info: Option<&ExtensionInfo>
   ) -> (bool, MaybeSubproblem) {
     // if let Some(ext_info) = extension_info {
     //   return self.match_variable_with_extension(index, sort, solution, returned_subproblem, ext_info);
     // }
-    let d = solution.get(index);
-    match d {
+    let maybe_dag_node = solution.get(index);
+    match maybe_dag_node {
       None => {
         if let (Outcome::Success, maybe_subproblem) = dag_node.check_sort(sort) {
           let dag_node_ref = if copy_to_avoid_overwriting {

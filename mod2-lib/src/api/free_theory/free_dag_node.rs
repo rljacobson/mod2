@@ -34,6 +34,7 @@ use crate::{
   },
   HashType
 };
+use crate::core::sort::SortIndex;
 
 #[repr(transparent)]
 pub struct FreeDagNode(DagNodeCore);
@@ -158,5 +159,32 @@ impl DagNode for FreeDagNode {
     new_node.set_sort_index(self.sort_index());
 
     new_node
+  }
+
+  fn compute_base_sort(&mut self) -> SortIndex {
+    let symbol = self.symbol();
+    // assert_eq!(self as *const _, subject.symbol() as *const _, "bad symbol");
+    let arg_count = symbol.arity();
+    if arg_count.as_numeric() == 0 {
+      let idx = symbol.sort_table().traverse(0, SortIndex::ZERO);
+      self.set_sort_index(idx); // Maude: HACK
+      return idx;
+    }
+
+    let mut state = SortIndex::ZERO;
+    // enumerate is only used for assertion
+    for (idx, arg) in self.iter_args().enumerate() {
+      let term_idx = arg.sort_index();
+      assert_ne!(
+        term_idx,
+        SortIndex::UNKNOWN,
+        "unknown sort encounter for arg {} subject = {}",
+        idx,
+        self as &dyn DagNode
+      );
+      state = symbol.sort_table().traverse(state.idx_unchecked(), term_idx);
+    }
+    self.set_sort_index(state);
+    state
   }
 }

@@ -34,7 +34,6 @@ pub type BxSortTable = Box<SortTable>;
 // ToDo: Most of these vectors are likely to be small. Benchmark with tiny_vec.
 #[derive(PartialEq, Eq)]
 pub struct SortTable {
-  symbol                   : Option<SymbolPtr>,
   arity                    : Arity,              // possibly `Any`, etc.
   arg_count                : i16,
   op_declarations          : Vec<OpDeclaration>,
@@ -48,7 +47,6 @@ pub struct SortTable {
 impl Default for SortTable {
   fn default() -> Self {
     Self {
-      symbol                   : None,
       arity                    : Arity::Unspecified,
       arg_count                : 0,
       op_declarations          : Vec::new(),
@@ -62,11 +60,8 @@ impl Default for SortTable {
 }
 
 impl SortTable {
-  pub fn new(parent_symbol: SymbolPtr) -> Self {
-    Self {
-      symbol: Some(parent_symbol),
-      ..SortTable::default()
-    }
+  pub fn new() -> Self {
+    SortTable::default()
   }
 
 
@@ -224,8 +219,8 @@ impl SortTable {
     }
   }
 
-  /// Called from `Module::close_theory()`
-  pub fn compile_op_declaration(&mut self) {
+  /// Called from `Module::close_theory()`. The `symbol_ptr` is the owner and is passed for error and debug logging.
+  pub fn compile_op_declaration(&mut self, symbol_ptr: SymbolPtr) {
     debug_assert!(self.op_declarations.len() > 0);
     self.arg_kinds.reserve((self.arg_count + 1) as usize);
 
@@ -238,7 +233,7 @@ impl SortTable {
         if kind != other_op_kind {
           error!(0,
             "Sort declarations for operator {} disagree on the sort component for argument {}",
-            self.symbol.unwrap(),
+            symbol_ptr,
             i + 1
           );
         }
@@ -247,7 +242,7 @@ impl SortTable {
       self.arg_kinds.push(kind);
     }
 
-    self.build_sort_diagram();
+    self.build_sort_diagram(symbol_ptr);
     if self.constructor_status() == ConstructorStatus::Complex {
       // self.build_constructor_diagram();
     }
@@ -257,7 +252,7 @@ impl SortTable {
   /// sorts and their corresponding result sorts. This precomputes a table used at runtime for
   /// efficient sort checking and inference during term rewriting. Handles both polymorphic
   /// and overloaded operator declarations, and detects sort ambiguities when they arise.
-  fn build_sort_diagram(&mut self) {
+  fn build_sort_diagram(&mut self, symbol_ptr: SymbolPtr) {
     let nr_declarations    = self.op_declarations.len();
     let mut current_states = vec![NatSet::new()];
     let all                = &mut current_states[0];
@@ -345,7 +340,7 @@ impl SortTable {
       self.sort_error_analysis(true, &bad_terminals);
     }
 
-    debug!(4, "sort table for {} has {} entries", self.symbol.unwrap(), self.sort_diagram.len());
+    debug!(4, "sort table for {} has {} entries", symbol_ptr, self.sort_diagram.len());
   }
 
 

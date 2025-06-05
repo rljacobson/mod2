@@ -143,7 +143,7 @@ impl Term for VariableTerm {
     bound_uniquely.insert(self.index as usize);
   }
 
-  fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
+  fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
     if !at_top {
       available_terms.insert_matched_term(self.as_ptr(), eager_context);
     }

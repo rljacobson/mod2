@@ -57,6 +57,7 @@ use crate::{
     automata::RHSBuilder,
   },
 };
+use crate::api::variable_theory::VariableTerm;
 
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<TermPtr>;
@@ -361,13 +362,11 @@ pub trait Term: Formattable {
   /// types (domain and range components). (This is a method on `Symbol` in Maude.)
   fn fill_in_sort_info(&mut self) {
     let symbol     = self.symbol();
-    let sort_table = symbol.deref().sort_table().as_ref();
-    assert!(sort_table.is_some(), "couldn't get component");
-    let sort_table = sort_table.unwrap();
+    let sort_table = symbol.sort_table();
     let kind       = sort_table.range_kind(); // should be const
 
     if symbol.arity() == Arity::Value(0) {
-      self.set_sort_info(kind.clone(), sort_table.traverse(0, SortIndex::ZERO)); // HACK
+      self.set_sort_info(kind, sort_table.traverse(0, SortIndex::ZERO)); // HACK
       return;
     }
 
@@ -394,13 +393,54 @@ pub trait Term: Formattable {
 
   /// Sets the kind and the sort index of this term.
   fn set_sort_info(&mut self, kind: KindPtr, sort_index: SortIndex) {
-    let core  = self.core_mut();
-    core.kind = Some(kind);
+    let core        = self.core_mut();
+    core.kind       = Some(kind);
     core.sort_index = sort_index;
   }
 
+  /// Recursively collects the terms in a set for structural sharing. This is the theory-specific
+  /// part of `find_available_terms`.
+  fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool);
+
+  /// Recursively collects the indices and occurs sets of this term and its descendants.
+  fn index_variables(&mut self, indices: &mut VariableInfo) {
+    // This condition needs to check an RcTerm for a VariableTerm
+    if self.is_variable() {
+      let index = indices.variable_to_index(self.as_ptr());
+      let variable_term = self.as_any_mut().downcast_mut::<VariableTerm>().unwrap();
+
+      // This call needs a mutable VariableTerm
+      variable_term.index = index;
+      variable_term.occurs_below_mut().insert(index as usize);
+    } else {
+      // Accumulate in a local variable, because the iterator holds a mutable borrow.
+      let mut occurs_below = NatSet::new();
+      for mut arg in self.iter_args() {
+        arg.index_variables(indices);
+        // Accumulate the set of variables that occur under this symbol.
+        occurs_below.union_in_place(&arg.occurs_below());
+      }
+      self.occurs_below_mut().union_in_place(&occurs_below);
+    }
+  }
+
+
   /// Recursively collects the terms in a set for structural sharing.
-  fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool);
+  ///
+  /// This is a free function, because we want it wrapped in the Rc so that when we call `find_available_terms()`
+  /// it's possible to add the Rc to the term set.
+  fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
+    if self.ground() {
+      return;
+    }
+
+    if !at_top {
+      available_terms.insert_matched_term(self.as_ptr(), eager_context);
+    }
+
+    // Now do theory-specific stuff
+    self.find_available_terms_aux(available_terms, eager_context, at_top);
+  }
 
   // endregion Compiler-related Function
 

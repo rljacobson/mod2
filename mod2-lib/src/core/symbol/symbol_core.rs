@@ -17,7 +17,7 @@ use crate::{
     },
     format::{FormatStyle, Formattable},
     strategy::Strategy,
-    pre_equation::{SortConstraintTable, BxSortConstraintTable},
+    pre_equation::{SortConstraintTable},
   },
   HashType,
 };
@@ -28,8 +28,8 @@ pub struct SymbolCore {
   pub attributes : SymbolAttributes,
   pub symbol_type: SymbolType,
 
-  pub sort_table: Option<BxSortTable>,
-  pub sort_constraint_table: Option<BxSortConstraintTable>,
+  pub sort_table: SortTable,
+  pub sort_constraint_table: SortConstraintTable,
 
   /// Unique integer for comparing symbols, also called order. In Maude, the `order`
   /// has lower bits equal to the value of an integer that is incremented every time
@@ -67,8 +67,8 @@ impl SymbolCore {
       arity,
       attributes,
       symbol_type,
-      sort_table: None,
-      sort_constraint_table: None,
+      sort_table: SortTable::default(),
+      sort_constraint_table: SortConstraintTable::new(),
       hash_value,
       strategy: Default::default(),
     };
@@ -102,32 +102,13 @@ impl SymbolCore {
     self.hash_value
   }
   
-  pub fn add_op_declaration(&mut self, symbol_ptr: SymbolPtr, op_declaration: OpDeclaration) {
-    match &mut self.sort_table {
-      
-      None => {
-        let mut sort_table = Box::new(SortTable::new(symbol_ptr));
-        sort_table.add_op_declaration(op_declaration);
-        self.sort_table = Some(sort_table);
-      }
-      
-      Some(sort_table) => {
-        sort_table.add_op_declaration(op_declaration);
-      }
-      
-    }
+  pub fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
+    self.sort_table.add_op_declaration(op_declaration);
   }
   
   #[inline(always)]
   pub(crate) fn arity(&self) -> Arity {
-    match self.sort_table {
-      None => { 
-        self.arity
-      },
-      Some(ref sort_table) => {
-        sort_table.arity()
-      }
-    }
+    self.sort_table.arity()
   }
 }
 
