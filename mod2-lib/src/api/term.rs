@@ -14,9 +14,11 @@ use std::{
   collections::HashMap,
   fmt::Display,
   hash::{Hash, Hasher},
-  ops::Deref
+  ops::{
+    Deref,
+    DerefMut
+  }
 };
-
 use mod2_abs::{
   decl_as_any_ptr_fns,
   NatSet,
@@ -25,7 +27,29 @@ use mod2_abs::{
   optimizable_int::OptU32
 };
 use crate::{
+  core::{
+    sort::{
+      Sort,
+      SortPtr,
+      kind::KindPtr,
+      SortIndex
+    },
+    VariableInfo,
+    TermBag,
+    format::Formattable,
+    substitution::Substitution,
+    term_core::{
+      TermAttribute,
+      TermCore,
+      VariableIndex
+    },
+    automata::{
+      RHSBuilder,
+      CopyRHSAutomaton
+    }
+  },
   api::{
+    variable_theory::VariableTerm,
     automaton::BxLHSAutomaton,
     symbol::{
       Symbol,
@@ -41,23 +65,7 @@ use crate::{
   },
   impl_display_debug_for_formattable,
   HashType,
-  core::{
-    VariableInfo,
-    TermBag,
-    format::Formattable,
-    sort::{
-      kind::KindPtr,
-      SortIndex
-    },
-    substitution::Substitution,
-    term_core::{
-      TermAttribute,
-      TermCore
-    },
-    automata::RHSBuilder,
-  },
 };
-use crate::api::variable_theory::VariableTerm;
 
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<TermPtr>;
@@ -70,20 +78,20 @@ pub trait Term: Formattable {
   fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
   /// This is very unsafe. Make sure this term is heap allocated and pinned before calling.
   fn as_ptr(&self) -> TermPtr;
-  fn copy(&self) -> TermPtr;
+  // fn copy(&self) -> TermPtr;
 
   /// Returns the structural hash computed in `Term::normalize()`
   fn structural_hash(&self) -> HashType { self.core().hash_value }
 
-  /// Returns a pointer to the normalized version of self. If a new term was created during
-  /// normalization, it is returned. We also need to know if any subterm changed, so we also
-  /// return a bool, and unless the term is the expression's top-most term, we will always need
-  /// the new hash value, too. The returned tuple is thus `( Option<TermBx>, changed, new_hash)`.
-  ///
+  /// Normalizes self. If a new (boxed) term was created during normalization, it is
+  /// returned. We also need to know if any subterm changed, so we also return a bool,
+  /// and unless the term is the expression's top-most term, we will always need the new
+  /// hash value, too. The returned tuple is thus `( Option<TermBx>, changed, new_hash)`.
+
   /// Note: The structural hash value of a term is first set in this method. The algorithm used
   ///       to compute this hash should be kept in sync with the corresponding implementation
   ///       of `DagNode::structural_hash()`.
-  fn normalize(&mut self, full: bool) -> (Option<TermPtr>, bool, HashType);
+  fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType);
 
   fn core(&self)         -> &TermCore;
   fn core_mut(&mut self) -> &mut TermCore;
@@ -289,21 +297,70 @@ pub trait Term: Formattable {
 
   /// Compiles the LHS automaton, returning the tuple `(lhs_automaton, subproblem_likely): (RcLHSAutomaton, bool)`
   fn compile_lhs(
-    &self,
-    match_at_top: bool,
-    variable_info: &VariableInfo,
+    &mut self,
+    match_at_top  : bool,
+    variable_info : &VariableInfo,
+    bound_uniquely: &mut NatSet,
+  ) -> (BxLHSAutomaton, bool);
+  
+  /// The theory-dependent part of `compile_lhs` called by `Term::compile_lhs(…)`.
+  fn compile_lhs_aux(
+    &mut self,
+    match_at_top  : bool,
+    variable_info : &VariableInfo,
     bound_uniquely: &mut NatSet,
   ) -> (BxLHSAutomaton, bool);
 
-  /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
+  fn compile_rhs(
+    &mut self,
+    rhs_builder    : &mut RHSBuilder,
+    variable_info  : &mut VariableInfo,
+    available_terms: &mut TermBag,
+    eager_context  : bool,
+  ) -> VariableIndex {
+    if let Some((mut found_term, _)) = available_terms.find(self.as_ptr(), eager_context) {
+      let mut found_term = found_term.deref_mut();
+
+      if found_term.core_mut().save_index.is_none() {
+        if let Some(variable_term) = found_term.as_any().downcast_ref::<VariableTerm>() {
+          return variable_term.index.unwrap();
+        }
+
+        found_term.core_mut().save_index = Some(variable_info.make_protected_variable());
+      }
+
+      return found_term.core_mut().save_index.unwrap();
+    }
+
+    if let Some(variable_term) = self.as_any_mut().downcast_mut::<VariableTerm>() {
+      let var_index = variable_term.index.unwrap();
+
+      if variable_term.is_eager_context() {
+        let index = variable_info.make_construction_index();
+        rhs_builder.add_rhs_automaton(Box::new(CopyRHSAutomaton::new(var_index, index)));
+        variable_term.core_mut().save_index = Some(index);
+        available_terms.insert_built_term(self.as_ptr(), true);
+        return index;
+      }
+      return var_index;
+    }
+
+    let index = self.compile_rhs_aux(rhs_builder, variable_info, available_terms, eager_context);
+    self.core_mut().save_index = Some(index);
+    available_terms.insert_built_term(self.as_ptr(), eager_context);
+    
+    index
+  }
+  
+  /// The theory-dependent part of `compile_rhs` called by `Term::compile_rhs(…)`. Returns
   /// the `save_index`.
   fn compile_rhs_aux(
     &mut self,
-    builder: &mut RHSBuilder,
-    variable_info: &VariableInfo,
+    builder        : &mut RHSBuilder,
+    variable_info  : &VariableInfo,
     available_terms: &mut TermBag,
-    eager_context: bool,
-  ) -> i32;
+    eager_context  : bool,
+  ) -> VariableIndex;
 
   // A subterm "honors ground out match" if its matching algorithm guarantees never to return a matching subproblem
   // when all the terms variables are already bound.
@@ -398,6 +455,16 @@ pub trait Term: Formattable {
     core.sort_index = sort_index;
   }
 
+  fn sort(&self) -> Option<SortPtr> {
+    if self.core().sort_index.is_index() {
+      let sort_index = self.core().sort_index;
+      if let Some(kind) = self.core().kind {
+        return Some(kind.sort(sort_index));
+      }
+    }
+    None
+  }
+
   /// Recursively collects the terms in a set for structural sharing. This is the theory-specific
   /// part of `find_available_terms`.
   fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool);
@@ -410,7 +477,7 @@ pub trait Term: Formattable {
       let variable_term = self.as_any_mut().downcast_mut::<VariableTerm>().unwrap();
 
       // This call needs a mutable VariableTerm
-      variable_term.index = index;
+      variable_term.index = Some(index);
       variable_term.occurs_below_mut().insert(index as usize);
     } else {
       // Accumulate in a local variable, because the iterator holds a mutable borrow.
@@ -449,7 +516,7 @@ pub trait Term: Formattable {
 
 // region trait impls for Term
 
-// ToDo: Revisit whether `semantic_hash` is appropriate for the `Hash` trait.
+// ToDo: Revisit whether `structural_hash` is appropriate for the `Hash` trait.
 // Use the `Term::structural_hash(…)` hash for `HashSet`s and friends.
 impl Hash for dyn Term {
   fn hash<H: Hasher>(&self, state: &mut H) {

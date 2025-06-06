@@ -48,10 +48,10 @@ use crate::{
   },
   core::{
     gc::allocate_dag_node,
-    theory::EquationalTheory
+    theory::EquationalTheory,
+    sort::SortIndex
   }
 };
-use crate::core::sort::SortIndex;
 
 /// Create vtable pointers for concrete `DagNode` types
 macro_rules! make_dag_node_vtable {
@@ -142,6 +142,9 @@ pub type DagNodeFlags = BitFlags<DagNodeFlag, u8>;
 /// Keep the fields ordered to optimize memory layout.
 pub struct DagNodeCore {
   pub(crate) symbol: SymbolPtr,
+  
+  /// Used only during a copy operation. Maude uses the `symbol` field for this purpose.
+  pub(crate) forwarding_ptr: Option<DagNodePtr>,
 
   /// Several Theories store values inline:
   ///   - `NADataType` values for `NADagNode<T: NADataType>`, usually 64 bits

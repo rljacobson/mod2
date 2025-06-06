@@ -373,8 +373,10 @@ impl PreEquation {
       //   }
       // }
 
-      let success: bool = self.solve_condition(find_first, trial_ref, context, state);
-
+      todo!("Uncomment the following line.");
+      // let success: bool = self.solve_condition(find_first, trial_ref, context, state);
+      let success = true;
+      
       // if trace_status() {
       //   if context.borrow().trace_abort() {
       //     state.clear();
@@ -427,7 +429,7 @@ impl PreEquation {
 
     result
   }
-
+/*
   fn solve_condition(
     &mut self,
     mut find_first: bool,
@@ -478,7 +480,7 @@ impl PreEquation {
 
     find_first
   }
-
+*/
 
   // endregion `check*` methods
   

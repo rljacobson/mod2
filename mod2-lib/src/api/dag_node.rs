@@ -27,7 +27,8 @@ use crate::{
   api::{
     symbol::SymbolPtr,
     Arity,
-    term::Term
+    term::Term,
+    subproblem::MaybeSubproblem
   },
   core::{
     dag_node_core::{
@@ -48,7 +49,8 @@ use crate::{
       }
     },
     sort::{SortPtr, SortIndex},
-    HashConsSet
+    HashConsSet,
+    substitution::MaybeDagNode
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -298,6 +300,26 @@ pub trait DagNode {
   }
 
   #[inline(always)]
+  fn is_copied(&self) -> bool {
+    self.core().flags.contains(DagNodeFlag::Copied)
+  }
+
+  fn clear_copied_pointers(&mut self) {
+    if self.is_copied() {
+      let core = self.core_mut();
+      core.flags.remove(DagNodeFlag::Copied);
+      // ToDo: Uncomment if `DagNodeCore::symbol` and `DagNodeCore::forwarding_ptr` are ever unified.
+      // if let Some(node) = core.forwarding_ptr {
+      //   core.symbol = node.symbol();
+      // }
+      self.clear_copied_pointers_aux();
+    }
+  }
+
+  /// The theory specific part of `DagNode::clear_copied_pointers()`.
+  fn clear_copied_pointers_aux(&mut self);
+
+  #[inline(always)]
   fn set_flags(&mut self, flags: DagNodeFlags) {
     self.core_mut().flags.insert(flags);
   }
@@ -395,15 +417,15 @@ pub trait DagNode {
           && self.compare_arguments(other) == Ordering::Equal
       )
   }
-  
+
   /// Tests whether `self`'s sort is less than or equal to other's sort
   fn leq_sort(&self, sort: SortPtr) -> bool {
     assert_ne!(self.sort_index(), SortIndex::UNKNOWN, "unknown sort");
     self.get_sort().unwrap().leq(sort)
   }
-  
+
   // endregion Comparison
-  
+
   // region Copy Constructors
 
   /// For hash consing, recursively checks child nodes to determine if a canonical copy needs to be made.
@@ -411,7 +433,7 @@ pub trait DagNode {
 
   /// For hash consing unreduced nodes, recursively creates a canonical copy.
   fn make_canonical_copy(&self, hash_cons_set: &mut HashConsSet) -> DagNodePtr;
-  
+
   /// Makes a shallow clone of this node.
   fn make_clone(&self) -> DagNodePtr;
 
@@ -420,7 +442,7 @@ pub trait DagNode {
   fn overwrite_with_clone(&mut self, mut other: DagNodePtr) -> DagNodePtr {
     let node_mut = other.core_mut();
 
-    // Overwrite all `DagNodeCore` fields. 
+    // Overwrite all `DagNodeCore` fields.
     node_mut.args       = self.shallow_copy_args();
     node_mut.inline     = self.core().inline;
     node_mut.theory_tag = self.core().theory_tag;
@@ -432,6 +454,22 @@ pub trait DagNode {
 
     DagNodeCore::upgrade(node_mut)
   }
+
+  fn copy_eager_upto_reduced(&mut self) -> MaybeDagNode {
+    if self.is_reduced() {
+      return None;
+    }
+
+    if !self.is_copied() {
+      self.core_mut().forwarding_ptr = Some(self.copy_eager_upto_reduced_aux());
+      self.set_flags(DagNodeFlag::Copied.into());
+    }
+
+    self.core_mut().forwarding_ptr
+  }
+
+  /// The implementor-specific part of `copy_eager_upto_reduced()`
+  fn copy_eager_upto_reduced_aux(&mut self) -> DagNodePtr;
 
   // endregion Copy Constructors
 
@@ -470,7 +508,7 @@ pub trait DagNode {
       node.mark();
     }
   } // end fn mark
-  
+
   fn shallow_copy_args(&self) -> *mut u8 {
     if !self.core().args.is_null() && self.core().needs_destruction() {
       // Reallocate
@@ -478,7 +516,7 @@ pub trait DagNode {
       (node_vector.copy() as *mut DagNodeVector) as *mut u8
     } // The empty or singleton case
     else {
-      // Be careful: 
+      // Be careful:
       self.core().args
     }
   }
@@ -490,7 +528,7 @@ pub trait DagNode {
   }
 
   // endregion GC related methods
-  
+
   // region Compiler related methods
 
   /// Sets the sort_index of self. This is a method on Symbol in Maude.
@@ -520,7 +558,7 @@ pub trait DagNode {
     return (Outcome::Success, None);
   }
   // endregion Compiler related methods
-  
+
 }
 
 // region trait impls for DagNode

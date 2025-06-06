@@ -7,25 +7,27 @@ Right hand side automata that make copies of bindings in the substitution.
 
 
 use std::any::Any;
-
-use tiny_logger::{log, Channel};
-
+use mod2_abs::debug;
 use crate::{
+  api::{
+    dag_node::DagNodePtr,
+    automaton::RHSAutomaton,
+    variable_theory::VariableIndex
+  },
   core::{
     substitution::{MaybeDagNode, Substitution},
     VariableInfo,
   },
-  theory::{RHSAutomaton, RcDagNode},
 };
 
 pub struct CopyRHSAutomaton {
-  original_index: i32,
-  copy_index:     i32,
+  original_index: VariableIndex,
+  copy_index:     VariableIndex,
 }
 
 
 impl CopyRHSAutomaton {
-  pub fn new(original_index: i32, copy_index: i32) -> Self {
+  pub fn new(original_index: VariableIndex, copy_index: VariableIndex) -> Self {
     // TODO: Are these indices necessarily positive?
     Self {
       original_index,
@@ -60,31 +62,31 @@ impl RHSAutomaton for CopyRHSAutomaton {
 
   fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
     let orig = matcher.value(self.original_index as usize);
-    if let Some(orig_dag_node) = orig {
-      log(
-        Channel::Debug,
+    if let Some(mut orig_dag_node) = orig {
+      debug!(
         2,
-        format!("CopyRhsAutomaton::construct {}", orig_dag_node.borrow()).as_str(),
+        "CopyRhsAutomaton::construct {}", 
+        orig_dag_node
       );
 
-      let mut new_dag_node = orig_dag_node.borrow_mut().copy_eager_upto_reduced();
-      orig_dag_node.borrow_mut().clear_copied_rc();
-      matcher.bind(self.copy_index as i32, new_dag_node.clone());
+      let mut new_dag_node = orig_dag_node.copy_eager_upto_reduced();
+      orig_dag_node.clear_copied_pointers();
+      matcher.bind(self.copy_index, new_dag_node.clone());
       new_dag_node
     } else {
       unreachable!("No DagNode for original index. This is a bug.");
     }
   }
 
-  fn replace(&mut self, old: RcDagNode, matcher: &mut Substitution) {
-    let orig = matcher.value(self.original_index as usize);
+  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) {
+    let orig = matcher.value(self.original_index);
 
-    if let Some(orig_dag_node) = orig {
-      let mut new_dag_node = orig_dag_node.borrow_mut().copy_eager_upto_reduced();
-      orig_dag_node.borrow_mut().clear_copied_rc();
+    if let Some(mut orig_dag_node) = orig {
+      let mut new_dag_node = orig_dag_node.copy_eager_upto_reduced();
+      orig_dag_node.clear_copied_pointers();
 
-      if let Some(new_dag_node) = new_dag_node {
-        new_dag_node.borrow_mut().overwrite_with_clone(old);
+      if let Some(mut new_dag_node) = new_dag_node {
+        new_dag_node.overwrite_with_clone(old);
       }
     } else {
       unreachable!("No DagNode for original index. This is a bug.");

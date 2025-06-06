@@ -23,7 +23,18 @@ use mod2_abs::{
   NatSet
 };
 use crate::{
+  core::{
+    automata::RHSBuilder,
+    format::{FormatStyle, Formattable},
+    term_core::TermCore,
+    TermBag,
+    VariableInfo
+  },
   api::{
+    variable_theory::VariableIndex,
+    dag_node_cache::DagNodeCache,
+    built_in::FloatDagNode,
+    automaton::BxLHSAutomaton,
     built_in::{
       Bool,
       Float,
@@ -36,17 +47,10 @@ use crate::{
     },
     dag_node::{DagNode, DagNodePtr},
     symbol::Symbol,
-    term::{Term, TermPtr, BxTerm},
-  },
-  core::{
-    format::{FormatStyle, Formattable},
-    term_core::TermCore,
-    TermBag,
+    term::{Term, TermPtr, BxTerm}
   },
   HashType,
 };
-use crate::api::built_in::FloatDagNode;
-use crate::api::dag_node_cache::DagNodeCache;
 
 pub type BoolTerm    = NATerm<Bool>;
 pub type FloatTerm   = NATerm<Float>;
@@ -194,9 +198,9 @@ impl<T: NADataType> Term for NATerm<T> {
     TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  fn copy(&self) -> BxTerm {
-    Box::new(self.clone())
-  }
+  // fn copy(&self) -> BxTerm {
+  //   Box::new(self.clone())
+  // }
 
   fn normalize(&mut self, _full: bool) -> (Option<BxTerm>, bool, HashType) {
     let hash_value = hash2(self.symbol().hash(), self.value.hashable_bits());
@@ -237,6 +241,14 @@ impl<T: NADataType> Term for NATerm<T> {
   #[allow(private_interfaces)]
   fn dagify_aux(&self, _node_cache: &mut DagNodeCache) -> DagNodePtr {
     T::make_dag_node(self.value.clone())
+  }
+
+  fn compile_lhs(&mut self, match_at_top: bool, variable_info: &VariableInfo, bound_uniquely: &mut NatSet) -> (BxLHSAutomaton, bool) {
+    todo!()
+  }
+
+  fn compile_rhs_aux(&mut self, builder: &mut RHSBuilder, variable_info: &VariableInfo, available_terms: &mut TermBag, eager_context: bool) -> VariableIndex {
+    todo!()
   }
 
   fn analyse_constraint_propagation(&mut self, _bound_uniquely: &mut NatSet) {

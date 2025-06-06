@@ -57,14 +57,10 @@ pub type StringBuiltIn = String;
 macro_rules! make_symbol {
     ($sort_name:expr, $symbol_name:expr, $symbol_type:expr) => {
         {
-          let name_lit = stringify!($symbol_name);  
-          let sort     = match get_built_in_sort(stringify!($sort_name)) {
-            None => {
-              panic!("COULD NOT FIND SORT {:?}", stringify!($sort_name));
-            }
-            Some(thing) => {thing}
-          };
-          // let sort     = get_built_in_sort(stringify!($sort_name)).unwrap();
+          let name_lit = stringify!($symbol_name);
+          let sort     = get_built_in_sort(stringify!($sort_name)).unwrap_or_else(
+                                || panic!("COULD NOT FIND SORT {:?}", stringify!($sort_name))
+                              );
           let symbol_name = IString::from(name_lit);
           let symbol_core = SymbolCore::new(
             symbol_name.clone(),
@@ -76,9 +72,8 @@ macro_rules! make_symbol {
             heap_construct!(paste!{ [<$sort_name Symbol>] ::new(symbol_core)})
           );
           let op_declaration  = OpDeclaration::new(smallvec![sort], true.into());
-          let symbol_ptr_copy = symbol_ptr; // Force copy
-          symbol_ptr.add_op_declaration(symbol_ptr_copy, op_declaration);
-          
+          symbol_ptr.add_op_declaration(op_declaration);
+
           (name_lit, symbol_ptr)
         }
     };
@@ -122,7 +117,7 @@ static BUILT_IN_SORTS: Lazy<HashMap<&'static str, Sort>> = Lazy::new(|| {
     let sort = Sort::new(IString::from(name));
     sorts.insert(name, sort);
   }
-  
+
   sorts
 });
 
@@ -160,7 +155,7 @@ static BUILT_IN_SYMBOLS: Lazy<HashMap<&'static str, SymbolPtr>> = Lazy::new(|| {
     let (symbol_name, symbol_ptr) = make_symbol!(NaturalNumber, NaturalNumber, SymbolType::NaturalNumber);
     symbols.insert(symbol_name, symbol_ptr);
   }
-  
+
   symbols
 });
 
@@ -181,12 +176,12 @@ pub fn get_built_in_symbol(name: &str) -> Option<SymbolPtr> {
 mod tests {
   use std::ops::Deref;
   use super::*;
-  
+
   #[test]
   fn test_built_in_sorts() {
     let maybe_bool_sort = get_built_in_sort("Bool");
     assert!(maybe_bool_sort.is_some());
-    
+
     let bool_sort = maybe_bool_sort.unwrap();
     assert_eq!(bool_sort.name.deref(), "Bool")
   }

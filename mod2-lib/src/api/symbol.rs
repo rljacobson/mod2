@@ -45,7 +45,7 @@ pub trait Symbol {
   fn as_ptr(&self) -> SymbolPtr;
 
   /// A type-erased way of asking a symbol to make a term of compatible type.
-  fn make_term(&self, args: Vec<TermPtr>) -> TermPtr;
+  fn make_term(&self, args: Vec<BxTerm>) -> BxTerm;
 
   // region Member Getters and Setters
   /// Trait level access to members for shared implementation

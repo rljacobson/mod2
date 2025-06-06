@@ -126,7 +126,7 @@ impl Condition {
     }
   }
 
-
+/*
   pub fn solve(&mut self, find_first: bool, solution: &mut RewritingContext, state: &mut Vec<ConditionState>) -> bool {
     match self {
       Match { .. } => todo!("Implement match condition solve"),
@@ -159,7 +159,7 @@ impl Condition {
 
       SortMembership { .. } => todo!("Implement sort test condition solve"),
     }
-  }
+  }*/
 }
 
 impl Display for Condition {

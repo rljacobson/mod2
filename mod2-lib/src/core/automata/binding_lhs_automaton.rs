@@ -6,18 +6,22 @@ real work.
 */
 
 use crate::{
+  api::{
+    subproblem::MaybeSubproblem,
+    dag_node::DagNodePtr,
+    automaton::{BxLHSAutomaton, LHSAutomaton},
+    variable_theory::VariableIndex
+  },
   core::substitution::Substitution,
-  theory::{LHSAutomaton, MaybeSubproblem, RcDagNode, RcLHSAutomaton},
 };
 
-
 pub(crate) struct BindingLHSAutomaton {
-  variable_index:    i32,
-  real_lhs_automata: RcLHSAutomaton,
+  variable_index:    VariableIndex,
+  real_lhs_automata: BxLHSAutomaton,
 }
 
 impl BindingLHSAutomaton {
-  pub fn new(variable_index: i32, real_lhs_automata: RcLHSAutomaton) -> Self {
+  pub fn new(variable_index: VariableIndex, real_lhs_automata: BxLHSAutomaton) -> Self {
     BindingLHSAutomaton {
       variable_index,
       real_lhs_automata,
@@ -29,15 +33,16 @@ impl BindingLHSAutomaton {
 impl LHSAutomaton for BindingLHSAutomaton {
   fn match_(
     &mut self,
-    subject: RcDagNode,
+    subject: DagNodePtr,
     solution: &mut Substitution,
     // extension_info: Option<&mut dyn ExtensionInfo>,
   ) -> (bool, MaybeSubproblem) {
-    let (matched, maybe_subproblem) = self.real_lhs_automata.borrow_mut().match_(subject.clone(), solution);
+    let (matched, maybe_subproblem) = self.real_lhs_automata.match_(subject, solution);
     if matched {
       solution.bind(self.variable_index, Some(subject));
       return (matched, maybe_subproblem);
     }
-    return (false, None);
+    
+    (false, None)
   }
 }

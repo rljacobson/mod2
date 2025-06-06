@@ -21,7 +21,7 @@ profiling     = []
 
 [dependencies]
 mod2-abs.workspace = true
-
+smallvec.workspace = true
 ordered-float.workspace = true
 paste.workspace         = true
 enumflags2.workspace    = true

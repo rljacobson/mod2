@@ -1,5 +1,6 @@
-#![feature(ptr_metadata)]
-#![feature(nonzero_internals)]
+#![feature(ptr_metadata)]      // For `std::ptr::metadata`
+#![feature(nonzero_internals)] // For `ZeroablePrimitive`
+#![allow(internal_features)]   // To silence warning for previous feature
 #![allow(unused)]
 /*!
 

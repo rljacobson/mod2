@@ -27,35 +27,38 @@ use crate::{
     },
     variable_theory::VariableTerm,
     dag_node_cache::DagNodeCache,
+    automaton::BxLHSAutomaton
   },
   core::{
     format::{
       FormatStyle,
       Formattable,
     },
-    term_core::TermCore,
+    term_core::{
+      TermCore,
+      VariableIndex
+    },
     dag_node_core::{
       DagNodeCore,
       DagNodeFlag,
     },
     substitution::Substitution,
     VariableInfo,
-    TermBag
+    TermBag,
+    automata::RHSBuilder,
   },
   impl_display_debug_for_formattable,
   HashType,
 };
-use crate::api::automaton::BxLHSAutomaton;
-use crate::core::automata::RHSBuilder;
 
 pub struct FreeTerm{
   core                 : TermCore,
-  pub args             : Vec<TermPtr>,
+  pub args             : Vec<BxTerm>,
   pub(crate) slot_index: i32,
 }
 
 impl FreeTerm {
-  pub fn new(symbol: SymbolPtr, args: Vec<TermPtr>) -> Self {
+  pub fn new(symbol: SymbolPtr, args: Vec<BxTerm>) -> Self {
     Self {
       core      : TermCore::new(symbol),
       args,
@@ -105,15 +108,15 @@ impl Term for FreeTerm {
     TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  fn copy(&self) -> TermPtr {
-    let term = FreeTerm{
-      core: self.core.clone(),
-      args: self.args.iter().map(|t| t.copy()).collect(),
-      slot_index: self.slot_index.clone(),
-    };
-    
-    TermPtr::new(Box::into_raw(Box::new(term)))
-  }
+  // fn copy(&self) -> TermPtr {
+  //   let term = FreeTerm{
+  //     core: self.core.clone(),
+  //     args: self.args.iter().map(|t| t.copy()).collect(),
+  //     slot_index: self.slot_index.clone(),
+  //   };
+  //   
+  //   TermPtr::new(Box::into_raw(Box::new(term)))
+  // }
 
 
   fn structural_hash(&self) -> HashType {
@@ -121,7 +124,7 @@ impl Term for FreeTerm {
   }
 
   /// In sync with `FreeDagNode::structural_hash()`
-  fn normalize(&mut self, full: bool) -> (Option<TermPtr>, bool, HashType) {
+  fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType) {
     let mut changed   : bool     = false;
     let mut hash_value: HashType = self.symbol().hash();
 
@@ -152,7 +155,7 @@ impl Term for FreeTerm {
   }
 
   fn iter_args(&self) -> Box<dyn Iterator<Item=TermPtr> + '_> {
-    Box::new(self.args.iter().copied())
+    Box::new(self.args.iter().map(| t | t.as_ptr()))
   }
 
   // region Comparison Methods
@@ -161,7 +164,7 @@ impl Term for FreeTerm {
     assert_eq!(&self.symbol(), &other.symbol(), "symbols differ");
 
     if let Some(other) = other.as_any().downcast_ref::<FreeTerm>() {
-      for (&arg_self, &arg_other) in self.args.iter().zip(other.args.iter()) {
+      for (arg_self, arg_other) in self.args.iter().zip(other.args.iter()) {
         let r = arg_self.compare(arg_other.deref());
         if r.is_ne() {
           return r;
@@ -243,7 +246,7 @@ impl Term for FreeTerm {
     // region Compiler-related
     #[inline(always)]
     fn compile_lhs(
-      &self,
+      &mut self,
       match_at_top: bool,
       variable_info: &VariableInfo,
       bound_uniquely: &mut NatSet,
@@ -261,7 +264,7 @@ impl Term for FreeTerm {
       variable_info: &VariableInfo,
       available_terms: &mut TermBag,
       eager_context: bool,
-    ) -> i32 {
+    ) -> VariableIndex {
       todo!("Implement FreeTerm::compile_rhs_aux");
       // FreeTerm::compile_rhs_aux(&mut self, rhs_builder, variable_info, available_terms, eager_context)
     }
@@ -279,7 +282,7 @@ impl Term for FreeTerm {
     for occurrence in &mut other_symbols {
       let t = occurrence.term_mut();
       if let Some(variable_term) = t.as_any_mut().downcast_mut::<VariableTerm>() {
-        bound_uniquely.insert(variable_term.index as usize);
+        bound_uniquely.insert(variable_term.index.unwrap());
       } else if !t.ground() {
         non_ground_aliens.push(occurrence.clone());
       }
@@ -367,7 +370,7 @@ impl FreeTerm {
       if let Some(f) = t.as_any_mut().downcast_mut::<FreeTerm>() {
         f.scan_free_skeleton(free_symbols, other_symbols, our_position, i as i32);
       } else {
-        let occurrence = FreeOccurrence::new(our_position, i as i32, *t);
+        let occurrence = FreeOccurrence::new(our_position, i as i32, t.as_ptr());
         other_symbols.push(occurrence);
       }
     }

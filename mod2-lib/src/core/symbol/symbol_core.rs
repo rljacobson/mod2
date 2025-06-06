@@ -6,14 +6,13 @@ use std::{
 use mod2_abs::{int_to_subscript, IString};
 
 use crate::{
-  api::{Arity, symbol::SymbolPtr},
+  api::Arity,
   core::{
     symbol::{
       SortTable,
       SymbolAttributes,
       SymbolType,
       OpDeclaration,
-      sort_table::BxSortTable
     },
     format::{FormatStyle, Formattable},
     strategy::Strategy,
@@ -44,7 +43,6 @@ pub struct SymbolCore {
 
 // This is an abomination. See `api/built_in/mod.rs`.
 unsafe impl Send for SymbolCore {}
-
 unsafe impl Sync for SymbolCore {}
 
 impl SymbolCore {

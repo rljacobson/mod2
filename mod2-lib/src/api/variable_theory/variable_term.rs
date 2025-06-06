@@ -22,9 +22,10 @@ use crate::{
     },
     variable_theory::{
       VariableDagNode,
-      VariableIndex,
-      VariableType
-    }
+      VariableType,
+      automaton::VariableLHSAutomaton
+    },
+    automaton::BxLHSAutomaton,
   },
   core::{
     TermBag,
@@ -33,13 +34,17 @@ use crate::{
       Formattable
     },
     substitution::Substitution,
-    term_core::TermCore
+    term_core::{
+      TermCore,
+      VariableIndex
+    },
+    automata::{BindingLHSAutomaton, RHSBuilder},
+    VariableInfo
   },
   HashType,
   UNDEFINED,
-  impl_display_debug_for_formattable
+  impl_display_debug_for_formattable,
 };
-
 
 #[derive(Clone)]
 pub struct VariableTerm {
@@ -48,7 +53,7 @@ pub struct VariableTerm {
   pub variable_type: VariableType,
   /// Variables are tracked in a `VariableInfo` structure that maintains the environment. 
   /// The value of `index` is set in `Term::index_variables()` as part of compilation.
-  pub index        : VariableIndex,
+  pub index        : Option<VariableIndex>,
 }
 
 impl VariableTerm {
@@ -57,7 +62,7 @@ impl VariableTerm {
       core         : TermCore::new(symbol),
       name,
       variable_type: VariableType::Blank,
-      index        : UNDEFINED as VariableIndex, // Set in `Term::index_variables()`
+      index        : None, // Set in `Term::index_variables()`
     }
   }
 }
@@ -78,9 +83,9 @@ impl Term for VariableTerm {
     TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  fn copy(&self) -> BxTerm {
-    Box::new(self.clone())
-  }
+  // fn copy(&self) -> BxTerm {
+  //   Box::new(self.clone())
+  // }
 
   #[inline(always)]
   fn structural_hash(&self) -> HashType {
@@ -124,7 +129,7 @@ impl Term for VariableTerm {
   }
 
   fn partial_compare_unstable(&self, partial_substitution: &mut Substitution, other: DagNodePtr) -> Option<Ordering> {
-    match partial_substitution.get(self.index) {
+    match partial_substitution.get(self.index.unwrap()) {
       None => {
         PartialOrdering::Unknown
       }
@@ -136,11 +141,44 @@ impl Term for VariableTerm {
   #[allow(private_interfaces)]
   fn dagify_aux(&self, _node_cache: &mut DagNodeCache) -> DagNodePtr {
     // ToDo: Why do we not consult `node_cache`?
-    VariableDagNode::new(self.symbol(), self.name.clone(), self.index)
+    VariableDagNode::new(self.symbol(), self.name.clone(), self.index.unwrap())
+  }
+  
+  // region Compiler related methods
+
+  fn compile_lhs(
+    &mut self,
+    match_at_top  : bool,
+    _variable_info: &VariableInfo,
+    bound_uniquely: &mut NatSet,
+  ) -> (BxLHSAutomaton, bool) {
+    let index = self.index.expect("index negative");
+    assert!(index > 100, "index too big");
+    bound_uniquely.insert(index as usize);
+
+    let mut automaton: BxLHSAutomaton =
+        Box::new(VariableLHSAutomaton::new(index, self.sort().unwrap(), match_at_top));
+
+    if let Some(save_index) = self.core_mut().save_index {
+      automaton = Box::new(BindingLHSAutomaton::new(save_index, automaton));
+    }
+
+    // subproblem is never likely for `VariableTerm`
+    (automaton, false)
+  }
+
+  fn compile_rhs_aux(
+    &mut self,
+    _builder        : &mut RHSBuilder,
+    _variable_info  : &VariableInfo,
+    _available_terms: &mut TermBag,
+    _eager_context  : bool,
+  ) -> VariableIndex {
+    unreachable!("The compile_rhs_aux method should never be called for a Rule.");
   }
 
   fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {
-    bound_uniquely.insert(self.index as usize);
+    bound_uniquely.insert(self.index.unwrap() as usize);
   }
 
   fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
@@ -148,6 +186,8 @@ impl Term for VariableTerm {
       available_terms.insert_matched_term(self.as_ptr(), eager_context);
     }
   }
+  
+  // endregion Compiler related methods
 }
 
 

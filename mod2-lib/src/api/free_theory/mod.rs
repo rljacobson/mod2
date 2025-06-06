@@ -93,10 +93,14 @@ pub(crate) type GroundAlien = FreeOccurrence;
 
 #[cfg(test)]
 mod tests {
-  use crate::api::Arity;
-  use crate::api::dag_node_cache::DagNodeCache;
-  use crate::api::symbol::Symbol;
-  use crate::core::symbol::{SymbolAttributes, SymbolType};
+  use crate::{
+    api::{
+      Arity,
+      dag_node_cache::DagNodeCache,
+      symbol::Symbol
+    },
+    core::symbol::{SymbolAttributes, SymbolType}
+  };
   use super::*;
   
   #[test]
@@ -126,7 +130,7 @@ mod tests {
       }
     };
 
-    let mut g_term = FreeTerm::new(g.as_ptr(), vec![h_term.copy(), h_term.copy()]);
+    let mut g_term = FreeTerm::new(g.as_ptr(), vec![h_term, h_term]);
     let g_term = match g_term.normalize(true) {
       (Some(new_g_term), changed, hash) => {
         println!("new g term: {}, changed: {}, hash: {}", new_g_term, changed, hash);

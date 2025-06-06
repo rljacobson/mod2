@@ -32,14 +32,12 @@ use crate::{
   core::{
     sort::{
       kind::KindPtr,
-      MaybeSortIndex,
       SortIndex
     }
   },
   HashType,
 };
-
-pub type SaveIndex = OptU32;
+pub(crate) use crate::api::variable_theory::VariableIndex;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TermType {
@@ -81,9 +79,9 @@ pub struct TermCore {
   pub(crate) attributes      : TermAttributes,
   pub(crate) sort_index      : SortIndex,
   pub(crate) term_type       : TermType,
-  pub(crate) save_index      : Option<SaveIndex>,
+  pub(crate) save_index      : Option<VariableIndex>,
   /// Stores the structural hash computed in `Term::normalize()`
-  pub(crate) hash_value      : HashType, // Set in `Term::normalize()`
+  pub(crate) hash_value      : HashType,
 
   /// The number of nodes in the term tree
   pub(crate) cached_size:  Cell<Option<OptU32>>,

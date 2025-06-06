@@ -6,18 +6,22 @@ use crate::{
       SymbolPtr
     },
     Arity,
-    term::BxTerm,
-    variable_theory::VariableTerm
+    term::{
+      BxTerm,
+      TermPtr
+    },
+    variable_theory::VariableTerm,
   },
   core::{
     sort::SortPtr,
     symbol::{
       SymbolAttributes,
       SymbolType,
-      SymbolCore
+      SymbolCore,
+      OpDeclaration
     },
     format::{FormatStyle, Formattable},
-    term_core::TermCore
+    term_core::TermCore,
   },
   impl_display_debug_for_formattable,
 };
@@ -42,6 +46,16 @@ impl VariableSymbol {
   pub(crate) fn with_name(name: IString) -> VariableSymbol {
     let core = SymbolCore::with_name(name);
     VariableSymbol { core }
+  }
+
+  pub fn sort(&self) -> SortPtr {
+    // Maude: Temporary hack until sorts mechanism revised.
+    let s = self.core().sort_table.get_op_declarations();
+    assert_eq!(s.len(), 1usize, "s.length() != 1");
+    let v: &OpDeclaration = s.first().unwrap();
+    assert_eq!(v.len(), 1usize, "v.length() != 1");
+
+    v[0]
   }
 }
 

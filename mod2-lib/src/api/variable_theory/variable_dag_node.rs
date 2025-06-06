@@ -41,8 +41,14 @@ use crate::{
     gc::allocate_dag_node,
     EquationalTheory,
     HashConsSet,
+    sort::SortIndex
   },
+  HashType,
   api::{
+    symbol::{
+      Symbol,
+      SymbolPtr
+    },
     dag_node::{
       DagNode,
       DagNodeVectorRefMut,
@@ -51,13 +57,13 @@ use crate::{
       arg_to_dag_node,
       arg_to_node_vec
     },
-    symbol::SymbolPtr,
-    variable_theory::VariableIndex,
-    Arity
+    variable_theory::{
+      VariableIndex,
+      VariableSymbol
+    },
+    Arity,
   },
-  HashType,
 };
-
 
 /// The index into `DagNodeCode::inline` at which we store the `index` of `VariableDagNode`.
 const VARIABLE_INDEX_OFFSET: usize = size_of::<IString>();
@@ -77,11 +83,11 @@ impl VariableDagNode {
     }
     // Needs destruction to drop the `IString` in `DagNodeCode::inline`, which decrements the `IString`'s internal
     // reference count.
-    // ToDo: Decouple `DagNodeVector` ownership from `NeedsDestruction` flag. For now this is ok because 
+    // ToDo: Decouple `DagNodeVector` ownership from `NeedsDestruction` flag. For now this is ok because
     //       `DagNodeCore.args` is null for all cases (so far) in which the `NeedsDestruction` flag is set but
     //       which have no argument vector.
     node.set_flags(DagNodeFlag::NeedsDestruction.into());
-    
+
     node
   }
 
@@ -98,7 +104,7 @@ impl VariableDagNode {
 
     cloned_name
   }
-  
+
   // Store the raw bytes of `name` in `self.inline`; `name` is consumed and it's `drop` method is *not* called.
   fn set_name(&mut self, name: IString) {
     let base = self.core_mut().inline.as_mut_ptr().cast::<IString>();
@@ -107,6 +113,7 @@ impl VariableDagNode {
     }
   }
 
+  /// This refers to the variable index, the index within a `VariableInfo` instance.
   #[inline(always)]
   pub fn index(&self) -> VariableIndex {
     unsafe {
@@ -115,6 +122,7 @@ impl VariableDagNode {
     }
   }
 
+  /// This refers to the variable index, the index within a `VariableInfo` instance.
   #[inline(always)]
   pub fn set_index(&mut self, index: VariableIndex) {
     unsafe {
@@ -188,5 +196,15 @@ impl DagNode for VariableDagNode {
     };
     // Decrements reference count
     drop(droppable_istring);
+  }
+
+  fn compute_base_sort(&mut self) -> SortIndex {
+    if let Some(symbol) = self.symbol().as_any().downcast_ref::<VariableSymbol>() {
+      let symbol_index = symbol.sort().index_within_kind;
+      self.set_sort_index(symbol_index);
+      symbol_index
+    } else {
+      unreachable!("Failed to downcast to VariableSymbol. This is a bug.");
+    }
   }
 }

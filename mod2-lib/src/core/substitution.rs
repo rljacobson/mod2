@@ -81,8 +81,8 @@ impl Substitution {
   /// This getter takes a `usize` for the common case that we start with a `usize` index. Be careful that the `usize`
   /// wasn't converted from an `i32` that was `NONE`.
   #[inline(always)]
-  pub fn value(&self, index: usize) -> MaybeDagNode {
-    self.get(index as VariableIndex)
+  pub fn value(&self, index: VariableIndex) -> MaybeDagNode {
+    self.get(index)
   }
 
   // Todo: Is this the best way to implement a getter? I think we did it this way so it returned a value.

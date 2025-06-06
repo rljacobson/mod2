@@ -1,6 +1,7 @@
 mod variable_symbol;
 mod variable_term;
 mod variable_dag_node;
+mod automaton;
 
 // Flatten module tree
 pub use variable_term::*;
