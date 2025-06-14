@@ -20,49 +20,47 @@ use std::{
     max,
     Ordering
   },
-  ops::DerefMut,
-  mem::transmute
+  mem::transmute,
+  ops::DerefMut
 };
 
 use mod2_abs::{
   as_bytes,
   debug,
-  IString,
-  hash::hash2
+  hash::hash2,
+  IString
 };
 use crate::{
-  core::{
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlags,
-      DagNodeFlag,
-      ThinDagNodePtr
-    },
-    gc::allocate_dag_node,
-    EquationalTheory,
-    HashConsSet,
-    sort::SortIndex
-  },
-  HashType,
   api::{
+    dag_node::{
+      arg_to_dag_node,
+      arg_to_node_vec,
+      DagNode,
+      DagNodePtr,
+      DagNodeVector,
+      DagNodeVectorRefMut
+    },
     symbol::{
       Symbol,
       SymbolPtr
     },
-    dag_node::{
-      DagNode,
-      DagNodeVectorRefMut,
-      DagNodeVector,
-      DagNodePtr,
-      arg_to_dag_node,
-      arg_to_node_vec
-    },
-    variable_theory::{
-      VariableIndex,
-      VariableSymbol
-    },
+    variable_theory::VariableSymbol,
     Arity,
   },
+  core::{
+    dag_node_core::{
+      DagNodeCore,
+      DagNodeFlag,
+      DagNodeFlags,
+      ThinDagNodePtr
+    },
+    gc::allocate_dag_node,
+    sort::SortIndex,
+    EquationalTheory,
+    HashConsSet,
+    VariableIndex
+  },
+  HashType
 };
 
 /// The index into `DagNodeCode::inline` at which we store the `index` of `VariableDagNode`.
@@ -167,6 +165,10 @@ impl DagNode for VariableDagNode {
     Box::new(std::iter::empty::<DagNodePtr>())
   }
 
+  fn clear_copied_pointers_aux(&mut self) {
+    /* pass */
+  }
+
   fn make_canonical(&self, _hash_cons_set: &mut HashConsSet) -> DagNodePtr {
     self.as_ptr()
   }
@@ -184,6 +186,10 @@ impl DagNode for VariableDagNode {
     new_node.set_sort_index(self.sort_index());
 
     new_node
+  }
+
+  fn copy_eager_upto_reduced_aux(&mut self) -> DagNodePtr {
+    VariableDagNode::new(self.symbol(), self.name(), self.index())
   }
 
   fn finalize(&mut self) {

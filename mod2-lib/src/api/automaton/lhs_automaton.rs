@@ -4,19 +4,18 @@ The automaton that matches the LHS.
 
 */
 
-use std::rc::Rc;
 use mod2_abs::Outcome;
 use crate::{
   api::{
     dag_node::DagNodePtr,
     subproblem::MaybeSubproblem,
-    variable_theory::VariableIndex,
   },
   core::{
     sort::SortPtr,
     substitution::Substitution,
   },
 };
+use crate::core::VariableIndex;
 
 pub type BxLHSAutomaton = Box<dyn LHSAutomaton>;
 

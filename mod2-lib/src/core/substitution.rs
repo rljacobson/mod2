@@ -17,18 +17,15 @@ use std::cmp::min;
 use mod2_abs::NatSet;
 
 use crate::{
+  api::dag_node::{DagNodePtr, MaybeDagNode},
   core::{
     LocalBindings,
     NarrowingVariableInfo,
-    VariableInfo
-  },
-  api::{
-    dag_node::DagNodePtr,
-    variable_theory::VariableIndex
+    VariableInfo,
+    VariableIndex
   }
 };
 
-pub type MaybeDagNode = Option<DagNodePtr>;
 
 #[derive(Clone, Default)]
 pub struct Substitution {
@@ -78,8 +75,7 @@ impl Substitution {
     }
   }
 
-  /// This getter takes a `usize` for the common case that we start with a `usize` index. Be careful that the `usize`
-  /// wasn't converted from an `i32` that was `NONE`.
+  /// This getter takes a `VariableIndex`. Be careful that the value wasn't converted from an `i32` that was `NONE`.
   #[inline(always)]
   pub fn value(&self, index: VariableIndex) -> MaybeDagNode {
     self.get(index)
@@ -188,7 +184,7 @@ pub fn print_substitution_narrowing(substitution: &Substitution, variable_info: 
 
   for i in 0..variable_count {
     let var = variable_info.index_to_variable(i).unwrap();
-    let binding = substitution.value(i);
+    let binding = substitution.value(i as VariableIndex);
     assert!(binding.is_some(), "A variable is bound to None. This is a bug.");
     let binding = binding.unwrap();
     println!("{} --> {}", var, binding);
@@ -211,7 +207,7 @@ pub fn print_substitution_with_ignored(substitution: &Substitution, var_info: &V
     let var = var.unwrap();
     print!("{} --> ", var);
 
-    match substitution.value(i) {
+    match substitution.value(i as VariableIndex) {
       None => {
         println!("(unbound)");
       }

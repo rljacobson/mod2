@@ -20,52 +20,51 @@ use std::{
   }
 };
 use mod2_abs::{
-  decl_as_any_ptr_fns,
-  NatSet,
-  RcCell,
-  UnsafePtr,
   optimizable_int::OptU32
+  ,
+  NatSet,
+  UnsafePtr
 };
 use crate::{
-  core::{
-    sort::{
-      Sort,
-      SortPtr,
-      kind::KindPtr,
-      SortIndex
-    },
-    VariableInfo,
-    TermBag,
-    format::Formattable,
-    substitution::Substitution,
-    term_core::{
-      TermAttribute,
-      TermCore,
-      VariableIndex
-    },
-    automata::{
-      RHSBuilder,
-      CopyRHSAutomaton
-    }
-  },
   api::{
-    variable_theory::VariableTerm,
     automaton::BxLHSAutomaton,
+    dag_node::{
+      DagNode,
+      DagNodePtr
+    },
+    dag_node_cache::DagNodeCache,
     symbol::{
       Symbol,
       SymbolPtr,
       SymbolSet
     },
-    dag_node_cache::DagNodeCache,
-    dag_node::{
-      DagNodePtr,
-      DagNode
-    },
+    variable_theory::VariableTerm,
     Arity
+  },
+  core::{
+    automata::{
+      CopyRHSAutomaton,
+      RHSBuilder
+    },
+    format::Formattable,
+    sort::{
+      kind::KindPtr,
+      SortIndex,
+      SortPtr
+    },
+    substitution::Substitution,
+    term_core::{
+      TermAttribute,
+      TermCore
+    },
+    TermBag,
+    VariableInfo
   },
   impl_display_debug_for_formattable,
   HashType,
 };
+use crate::core::automata::BindingLHSAutomaton;
+use crate::core::VariableIndex;
 
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<TermPtr>;
@@ -86,17 +85,39 @@ pub trait Term: Formattable {
   /// Normalizes self. If a new (boxed) term was created during normalization, it is
   /// returned. We also need to know if any subterm changed, so we also return a bool,
   /// and unless the term is the expression's top-most term, we will always need the new
-  /// hash value, too. The returned tuple is thus `( Option<TermBx>, changed, new_hash)`.
+  /// hash value, too. The returned tuple is thus `(Option<TermBx>, changed, new_hash)`.
 
   /// Note: The structural hash value of a term is first set in this method. The algorithm used
   ///       to compute this hash should be kept in sync with the corresponding implementation
   ///       of `DagNode::structural_hash()`.
   fn normalize(&mut self, full: bool) -> (Option<BxTerm>, bool, HashType);
 
+  /// Creates a deep copy of `self`.
+  fn deep_copy(&self) -> BxTerm {
+    // ToDo: Implement `SymbolTranslationMap`.
+    let term = self.deep_copy_aux();
+    // ToDo: Figure out what we want to do with line numbers
+    // term.core_mut().line_number = self.core().line_number;
+    term
+  }
+
+  /// The theory specific part of `deep_copy()`.
+  fn deep_copy_aux(&self) -> BxTerm;
+
+  /// This method is only used for `NATerm<T>`, but it is convenient to have it here.
+  /// Overwrites `old_node` in place with a new `NADagNode<T>` with the same value as `self`.
+  ///
+  /// This method is on `Term` instead of `DagNode` because it is used in a context in which we only 
+  /// have a term available. 
+  fn overwrite_with_dag_node(&mut self, _old_node: DagNodePtr) -> DagNodePtr {
+    panic!("Term::overwrite_with_dag_node() is not implemented for {}", std::any::type_name::<Self>());
+  }
+  
+  
+  // region Accessors
+
   fn core(&self)         -> &TermCore;
   fn core_mut(&mut self) -> &mut TermCore;
-
-  // region Accessors
 
   /// Is the term stable?
   #[inline(always)]
@@ -201,12 +222,14 @@ pub trait Term: Formattable {
 
   // region Comparison Functions
 
-  fn compare_term_arguments(&self, _other: &dyn Term) -> Ordering;
-  fn compare_dag_arguments(&self, _other: DagNodePtr) -> Ordering;
+  fn compare_term_arguments(&self, other: &dyn Term) -> Ordering;
+  fn compare_dag_arguments(&self, other: DagNodePtr) -> Ordering;
 
+  /// For equality check (`Term::equal_dag_node()`), just use `Term::compare_dag_node().is_equal()`.
   #[inline(always)]
   fn compare_dag_node(&self, other: DagNodePtr) -> Ordering {
-    if self.symbol().hash() == other.symbol().hash() {
+    // Symbol equality has the semantics of pointer equality.
+    if self.symbol() == other.symbol() {
       self.compare_dag_arguments(other)
     } else {
       // We only get equality, not ordering, from comparing hashes, so when hashes are unequal, we defer to compare.
@@ -301,8 +324,17 @@ pub trait Term: Formattable {
     match_at_top  : bool,
     variable_info : &VariableInfo,
     bound_uniquely: &mut NatSet,
-  ) -> (BxLHSAutomaton, bool);
-  
+  ) -> (BxLHSAutomaton, bool) {
+    // The theory-specific compilation occurs in `compile_aux()`.
+    let (mut automaton, subproblem_likely) = self.compile_lhs_aux(match_at_top, variable_info, bound_uniquely);
+
+    if let Some(save_index) = self.core_mut().save_index {
+      automaton = BindingLHSAutomaton::new(save_index, automaton);
+    }
+
+    (automaton, subproblem_likely)
+  }
+
   /// The theory-dependent part of `compile_lhs` called by `Term::compile_lhs(…)`.
   fn compile_lhs_aux(
     &mut self,
@@ -348,16 +380,16 @@ pub trait Term: Formattable {
     let index = self.compile_rhs_aux(rhs_builder, variable_info, available_terms, eager_context);
     self.core_mut().save_index = Some(index);
     available_terms.insert_built_term(self.as_ptr(), eager_context);
-    
+
     index
   }
-  
+
   /// The theory-dependent part of `compile_rhs` called by `Term::compile_rhs(…)`. Returns
   /// the `save_index`.
   fn compile_rhs_aux(
     &mut self,
     builder        : &mut RHSBuilder,
-    variable_info  : &VariableInfo,
+    variable_info  : &mut VariableInfo,
     available_terms: &mut TermBag,
     eager_context  : bool,
   ) -> VariableIndex;

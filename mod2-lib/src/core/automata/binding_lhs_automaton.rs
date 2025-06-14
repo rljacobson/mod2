@@ -7,13 +7,13 @@ real work.
 
 use crate::{
   api::{
-    subproblem::MaybeSubproblem,
-    dag_node::DagNodePtr,
     automaton::{BxLHSAutomaton, LHSAutomaton},
-    variable_theory::VariableIndex
+    dag_node::DagNodePtr,
+    subproblem::MaybeSubproblem
   },
   core::substitution::Substitution,
 };
+use crate::core::VariableIndex;
 
 pub(crate) struct BindingLHSAutomaton {
   variable_index:    VariableIndex,
@@ -21,11 +21,13 @@ pub(crate) struct BindingLHSAutomaton {
 }
 
 impl BindingLHSAutomaton {
-  pub fn new(variable_index: VariableIndex, real_lhs_automata: BxLHSAutomaton) -> Self {
+  pub fn new(variable_index: VariableIndex, real_lhs_automata: BxLHSAutomaton) -> BxLHSAutomaton {
+    Box::new(
     BindingLHSAutomaton {
       variable_index,
       real_lhs_automata,
     }
+    )
   }
 }
 
@@ -42,7 +44,7 @@ impl LHSAutomaton for BindingLHSAutomaton {
       solution.bind(self.variable_index, Some(subject));
       return (matched, maybe_subproblem);
     }
-    
+
     (false, None)
   }
 }

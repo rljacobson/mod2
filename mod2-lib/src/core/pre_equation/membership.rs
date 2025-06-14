@@ -9,29 +9,27 @@ membership::fast_variable_count(&this);
 */
 use nu_ansi_term::Color::Magenta;
 use mod2_abs::{
-  IString,
-  tracing::warn
+  tracing::warn,
+  IString
 };
 use crate::{
-  api::{
-    term::BxTerm,
-    variable_theory::VariableIndex
-  },
+  api::term::BxTerm,
   core::{
+    format::{
+      FormatStyle,
+      Formattable
+    },
     pre_equation::{
       condition::Conditions,
-      PreEquationKind,
+      PreEquation,
       PreEquationAttribute,
-      PreEquation
-    },
-    format::{
-      Formattable,
-      FormatStyle
+      PreEquationKind
     },
     sort::SortPtr
   },
   UNDEFINED,
 };
+use crate::core::VariableIndex;
 
 pub fn new(name: Option<IString>, lhs_term: BxTerm, sort: SortPtr, condition: Conditions) -> PreEquation {
   PreEquation {

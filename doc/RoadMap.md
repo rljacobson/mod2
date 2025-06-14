@@ -18,6 +18,13 @@
 - rewriter
   - rewriting methods on `core::rewriting_context::context::RewritingContext`
   - `StateTransitionGraph`
+- Incorporate the remaining commented automata in the free theory: 
+  * FreeFast3RHSAutomaton
+  * FreeFast2RHSAutomaton
+  * FreeTernaryRHSAutomaton
+  * FreeBinaryRHSAutomaton
+  * FreeUnaryRHSAutomaton
+  * FreeNullaryRHSAutomaton
 
 # Saved for later
 

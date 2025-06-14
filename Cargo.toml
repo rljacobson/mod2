@@ -29,10 +29,10 @@ lalrpop       = "0.22"  # Parser
 lalrpop-util  = { version = "0.22", features = ["lexer", "unicode"] }
 num-bigint    = "0.4"
 num-traits    = "0.2"
-once_cell     = "^1.21" # Lazy statics
-ordered-float = "5.0.0" # Totally ordered, hashable floating point types.
-paste         = "^1.0"  # Concat identifiers in `implement_data_atom!` macro
-rand          = "^0.9"  # Testing
+once_cell     = "1" # Lazy statics
+ordered-float = "5" # Totally ordered, hashable floating point types.
+paste         = "1"  # Concat identifiers in `implement_data_atom!` macro
+rand          = "0.9"  # Testing
 smallvec      = { version = "2.0.0-alpha.11", features = ["std"] }
 string_cache  = "0.8"   # String interning
 nu-ansi-term  = "0.46"

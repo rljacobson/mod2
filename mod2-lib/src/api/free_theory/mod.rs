@@ -1,7 +1,7 @@
 mod free_term;
 mod free_dag_node;
 mod free_symbol;
-// mod compiler;
+mod free_automata;
 
 use std::ops::{Deref, DerefMut};
 use crate::{
@@ -12,7 +12,9 @@ use crate::{
 pub use free_term::FreeTerm;
 pub use free_dag_node::FreeDagNode;
 pub use free_symbol::FreeSymbol;
-
+use crate::api::ArgIndex;
+use crate::api::automaton::BxLHSAutomaton;
+use crate::core::VariableIndex;
 // Small auxiliary types for the free theory
 
 pub(crate) type FreeOccurrences = Vec<FreeOccurrence>;
@@ -20,17 +22,29 @@ pub(crate) type FreeOccurrences = Vec<FreeOccurrence>;
 /// A type erased term that exists under a free term that knows its position and arg index.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) struct FreeOccurrence {
-  position:  i32,
-  arg_index: i32,
+  position:  ArgIndex,
+  arg_index: ArgIndex,
   term:      TermPtr,
 }
 
 impl FreeOccurrence {
-  pub fn new(position: i32, arg_index: i32, term: TermPtr) -> Self {
+  pub fn new(position: ArgIndex, arg_index: ArgIndex, term: TermPtr) -> Self {
     FreeOccurrence {
       position,
       arg_index,
       term,
+    }
+  }
+
+  /// Downcast the term to a mutable reference to a concrete term type. Panics if the term is not actually
+  /// of type `T`.
+  pub fn downcast_term<T: Term + 'static>(&self) -> &T {
+    let term: &dyn Term = self.term.deref();
+
+    if let Some(term) = term.as_any().downcast_ref() {
+      term
+    } else {
+      unreachable!("Could not dereference as the requested type of Term. This is a bug.")
     }
   }
 
@@ -65,17 +79,17 @@ impl FreeOccurrence {
 // These two structs are specific to the free theory. The ACU theory has its own version.
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct FreeVariable {
-  position:  i32,
-  arg_index: i32,
-  var_index: i32,
-  sort:      SortPtr,
+  position:  ArgIndex,
+  arg_index: ArgIndex,
+  var_index: Option<VariableIndex>,
+  sort:      Option<SortPtr>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) struct BoundVariable {
-  position:  i32,
-  arg_index: i32,
-  var_index: i32,
+  position:  ArgIndex,
+  arg_index: ArgIndex,
+  var_index: VariableIndex,
 }
 
 
@@ -84,11 +98,11 @@ pub(crate) type GroundAlien = FreeOccurrence;
 
 
 // #[derive(Clone, PartialEq)]
-// pub(crate) struct NonGroundAlien {
-//   position:  i32,
-//   arg_index: i32,
-//   automaton: RcLHSAutomaton, //RefCell<dyn LHSAutomaton>,
-// }
+pub(crate) struct NonGroundAlien {
+  position:  ArgIndex,
+  arg_index: ArgIndex,
+  automaton: BxLHSAutomaton,
+}
 
 
 #[cfg(test)]
@@ -102,7 +116,7 @@ mod tests {
     core::symbol::{SymbolAttributes, SymbolType}
   };
   use super::*;
-  
+
   #[test]
   fn term_normalize_sets_hash(){
     let f = FreeSymbol::with_arity("f".into(), Arity::Any);
@@ -110,7 +124,7 @@ mod tests {
     let h = FreeSymbol::with_arity("h".into(), Arity::Any);
 
     // f(g(h, h), h)
-    
+
     let mut h_term = FreeTerm::new(h.as_ptr(), vec![]);
     let h_term = match h_term.normalize(true) {
       (Some(new_h_term), changed, hash) => {
@@ -121,16 +135,16 @@ mod tests {
       (None, true, hash) => {
         println!("h term changed: {}, hash: {}", h_term, hash);
         assert_eq!(h_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(h_term)))
+        Box::new(h_term)
       }
       (_, _, hash) => {
         println!("h term hash: {}", hash);
         assert_eq!(h_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(h_term)))
+        Box::new(h_term)
       }
     };
 
-    let mut g_term = FreeTerm::new(g.as_ptr(), vec![h_term, h_term]);
+    let mut g_term = FreeTerm::new(g.as_ptr(), vec![h_term.deep_copy(), h_term.deep_copy()]);
     let g_term = match g_term.normalize(true) {
       (Some(new_g_term), changed, hash) => {
         println!("new g term: {}, changed: {}, hash: {}", new_g_term, changed, hash);
@@ -140,12 +154,12 @@ mod tests {
       (None, true, hash) => {
         println!("g term changed: {}, hash: {}", g_term, hash);
         assert_eq!(g_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(g_term)))
+        Box::new(g_term)
       }
       (_, _, hash) => {
         println!("g term hash: {}", hash);
         assert_eq!(g_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(g_term)))
+        Box::new(g_term)
       }
     };
 
@@ -159,12 +173,12 @@ mod tests {
       (None, true, hash) => {
         println!("f term changed: {}, hash: {}", f_term, hash);
         assert_eq!(f_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(f_term)))
+        Box::new(f_term)
       }
       (_, _, hash) => {
         println!("f term hash: {}", hash);
         assert_eq!(f_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(f_term)))
+        Box::new(f_term)
       }
     };
 
@@ -175,9 +189,9 @@ mod tests {
     let f = FreeSymbol::with_arity("f".into(), Arity::Any);
     let g = FreeSymbol::with_arity("g".into(), Arity::Any);
     let h = FreeSymbol::with_arity("h".into(), Arity::Any);
-    
+
     // f(g(h, h), h)
-    let mut h_term = FreeTerm::new(h.as_ptr(), vec![]); 
+    let mut h_term = FreeTerm::new(h.as_ptr(), vec![]);
     let h_term = match h_term.normalize(true) {
       (Some(new_h_term), changed, hash) => {
         println!("new h term: {}, changed: {}, hash: {}", new_h_term, changed, hash);
@@ -185,15 +199,15 @@ mod tests {
       }
       (None, true, hash) => {
         println!("h term changed: {}, hash: {}", h_term, hash);
-        TermPtr::new(Box::into_raw(Box::new(h_term)))
+        Box::new(h_term)
       }
       (_, _, hash) => {
         println!("h term hash: {}", hash);
-        TermPtr::new(Box::into_raw(Box::new(h_term)))
+        Box::new(h_term)
       }
     };
-    
-    let mut g_term = FreeTerm::new(g.as_ptr(), vec![h_term.copy(), h_term.copy()]);
+
+    let mut g_term = FreeTerm::new(g.as_ptr(), vec![h_term.deep_copy(), h_term.deep_copy()]);
     let g_term = match g_term.normalize(true) {
       (Some(new_g_term), changed, hash) => {
         println!("new g term: {}, changed: {}, hash: {}", new_g_term, changed, hash);
@@ -203,15 +217,15 @@ mod tests {
       (None, true, hash) => {
         println!("g term changed: {}, hash: {}", g_term, hash);
         assert_eq!(g_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(g_term)))
+        Box::new(g_term)
       }
       (_, _, hash) => {
         println!("g term hash: {}", hash);
         assert_eq!(g_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(g_term)))
+        Box::new(g_term)
       }
     };
-    
+
     let mut f_term = FreeTerm::new(f.as_ptr(), vec![g_term, h_term]);
     let f_term = match f_term.normalize(true) {
       (Some(new_f_term), changed, hash) => {
@@ -222,17 +236,17 @@ mod tests {
       (None, true, hash) => {
         println!("f term changed: {}, hash: {}", f_term, hash);
         assert_eq!(f_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(f_term)))
+        Box::new(f_term)
       }
       (_, _, hash) => {
         println!("f term hash: {}", hash);
         assert_eq!(f_term.structural_hash(), hash);
-        TermPtr::new(Box::into_raw(Box::new(f_term)))
+        Box::new(f_term)
       }
     };
-    
+
     println!("f_term: {}", f_term);
-    
+
     let mut node_cache = DagNodeCache::new(false);
     let f_dag = f_term.dagify(&mut node_cache);
     println!("node_cache:\n[");

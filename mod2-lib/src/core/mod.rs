@@ -33,12 +33,14 @@ pub(crate) mod automata;
 // Stubs
 pub(crate) struct StateTransitionGraph;
 
-
+// use shared_vector::SharedVector;
+use crate::api::dag_node::DagNodePtr;
+pub type NodeList = Vec<DagNodePtr>;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
 pub(crate) use narrowing_variable_info::NarrowingVariableInfo;
-pub(crate) use variable_info::VariableInfo;
+pub(crate) use variable_info::{VariableInfo, VariableIndex};
 pub(crate) use term_bag::TermBag;
 pub(crate) use hash_cons_set::HashConsSet;
 

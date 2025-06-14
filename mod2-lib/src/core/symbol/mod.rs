@@ -11,12 +11,15 @@ mod symbol_core;
 mod sort_table;
 pub(self) mod op_declaration;
 
+use enumflags2::{bitflags, make_bitflags, BitFlags};
+
 pub use symbol_core::SymbolCore;
 pub use sort_table::{SortTable, BxSortTable};
 pub use op_declaration::*;
 
+pub struct SymbolTranslationMap;
 
-use enumflags2::{bitflags, make_bitflags, BitFlags};
+
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug, Hash)]
 pub enum SymbolType {

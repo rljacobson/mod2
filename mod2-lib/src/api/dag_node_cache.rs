@@ -20,8 +20,8 @@ use crate::{
 
 #[derive(Default)]
 pub(crate) struct DagNodeCache {
+  pub map          : HashMap<HashType, DagNodePtr>,
   pub set_sort_info: bool,
-  pub map: HashMap<HashType, DagNodePtr>,
 }
 
 impl DagNodeCache {

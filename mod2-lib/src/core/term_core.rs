@@ -33,11 +33,12 @@ use crate::{
     sort::{
       kind::KindPtr,
       SortIndex
-    }
+    },
+    VariableIndex,
   },
   HashType,
 };
-pub(crate) use crate::api::variable_theory::VariableIndex;
+
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TermType {

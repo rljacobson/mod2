@@ -39,9 +39,10 @@ fn test_sort_table_sort_diagram(){
   println!("{:?}", module);
 
   let mut f      = module.symbols[&IString::from("f")];
-  let sort_table = f.core_mut().sort_table.as_mut().unwrap();
+  let f2         = f.clone();
+  let sort_table = &mut f.core_mut().sort_table;
   
-  sort_table.compile_op_declaration();
+  sort_table.compile_op_declaration(f2);
   println!("Raw sort diagram: {:?}", sort_table.sort_diagram);
   {
     let mut out = String::new();

@@ -64,6 +64,7 @@ use crate::{
   },
   HashType,
 };
+use crate::core::sort::SortIndex;
 
 pub type BoolDagNode    = NADagNode<Bool>;
 pub type FloatDagNode   = NADagNode<Float>;
@@ -187,6 +188,10 @@ impl<T: NADataType> DagNode for NADagNode<T> {
     Box::new(std::iter::empty::<DagNodePtr>())
   }
 
+  fn clear_copied_pointers_aux(&mut self) {
+    /* Nothing to do. */
+  }
+
   fn make_canonical(&self, _hash_cons_set: &mut HashConsSet) -> DagNodePtr {
     self.as_ptr()
   }
@@ -206,10 +211,18 @@ impl<T: NADataType> DagNode for NADagNode<T> {
     new_node
   }
 
+  fn copy_eager_upto_reduced_aux(&mut self) -> DagNodePtr {
+    self.make_clone()
+  }
+
   // Only needed for `NADataType` that needs to release resources, which is only `StringBuiltIn`
   #[inline(always)]
   fn finalize(&mut self) {
     T::finalize_dag_node(self);
+  }
+
+  fn compute_base_sort(&mut self) -> SortIndex {
+    T::compute_base_sort(self)
   }
 }
 

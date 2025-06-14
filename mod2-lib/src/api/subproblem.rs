@@ -30,17 +30,14 @@ object with its state updated. Thus, solutions can be extracted from the subprob
 use std::rc::Rc;
 use super::automaton::LHSAutomaton;
 use crate::{
-  api::{
-    dag_node::DagNodePtr,
-    variable_theory::VariableIndex,
-  },
+  api::dag_node::DagNodePtr,
   core::{
-    LocalBindings,
     rewriting_context::RewritingContext,
     substitution::Substitution,
+    LocalBindings,
   },
 };
-
+use crate::core::VariableIndex;
 // These traits must be derived from for equational theories that need to generate
 // matching or unification subproblems or pass back extension information.
 

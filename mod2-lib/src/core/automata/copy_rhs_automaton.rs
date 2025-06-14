@@ -10,21 +10,21 @@ use std::any::Any;
 use mod2_abs::debug;
 use crate::{
   api::{
-    dag_node::DagNodePtr,
     automaton::RHSAutomaton,
-    variable_theory::VariableIndex
+    dag_node::{DagNodePtr, MaybeDagNode}
   },
   core::{
-    substitution::{MaybeDagNode, Substitution},
+    substitution::Substitution,
     VariableInfo,
-  },
+    VariableIndex
+  }
 };
+
 
 pub struct CopyRHSAutomaton {
   original_index: VariableIndex,
   copy_index:     VariableIndex,
 }
-
 
 impl CopyRHSAutomaton {
   pub fn new(original_index: VariableIndex, copy_index: VariableIndex) -> Self {
@@ -61,11 +61,11 @@ impl RHSAutomaton for CopyRHSAutomaton {
   */
 
   fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
-    let orig = matcher.value(self.original_index as usize);
+    let orig = matcher.value(self.original_index);
     if let Some(mut orig_dag_node) = orig {
       debug!(
         2,
-        "CopyRhsAutomaton::construct {}", 
+        "CopyRhsAutomaton::construct {}",
         orig_dag_node
       );
 
@@ -78,7 +78,7 @@ impl RHSAutomaton for CopyRHSAutomaton {
     }
   }
 
-  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) {
+  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
     let orig = matcher.value(self.original_index);
 
     if let Some(mut orig_dag_node) = orig {
@@ -86,10 +86,9 @@ impl RHSAutomaton for CopyRHSAutomaton {
       orig_dag_node.clear_copied_pointers();
 
       if let Some(mut new_dag_node) = new_dag_node {
-        new_dag_node.overwrite_with_clone(old);
+        return new_dag_node.overwrite_with_clone(old);
       }
-    } else {
-      unreachable!("No DagNode for original index. This is a bug.");
     }
+    unreachable!("No DagNode for original index. This is a bug.");
   }
 }

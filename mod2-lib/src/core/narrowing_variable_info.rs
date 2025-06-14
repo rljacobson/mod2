@@ -14,7 +14,7 @@ variable-related data and ensuring consistent variable handling across the narro
 */
 
 
-use crate::{core::substitution::MaybeDagNode, api::dag_node::DagNodePtr};
+use crate::api::dag_node::{DagNodePtr, MaybeDagNode};
 
 
 pub struct NarrowingVariableInfo {

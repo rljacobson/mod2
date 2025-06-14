@@ -84,7 +84,7 @@ pub type ThinDagNodePtr = *mut DagNodeCore;
 /// The `DagNodeCore::inline` field needs to be large enough to hold the largest data value that will be stored there.
 /// The largest value is a `Vec<u8>` or `String` (which are the same size), 24 bytes on most 64-bit systems.
 // ToDo: Replace this with a const max of all sizes.
-const INLINE_BYTE_COUNT: usize = size_of::<StringBuiltIn>();
+pub(crate) const INLINE_BYTE_COUNT: usize = size_of::<StringBuiltIn>();
 
 
 #[bitflags]

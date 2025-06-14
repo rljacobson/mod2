@@ -8,6 +8,8 @@ mod nonalgebraic_term;
 mod nonalgebraic_symbol;
 mod nonalgebraic_dag_node;
 mod nonalgebraic_datatype;
+mod nonalgebraic_lhs_automaton;
+mod nonalgebraic_rhs_automaton;
 
 use std::{
   collections::HashMap,

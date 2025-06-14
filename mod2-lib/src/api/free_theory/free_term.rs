@@ -1,6 +1,6 @@
 use std::{
-  cmp::Ordering,
   any::Any,
+  cmp::Ordering,
   fmt::{Display, Formatter, Pointer},
   ops::Deref
 };
@@ -8,53 +8,60 @@ use std::{
 use mod2_abs::{hash::hash2 as term_hash, impl_as_any_ptr_fns, NatSet, PartialOrdering};
 
 use crate::{
-  api::{
-    dag_node::{
-      DagNode,
-      DagNodeVector,
-      DagNodePtr,
-      arg_to_node_vec,
+  core::{
+    automata::RHSBuilder,
+    dag_node_core::{
+      DagNodeCore,
+      DagNodeFlag,
     },
+    format::{
+      FormatStyle,
+      Formattable,
+    },
+    substitution::Substitution,
+    term_core::TermCore,
+    TermBag,
+    VariableInfo,
+    symbol::SymbolTranslationMap,
+    VariableIndex
+  },
+  impl_display_debug_for_formattable,
+  HashType,
+  api::{
+    ArgIndex,
+    automaton::{
+      BxLHSAutomaton,
+      LHSAutomaton,
+      RHSAutomaton
+    },
+    dag_node::{
+      arg_to_node_vec,
+      DagNode,
+      DagNodePtr,
+      DagNodeVector,
+    },
+    dag_node_cache::DagNodeCache,
+    free_theory::{
+      free_dag_node::FreeDagNode,
+      free_automata::FreeLHSAutomaton,
+      FreeOccurrence,
+      FreeOccurrences
+    },
+    symbol::SymbolPtr,
     term::{
       BxTerm,
       Term,
       TermPtr
     },
-    symbol::SymbolPtr,
-    free_theory::{
-      free_dag_node::FreeDagNode,
-      FreeOccurrence
-    },
     variable_theory::VariableTerm,
-    dag_node_cache::DagNodeCache,
-    automaton::BxLHSAutomaton
   },
-  core::{
-    format::{
-      FormatStyle,
-      Formattable,
-    },
-    term_core::{
-      TermCore,
-      VariableIndex
-    },
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlag,
-    },
-    substitution::Substitution,
-    VariableInfo,
-    TermBag,
-    automata::RHSBuilder,
-  },
-  impl_display_debug_for_formattable,
-  HashType,
 };
+use crate::api::free_theory::free_automata::FreeRHSAutomaton;
 
 pub struct FreeTerm{
   core                 : TermCore,
   pub args             : Vec<BxTerm>,
-  pub(crate) slot_index: i32,
+  pub(crate) slot_index: ArgIndex,
 }
 
 impl FreeTerm {
@@ -108,17 +115,6 @@ impl Term for FreeTerm {
     TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  // fn copy(&self) -> TermPtr {
-  //   let term = FreeTerm{
-  //     core: self.core.clone(),
-  //     args: self.args.iter().map(|t| t.copy()).collect(),
-  //     slot_index: self.slot_index.clone(),
-  //   };
-  //   
-  //   TermPtr::new(Box::into_raw(Box::new(term)))
-  // }
-
-
   fn structural_hash(&self) -> HashType {
     self.core().hash_value
   }
@@ -132,16 +128,25 @@ impl Term for FreeTerm {
     for idx in 0..self.args.len() {
       let (maybe_new_child, child_changed, child_hash) = self.args[idx].normalize(full);
       if let Some(new_child) = maybe_new_child {
+        // In `Maude`, term nodes that change must delete themselves. Here, we overwrite the previous value, and the
+        // compiler makes sure it's dropped.
         self.args[idx] = new_child;
       }
 
       changed = changed || child_changed;
       hash_value = term_hash(hash_value, child_hash);
     }
-    
+
     self.core_mut().hash_value = hash_value;
 
     (None, changed, hash_value)
+  }
+
+  fn deep_copy_aux(&self) -> BxTerm {
+    let symbol = self.core().symbol();
+    let args   = self.args.iter().map(|t| t.deep_copy()).collect();
+
+    symbol.make_term(args)
   }
 
   // endregion
@@ -215,10 +220,10 @@ impl Term for FreeTerm {
           return r;
         }
       }
-      
+
       if self.args.len() < da.len() { return PartialOrdering::Less }
       else if self.args.len() > da.len() { return PartialOrdering::Greater }
-      
+
       PartialOrdering::Equal
     } else {
       unreachable!(
@@ -242,32 +247,121 @@ impl Term for FreeTerm {
 
     new_node
   }
-  
-    // region Compiler-related
-    #[inline(always)]
-    fn compile_lhs(
-      &mut self,
-      match_at_top: bool,
-      variable_info: &VariableInfo,
-      bound_uniquely: &mut NatSet,
-    ) -> (BxLHSAutomaton, bool) {
-      todo!("Implement FreeTerm::compile_lhs");
-      // FreeTerm::compile_lhs(self, match_at_top, variable_info, bound_uniquely)
+
+  // region Compiler-related
+  #[inline(always)]
+  fn compile_lhs_aux(
+    &mut self,
+    _match_at_top : bool,
+    variable_info : &VariableInfo,
+    bound_uniquely: &mut NatSet,
+  ) -> (BxLHSAutomaton, bool) {
+    // We bin the arg terms according to the following categories.
+    // First gather all symbols lying in or directly under free skeleton.
+    let mut free_symbols = FreeOccurrences::new();
+    let mut other_symbols = FreeOccurrences::new();
+    // See if we can fail on the free skeleton.
+    self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
+
+    // Now classify occurrences of non Free-Theory symbols into 4 types
+    let mut bound_variables = FreeOccurrences::new(); // guaranteed bound when matched against
+    let mut uncertain_variables = FreeOccurrences::new(); // status when matched against uncertain
+    let mut ground_aliens = FreeOccurrences::new(); // ground alien subterms
+    let mut non_ground_aliens = FreeOccurrences::new(); // non-ground alien subterms
+
+
+    for mut occurrence in other_symbols {
+      if let Some(v) = occurrence.try_downcast_term_mut::<VariableTerm>() {
+        assert!(v.index.is_some(), "index is none");
+        let index: VariableIndex = v.index.unwrap();
+        assert!(index > 100, "index too big");
+
+        if bound_uniquely.contains(index as usize) {
+          bound_variables.push(occurrence);
+        } else {
+          bound_uniquely.insert(index as usize);
+          uncertain_variables.push(occurrence);
+        }
+      } else {
+        let term: &dyn Term = occurrence.term();
+        if term.ground() {
+          ground_aliens.push(occurrence);
+        } else {
+          non_ground_aliens.push(occurrence);
+        }
+      }
     }
 
-    /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
-    /// the `save_index`.
-    #[inline(always)]
-    fn compile_rhs_aux(
-      &mut self,
-      rhs_builder: &mut RHSBuilder,
-      variable_info: &VariableInfo,
-      available_terms: &mut TermBag,
-      eager_context: bool,
-    ) -> VariableIndex {
-      todo!("Implement FreeTerm::compile_rhs_aux");
-      // FreeTerm::compile_rhs_aux(&mut self, rhs_builder, variable_info, available_terms, eager_context)
+    // Now reorder the non-ground alien args in an order most likely to fail fast.
+    // Now we have to find a best sequence in which to match the
+    // non-ground alien subterms and generate subautomata for them
+
+    let mut best_sequence = ConstraintPropagationSequence::default();
+    let mut sub_automata = Vec::with_capacity(non_ground_aliens.len());
+    let mut subproblem_likely = false;
+
+    if non_ground_aliens.len() > 0 {
+      Self::find_constraint_propagation_sequence(&mut non_ground_aliens, bound_uniquely, &mut best_sequence);
+
+      for &sequence_index in &best_sequence.sequence {
+        let (automata, spl): (BxLHSAutomaton, bool) =
+            non_ground_aliens[sequence_index as usize]
+                .term_mut()
+                .compile_lhs(false, variable_info, bound_uniquely);
+        sub_automata.push(Some(automata));
+        subproblem_likely = subproblem_likely || spl;
+      }
+      assert!(*bound_uniquely == best_sequence.bound, "Bound clash. This is a bug.");
     }
+
+    let automaton: Box<dyn LHSAutomaton> = FreeLHSAutomaton::new(
+      free_symbols,
+      uncertain_variables,
+      bound_variables,
+      ground_aliens,
+      non_ground_aliens,
+      best_sequence.sequence,
+      sub_automata,
+    );
+
+    (automaton, subproblem_likely)
+  }
+
+  /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
+  /// the `save_index`. Maude's `compileRhs2`
+  #[inline(always)]
+  fn compile_rhs_aux(
+    &mut self,
+    rhs_builder    : &mut RHSBuilder,
+    variable_info  : &mut VariableInfo,
+    available_terms: &mut TermBag,
+    eager_context  : bool,
+  ) -> VariableIndex {
+    let mut max_arity = 0;
+    let mut free_variable_count = 1;
+    self.compile_rhs_aliens(
+      rhs_builder,
+      variable_info,
+      available_terms,
+      eager_context,
+      &mut max_arity,
+      &mut free_variable_count,
+    );
+
+    let mut automaton: Box<dyn RHSAutomaton> =
+        FreeRHSAutomaton::with_arity_and_free_variable_count(max_arity, free_variable_count);
+
+    let index = self.compile_into_automaton(
+      automaton.as_mut(),
+      rhs_builder,
+      variable_info,
+      available_terms,
+      eager_context,
+    );
+
+    rhs_builder.add_rhs_automaton(automaton);
+    index
+  }
 
 
   fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {
@@ -282,7 +376,7 @@ impl Term for FreeTerm {
     for occurrence in &mut other_symbols {
       let t = occurrence.term_mut();
       if let Some(variable_term) = t.as_any_mut().downcast_mut::<VariableTerm>() {
-        bound_uniquely.insert(variable_term.index.unwrap());
+        bound_uniquely.insert(variable_term.index.unwrap() as usize);
       } else if !t.ground() {
         non_ground_aliens.push(occurrence.clone());
       }
@@ -343,34 +437,70 @@ impl Term for FreeTerm {
 }
 
 
-
 // Only used locally. Other theories will have their own local version.
 #[derive(Default)]
 struct ConstraintPropagationSequence {
-  sequence:    Vec<u32>,
-  bound:       NatSet,
+  sequence   : Vec<u32>,
+  bound      : NatSet,
   cardinality: i32,
 }
 
 
 impl FreeTerm {
 
+
+  /// Traverse the free skeleton, calling compile_rhs() on all non-free subterms.
+  pub fn compile_rhs_aliens(
+    &mut self,
+    rhs_builder: &mut RHSBuilder,
+    variable_info: &mut VariableInfo,
+    available_terms: &mut TermBag,
+    eager_context: bool,
+    max_arity: &mut u32,
+    free_variable_count: &mut u32,
+  ) {
+    let arg_count = self.args.len() as u32;
+    if arg_count > *max_arity {
+      *max_arity = arg_count;
+    }
+    let symbol = self.symbol();
+    for i in 0..arg_count as usize {
+      let arg_eager = eager_context && symbol.strategy().eager_argument(i);
+      let term = &mut self.args[i];
+      if let Some(free_term) = term.as_any_mut().downcast_mut::<FreeTerm>() {
+        *free_variable_count += 1;
+        if !available_terms.contains(free_term.as_ptr(), arg_eager) {
+          free_term.compile_rhs_aliens(
+            rhs_builder,
+            variable_info,
+            available_terms,
+            arg_eager,
+            max_arity,
+            free_variable_count,
+          );
+        }
+      } else {
+        term.compile_rhs(rhs_builder, variable_info, available_terms, arg_eager);
+      }
+    }
+  }
+
   fn scan_free_skeleton(
     &mut self,
-    free_symbols: &mut Vec<FreeOccurrence>,
+    free_symbols : &mut Vec<FreeOccurrence>,
     other_symbols: &mut Vec<FreeOccurrence>,
-    parent: i32,
-    arg_index: i32,
+    parent       : ArgIndex,
+    arg_index    : ArgIndex,
   ) {
-    let our_position = free_symbols.len() as i32;
-    let occurrence = FreeOccurrence::new(parent, arg_index, self.as_ptr());
+    let our_position = free_symbols.len() as ArgIndex;
+    let occurrence   = FreeOccurrence::new(parent, arg_index, self.as_ptr());
     free_symbols.push(occurrence);
 
     for (i, t) in self.args.iter_mut().enumerate() {
       if let Some(f) = t.as_any_mut().downcast_mut::<FreeTerm>() {
-        f.scan_free_skeleton(free_symbols, other_symbols, our_position, i as i32);
+        f.scan_free_skeleton(free_symbols, other_symbols, our_position, i as ArgIndex);
       } else {
-        let occurrence = FreeOccurrence::new(our_position, i as i32, t.as_ptr());
+        let occurrence = FreeOccurrence::new(our_position, i as ArgIndex, t.as_ptr());
         other_symbols.push(occurrence);
       }
     }
@@ -378,11 +508,11 @@ impl FreeTerm {
 
 
   fn find_constraint_propagation_sequence(
-    aliens: &mut Vec<FreeOccurrence>,
+    aliens        : &mut Vec<FreeOccurrence>,
     bound_uniquely: &mut NatSet,
-    best_sequence: &mut ConstraintPropagationSequence,
+    best_sequence : &mut ConstraintPropagationSequence,
   ) {
-    let mut current_sequence: Vec<u32> = (0..aliens.len() as u32).collect();
+    let mut current_sequence: Vec<ArgIndex> = (0..aliens.len() as ArgIndex).collect();
     best_sequence.cardinality = -1;
 
     Self::find_constraint_propagation_sequence_helper(
@@ -397,7 +527,7 @@ impl FreeTerm {
 
   fn remaining_aliens_contain(
     aliens               : &Vec<FreeOccurrence>,
-    current_sequence     : &Vec<u32>,
+    current_sequence     : &Vec<ArgIndex>,
     step                 : usize,
     us                   : usize,
     interesting_variables: &NatSet,
@@ -412,9 +542,10 @@ impl FreeTerm {
     }
     false
   }
+
   fn find_constraint_propagation_sequence_helper(
     aliens          : &mut Vec<FreeOccurrence>,
-    current_sequence: &mut Vec<u32>,
+    current_sequence: &mut Vec<ArgIndex>,
     bound_uniquely  : &NatSet,
     mut step        : usize,
     best_sequence   : &mut ConstraintPropagationSequence,
@@ -537,135 +668,16 @@ impl FreeTerm {
       best_sequence.cardinality = n;
     }
   }
-  /*
-
-    pub fn compile_lhs(
-      &self,
-      _match_at_top: bool,
-      variable_info: &VariableInfo,
-      bound_uniquely: &mut NatSet,
-    ) -> (RcLHSAutomaton, bool) {
-      // We bin the arg terms according to the following categories.
-      // First gather all symbols lying in or directly under free skeleton.
-      let mut free_symbols = FreeOccurrences::new();
-      let mut other_symbols = FreeOccurrences::new();
-      // See if we can fail on the free skeleton.
-      self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
-
-      // Now classify occurrences of non Free-Theory symbols into 4 types
-      let mut bound_variables = FreeOccurrences::new(); // guaranteed bound when matched against
-      let mut uncertain_variables = FreeOccurrences::new(); // status when matched against uncertain
-      let mut ground_aliens = FreeOccurrences::new(); // ground alien subterms
-      let mut non_ground_aliens = FreeOccurrences::new(); // non-ground alien subterms
-
-
-      for occurrence in other_symbols {
-        if let Some(v) = occurrence.try_dereference_term::<VariableTerm>() {
-          let index: i32 = v.index;
-
-          assert!(index > 100, "index too big");
-          assert!(index < 0, "index negative");
-          if bound_uniquely.contains(index as usize) {
-            bound_variables.push(occurrence);
-          } else {
-            bound_uniquely.insert(index as usize);
-            uncertain_variables.push(occurrence);
-          }
-        } else {
-          let term: &mut dyn Term = occurrence.term();
-          if term.ground() {
-            ground_aliens.push(occurrence);
-          } else {
-            non_ground_aliens.push(occurrence);
-          }
-        }
-      }
-
-      // Now reorder the non-ground alien args in an order most likely to fail fast.
-      // Now we have to find a best sequence in which to match the
-      //	non-ground alien subterms and generate subautomata for them
-
-      let mut best_sequence = ConstraintPropagationSequence::default();
-      let mut sub_automata = Vec::with_capacity(non_ground_aliens.len());
-      let mut subproblem_likely = false;
-
-      if non_ground_aliens.len() > 0 {
-        Self::find_constraint_propagation_sequence(&non_ground_aliens, bound_uniquely, &mut best_sequence);
-
-        for &sequence_index in &best_sequence.sequence {
-          let (automata, spl): (RcLHSAutomaton, bool) =
-              non_ground_aliens[sequence_index as usize]
-                  .term()
-                  .compile_lhs(false, variable_info, bound_uniquely);
-          sub_automata.push(automata);
-          subproblem_likely = subproblem_likely || spl;
-        }
-        assert!(*bound_uniquely == best_sequence.bound, "Bound clash. This is a bug.");
-      }
-
-      let mut automaton: RcCell<dyn LHSAutomaton> = rc_cell!(FreeLHSAutomaton::new(
-        &free_symbols,
-        &uncertain_variables,
-        &bound_variables,
-        &ground_aliens,
-        &non_ground_aliens,
-        &best_sequence.sequence,
-        &sub_automata,
-      ));
-
-      if self.term_members.save_index != NONE {
-        automaton = rc_cell!(BindingLHSAutomaton::new(self.term_members.save_index, automaton));
-      }
-
-
-      return (automaton, subproblem_likely);
-    }
-
-    /// The theory-dependent part of `compile_rhs` called by `term_compiler::compile_rhs(…)`. Returns
-    /// the `save_index`. Maude's `compileRhs2`
-    #[inline(always)]
-    fn compile_rhs_aux(
-      &mut self,
-      rhs_builder: &mut RHSBuilder,
-      variable_info: &mut VariableInfo,
-      available_terms: &mut TermBag,
-      eager_context: bool,
-    ) -> i32 {
-      let mut max_arity = 0;
-      let mut free_variable_count = 1;
-      self.compile_rhs_aliens(
-        rhs_builder,
-        variable_info,
-        available_terms,
-        eager_context,
-        &mut max_arity,
-        &mut free_variable_count,
-      );
-
-      let mut automaton: Box<dyn RHSAutomaton> =
-          FreeRHSAutomaton::with_arity_and_free_variable_count(max_arity, free_variable_count);
-
-      let index = self.compile_into_automaton(
-        automaton.as_mut(),
-        rhs_builder,
-        variable_info,
-        available_terms,
-        eager_context,
-      );
-
-      rhs_builder.add_rhs_automaton(automaton);
-      index
-    }
 
     /// Use the given automaton to compile this RHS. Maude's compileRhs3
     pub fn compile_into_automaton(
       &self,
-      automaton: &mut dyn RHSAutomaton,
-      rhs_builder: &mut RHSBuilder,
-      variable_info: &mut VariableInfo,
+      automaton      : &mut dyn RHSAutomaton,
+      rhs_builder    : &mut RHSBuilder,
+      variable_info  : &mut VariableInfo,
       available_terms: &mut TermBag,
-      eager_context: bool,
-    ) -> i32 {
+      eager_context  : bool,
+    ) -> VariableIndex {
       let arg_count = self.args.len();
 
       // We want to minimize conflict between slots to avoid quadratic number of
@@ -673,36 +685,36 @@ impl FreeTerm {
       // we sort in order of arguments by number of symbol occurrences, and build
       // largest first.
       let mut order: Vec<(i32, usize)> = (0..arg_count)
-          .map(|i| (-self.args[i].borrow().compute_size(), i))
+          .map(|i| (-(self.args[i].compute_size() as i32), i))
           .collect();
 
       order.sort_unstable();
 
       // Consider each argument in largest first order.
       let symbol = self.symbol();
-      let mut sources: Vec<i32> = vec![0; arg_count];
+      let mut sources: Vec<VariableIndex> = vec![0; arg_count];
 
       for (_, idx) in &order {
         let idx = *idx;
         let arg_is_eager = eager_context && symbol.strategy().eager_argument(idx);
-        let term: RcTerm = self.args[idx].clone();
+        let mut term = self.args[idx].as_ptr();
 
         // Argument is free - see if we need to compile it into current automaton.
-        if !available_terms.contains(term.as_ref(), arg_is_eager) {
-          let source = if let Some(free_term) = term.borrow_mut().as_any_mut().downcast_mut::<FreeTerm>() {
+        if !available_terms.contains(term, arg_is_eager) {
+          let source = if let Some(free_term) = term.as_any_mut().downcast_mut::<FreeTerm>() {
             free_term.compile_into_automaton(automaton, rhs_builder, variable_info, available_terms, arg_is_eager)
           } else {
             unreachable!()
           };
           sources[idx] = source;
-          term.borrow_mut().term_members_mut().save_index = source;
+          term.core_mut().save_index = Some(source as VariableIndex);
           available_terms.insert_built_term(term, arg_is_eager);
 
           continue;
         }
 
         // Alien, variable or available term so use standard mechanism.
-        sources[idx] = compile_rhs(term, rhs_builder, variable_info, available_terms, arg_is_eager);
+        sources[idx] = term.compile_rhs(rhs_builder, variable_info, available_terms, arg_is_eager);
       }
 
       // Need to flag last use of each source.
@@ -718,7 +730,7 @@ impl FreeTerm {
 
       index
     }
-
+/*
     pub fn compile_remainder(&self, equation: RcPreEquation, slot_translation: &Vec<i32>) -> RcFreeRemainder {
       // Gather all symbols lying in or directly under free skeleton
       let mut free_symbols: Vec<FreeOccurrence> = Vec::new();
@@ -853,41 +865,6 @@ impl FreeTerm {
       }
     }
 
-    /// Traverse the free skeleton, calling compile_rhs() on all non-free subterms.
-    pub fn compile_rhs_aliens(
-      &mut self,
-      rhs_builder: &mut RHSBuilder,
-      variable_info: &mut VariableInfo,
-      available_terms: &mut TermBag,
-      eager_context: bool,
-      max_arity: &mut u32,
-      free_variable_count: &mut u32,
-    ) {
-      let arg_count = self.args.len() as u32;
-      if arg_count > *max_arity {
-        *max_arity = arg_count;
-      }
-      let symbol = self.symbol();
-      for i in 0..arg_count as usize {
-        let arg_eager = eager_context && symbol.strategy().eager_argument(i);
-        let term = &mut self.args[i];
-        if let Some(free_term) = term.borrow_mut().as_any_mut().downcast_mut::<FreeTerm>() {
-          *free_variable_count += 1;
-          if !available_terms.contains(free_term, arg_eager) {
-            free_term.compile_rhs_aliens(
-              rhs_builder,
-              variable_info,
-              available_terms,
-              arg_eager,
-              max_arity,
-              free_variable_count,
-            );
-          }
-        } else {
-          compile_rhs(term.clone(), rhs_builder, variable_info, available_terms, arg_eager);
-        }
-      }
-    }
     */
 }
 

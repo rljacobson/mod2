@@ -3,55 +3,51 @@ use std::{
   cmp::Ordering
 };
 
-use rand::seq::index::IndexVec;
-
-use mod2_abs::{IString, NatSet, hash::hash2, PartialOrdering};
+use mod2_abs::{hash::hash2, IString, NatSet, PartialOrdering};
 
 use crate::{
   api::{
+    automaton::BxLHSAutomaton,
+    dag_node::{
+      DagNode,
+      DagNodePtr
+    },
+    dag_node_cache::DagNodeCache,
     symbol::SymbolPtr,
     term::{
       BxTerm,
       Term,
       TermPtr
     },
-    dag_node_cache::DagNodeCache,
-    dag_node::{
-      DagNodePtr,
-      DagNode
-    },
     variable_theory::{
+      automaton::VariableLHSAutomaton,
       VariableDagNode,
-      VariableType,
-      automaton::VariableLHSAutomaton
+      VariableType
     },
-    automaton::BxLHSAutomaton,
   },
   core::{
-    TermBag,
+    automata::RHSBuilder,
     format::{
       FormatStyle,
       Formattable
     },
     substitution::Substitution,
-    term_core::{
-      TermCore,
-      VariableIndex
-    },
-    automata::{BindingLHSAutomaton, RHSBuilder},
+    term_core::TermCore,
+    TermBag,
     VariableInfo
   },
+  impl_display_debug_for_formattable
+  ,
   HashType,
-  UNDEFINED,
-  impl_display_debug_for_formattable,
 };
+use crate::core::VariableIndex;
 
 #[derive(Clone)]
 pub struct VariableTerm {
   pub core         : TermCore,
   pub name         : IString,
   pub variable_type: VariableType,
-  /// Variables are tracked in a `VariableInfo` structure that maintains the environment. 
+  /// Variables are tracked in a `VariableInfo` structure that maintains the environment.
   /// The value of `index` is set in `Term::index_variables()` as part of compilation.
   pub index        : Option<VariableIndex>,
 }
@@ -91,12 +87,17 @@ impl Term for VariableTerm {
   fn structural_hash(&self) -> HashType {
     self.symbol().hash()
   }
-  
+
   fn normalize(&mut self, _full: bool) -> (Option<BxTerm>, bool, HashType) {
     let hash_value = hash2(self.symbol().hash(), self.name.get_hash());
     self.core_mut().hash_value = hash_value;
-    
+
     (None, false, hash_value)
+  }
+
+  fn deep_copy_aux(&self) -> BxTerm {
+    // ToDo: Implement symbol translation for imports.
+    Box::new(VariableTerm::new(self.name.clone(), self.symbol()))
   }
 
   #[inline(always)]
@@ -143,10 +144,10 @@ impl Term for VariableTerm {
     // ToDo: Why do we not consult `node_cache`?
     VariableDagNode::new(self.symbol(), self.name.clone(), self.index.unwrap())
   }
-  
+
   // region Compiler related methods
 
-  fn compile_lhs(
+  fn compile_lhs_aux(
     &mut self,
     match_at_top  : bool,
     _variable_info: &VariableInfo,
@@ -156,12 +157,8 @@ impl Term for VariableTerm {
     assert!(index > 100, "index too big");
     bound_uniquely.insert(index as usize);
 
-    let mut automaton: BxLHSAutomaton =
+    let automaton: BxLHSAutomaton =
         Box::new(VariableLHSAutomaton::new(index, self.sort().unwrap(), match_at_top));
-
-    if let Some(save_index) = self.core_mut().save_index {
-      automaton = Box::new(BindingLHSAutomaton::new(save_index, automaton));
-    }
 
     // subproblem is never likely for `VariableTerm`
     (automaton, false)
@@ -170,7 +167,7 @@ impl Term for VariableTerm {
   fn compile_rhs_aux(
     &mut self,
     _builder        : &mut RHSBuilder,
-    _variable_info  : &VariableInfo,
+    _variable_info  : &mut VariableInfo,
     _available_terms: &mut TermBag,
     _eager_context  : bool,
   ) -> VariableIndex {
@@ -186,7 +183,7 @@ impl Term for VariableTerm {
       available_terms.insert_matched_term(self.as_ptr(), eager_context);
     }
   }
-  
+
   // endregion Compiler related methods
 }
 
@@ -201,7 +198,7 @@ impl Formattable for VariableTerm {
       | FormatStyle::Simple
       | FormatStyle::Input => {
         // `X_Bool`
-        
+
         match self.variable_type {
           VariableType::Blank        => write!(f, "{}_", name)?,
           VariableType::Sequence     => write!(f, "{}__", name)?,
@@ -212,10 +209,10 @@ impl Formattable for VariableTerm {
 
       FormatStyle::Debug => {
         // `[variable<X><Bool><Blank>]`
-        
+
         write!(f, "[{}<", name)?;
         symbol.repr(f, FormatStyle::Debug)?;
-        
+
         match self.variable_type {
           VariableType::Blank        => write!(f, "><Blank>]"),
           VariableType::Sequence     => write!(f, "><Sequence>]"),

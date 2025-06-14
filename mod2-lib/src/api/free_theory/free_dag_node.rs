@@ -34,6 +34,7 @@ use crate::{
   },
   HashType
 };
+use crate::api::dag_node::node_vec_to_args;
 use crate::core::sort::SortIndex;
 
 #[repr(transparent)]
@@ -90,6 +91,12 @@ impl DagNode for FreeDagNode {
   #[inline(always)]
   fn core_mut(&mut self) -> &mut DagNodeCore {
     &mut self.0
+  }
+
+  fn clear_copied_pointers_aux(&mut self) {
+    for mut node in self.iter_args(){
+      node.clear_copied_pointers()
+    }
   }
 
   /// For hash consing, recursively checks child nodes to determine if a canonical copy needs to be made.
@@ -159,6 +166,22 @@ impl DagNode for FreeDagNode {
     new_node.set_sort_index(self.sort_index());
 
     new_node
+  }
+
+  fn copy_eager_upto_reduced_aux(&mut self) -> DagNodePtr {
+    if self.len() > 0 {
+      let node_vec = DagNodeVector::with_capacity(self.len());
+      // ToDo: When strategies are implemented, everything might not be eager, so this code changes.
+      node_vec.extend(self.iter_args().map(|mut node| node.copy_eager_upto_reduced_aux()));
+
+      let mut new_node = DagNodeCore::with_theory(self.symbol(), EquationalTheory::Free);
+      new_node.core_mut().args = node_vec_to_args(node_vec);
+      
+      new_node
+    } else {
+      // A copy is just a DAG node with the same symbol
+      DagNodeCore::with_theory(self.symbol(), EquationalTheory::Free)
+    }
   }
 
   fn compute_base_sort(&mut self) -> SortIndex {

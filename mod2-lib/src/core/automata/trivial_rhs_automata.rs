@@ -1,6 +1,6 @@
 /*!
 
-A kind of "dummy" RHS automata used, for example, to just do the substitution.
+A kind of "dummy" RHS automata used, for example, to just do a substitution.
 
 */
 

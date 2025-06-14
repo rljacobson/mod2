@@ -153,8 +153,7 @@ pub fn construct_symbol_term_from_decl(
         if let Some(type_signature) = type_signature {
           let constructor_status = attributes.contains(SymbolAttribute::Constructor);
           let op_declaration     = OpDeclaration::new(type_signature, constructor_status.into());
-          let symbol_copy        = *symbol; // force copy
-          symbol.add_op_declaration(symbol_copy, op_declaration);
+          symbol.add_op_declaration(op_declaration);
         }
   
         *symbol
@@ -175,8 +174,7 @@ pub fn construct_symbol_term_from_decl(
               if let Some(type_signature) = type_signature {
                 let constructor_status = attributes.contains(SymbolAttribute::Constructor);
                 let op_declaration = OpDeclaration::new(type_signature, constructor_status.into());
-                let symbol_copy = symbol; // force copy
-                symbol.add_op_declaration(symbol_copy, op_declaration);
+                symbol.add_op_declaration(op_declaration);
               }
   
               entry.insert(symbol);
@@ -191,8 +189,7 @@ pub fn construct_symbol_term_from_decl(
               if let Some(type_signature) = type_signature {
                 let constructor_status = attributes.contains(SymbolAttribute::Constructor);
                 let op_declaration = OpDeclaration::new(type_signature, constructor_status.into());
-                let symbol_copy = symbol; // force copy
-                symbol.add_op_declaration(symbol_copy, op_declaration);
+                symbol.add_op_declaration(op_declaration);
               }
   
               entry.insert(symbol);

@@ -2,14 +2,14 @@ use crate::{
   api::{
     automaton::LHSAutomaton,
     dag_node::DagNodePtr,
-    subproblem::MaybeSubproblem,
-    variable_theory::VariableIndex
+    subproblem::MaybeSubproblem
   },
   core::{
     sort::SortPtr,
     substitution::Substitution
   }
 };
+use crate::core::VariableIndex;
 
 pub struct VariableLHSAutomaton {
   index: VariableIndex,

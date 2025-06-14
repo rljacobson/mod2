@@ -8,49 +8,44 @@ use std::{
   any::Any,
   cmp::Ordering,
   fmt::Display,
-  hash::{Hash, Hasher},
-  mem::transmute,
-  ops::{
-    Deref,
-    BitAnd,
-    BitXor,
-  },
-  str::FromStr,
+  hash::Hash
+
+
+  ,
 };
-use ordered_float::OrderedFloat;
-use mod2_abs::{
-  hash::{hash2, FastHasher},
-  NatSet
-};
+use std::ptr::null_mut;
+use mod2_abs::{hash::hash2, NatSet, UnsafePtr};
 use crate::{
+  api::{
+    automaton::BxLHSAutomaton,
+    built_in::{
+      get_built_in_symbol,
+      Bool,
+      Float,
+      Integer,
+      NADagNode,
+      NADataType,
+      NaturalNumber,
+      StringBuiltIn,
+      nonalgebraic_lhs_automaton::NonalgebraicLHSAutomaton,
+      nonalgebraic_rhs_automaton::NonalgebraicRHSAutomaton
+    },
+    dag_node::{DagNode, DagNodePtr},
+    dag_node_cache::DagNodeCache,
+    symbol::Symbol,
+    term::{BxTerm, Term, TermPtr},
+  },
   core::{
     automata::RHSBuilder,
     format::{FormatStyle, Formattable},
     term_core::TermCore,
     TermBag,
-    VariableInfo
-  },
-  api::{
-    variable_theory::VariableIndex,
-    dag_node_cache::DagNodeCache,
-    built_in::FloatDagNode,
-    automaton::BxLHSAutomaton,
-    built_in::{
-      Bool,
-      Float,
-      Integer,
-      NADataType,
-      NADagNode,
-      NaturalNumber,
-      StringBuiltIn,
-      get_built_in_symbol,
-    },
-    dag_node::{DagNode, DagNodePtr},
-    symbol::Symbol,
-    term::{Term, TermPtr, BxTerm}
+    VariableInfo,
+    VariableIndex
   },
   HashType,
 };
+use crate::core::dag_node_core::{DagNodeCore, DagNodeFlag, INLINE_BYTE_COUNT};
 
 pub type BoolTerm    = NATerm<Bool>;
 pub type FloatTerm   = NATerm<Float>;
@@ -198,15 +193,24 @@ impl<T: NADataType> Term for NATerm<T> {
     TermPtr::new(self as *const dyn Term as *mut dyn Term)
   }
 
-  // fn copy(&self) -> BxTerm {
-  //   Box::new(self.clone())
-  // }
-
   fn normalize(&mut self, _full: bool) -> (Option<BxTerm>, bool, HashType) {
     let hash_value = hash2(self.symbol().hash(), self.value.hashable_bits());
     self.core_mut().hash_value = hash_value;
 
     (None, false, hash_value)
+  }
+
+  fn deep_copy_aux(&self) -> BxTerm {
+    Box::new(self.clone())
+  }
+  
+  /// Overwrites `old_node` in place with the value of `self`. Returns a new fat pointer, which might be
+  /// necessary if the vtable has changed. 
+  fn overwrite_with_dag_node(&mut self, mut old_node: DagNodePtr) -> DagNodePtr {
+    // ToDo: overwrite without allocating a new node.
+    let new_node = self.dagify_aux(&mut DagNodeCache::default());
+    
+    old_node.overwrite_with_clone(new_node)
   }
 
   fn core(&self) -> &TermCore {
@@ -226,14 +230,14 @@ impl<T: NADataType> Term for NATerm<T> {
         .as_any()
         .downcast_ref::<NATerm<T>>()
         .expect("NATerm type mismatch: cannot compare");
-    
+
     self.value.compare(&other.value)
   }
 
   fn compare_dag_arguments(&self, other: DagNodePtr) -> Ordering {
     if let Some(other) = other.as_any().downcast_ref::<NADagNode<T>>() {
       self.value.compare(&T::value_from_dag_node(other))
-    } else { 
+    } else {
       panic!("NATerm type mismatch: cannot compare");
     }
   }
@@ -243,12 +247,16 @@ impl<T: NADataType> Term for NATerm<T> {
     T::make_dag_node(self.value.clone())
   }
 
-  fn compile_lhs(&mut self, match_at_top: bool, variable_info: &VariableInfo, bound_uniquely: &mut NatSet) -> (BxLHSAutomaton, bool) {
-    todo!()
+  /// Compiles the LHS automaton, returning the tuple `(lhs_automaton, subproblem_likely): (RcLHSAutomaton, bool)`
+  fn compile_lhs_aux(&mut self, _match_at_top: bool, _variable_info: &VariableInfo, _bound_uniquely: &mut NatSet) -> (BxLHSAutomaton, bool) {
+    (Box::new(NonalgebraicLHSAutomaton::new(self.as_ptr())), false)
   }
 
-  fn compile_rhs_aux(&mut self, builder: &mut RHSBuilder, variable_info: &VariableInfo, available_terms: &mut TermBag, eager_context: bool) -> VariableIndex {
-    todo!()
+  fn compile_rhs_aux(&mut self, builder: &mut RHSBuilder, variable_info: &mut VariableInfo, _available_terms: &mut TermBag, _eager_context: bool) -> VariableIndex {
+    let index = variable_info.make_construction_index();
+    let automaton = NonalgebraicRHSAutomaton::new(self.as_ptr(), index);
+    builder.add_rhs_automaton(automaton);
+    index
   }
 
   fn analyse_constraint_propagation(&mut self, _bound_uniquely: &mut NatSet) {

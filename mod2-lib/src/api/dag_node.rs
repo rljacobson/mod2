@@ -50,7 +50,6 @@ use crate::{
     },
     sort::{SortPtr, SortIndex},
     HashConsSet,
-    substitution::MaybeDagNode
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -58,6 +57,7 @@ use crate::{
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr          = UnsafePtr<dyn DagNode + 'static>;
+pub type MaybeDagNode        = Option<DagNodePtr>;
 pub type DagNodeVector       = GCVector<DagNodePtr>;
 pub type DagNodeVectorRefMut = GCVectorRefMut<DagNodePtr>;
 
@@ -312,6 +312,7 @@ pub trait DagNode {
       // if let Some(node) = core.forwarding_ptr {
       //   core.symbol = node.symbol();
       // }
+      core.forwarding_ptr = None;
       self.clear_copied_pointers_aux();
     }
   }
@@ -624,4 +625,10 @@ pub fn arg_to_dag_node(args: *mut u8) -> DagNodePtr {
 #[inline(always)]
 pub fn arg_to_node_vec(args: *mut u8) -> DagNodeVectorRefMut {
   unsafe { (args as *mut DagNodeVector).as_mut().unwrap() }
+}
+
+/// Reinterprets the `DagNodeVectorRefMut` as `*mut u8` to store in args.
+#[inline(always)]
+pub fn node_vec_to_args(node_vec: DagNodeVectorRefMut) -> *mut u8 {
+  (node_vec as *mut DagNodeVector) as *mut u8
 }

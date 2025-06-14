@@ -29,6 +29,7 @@ use crate::{
       condition::ConditionState
     },
     VariableInfo,
+    VariableIndex,
     format::{FormatStyle, Formattable},
     interpreter::InterpreterAttribute,
     rewriting_context::RewritingContext
@@ -135,7 +136,7 @@ pub struct PreEquation {
 impl PreEquation {
   // region Constructors
   // Several fields of a new `PreEquation` will be empty/default upon first creation.
-  
+
   pub fn new_rule(
     name      : Option<IString>,
     lhs_term  : BxTerm,
@@ -155,7 +156,7 @@ impl PreEquation {
       index_within_parent_module: 0,
     }
   }
-  
+
   pub fn new_equation(
     name      : Option<IString>,
     lhs_term  : BxTerm,
@@ -175,7 +176,7 @@ impl PreEquation {
       index_within_parent_module: 0,
     }
   }
-  
+
   pub fn new_membership(
     name      : Option<IString>,
     lhs_term  : BxTerm,
@@ -195,9 +196,9 @@ impl PreEquation {
       index_within_parent_module: 0,
     }
   }
-  
+
   // endregion Constructors
-  
+
   // Common implementation
   // fn trace_begin_trial(&self, subject: DagNodePtr, context: RcRewritingContext) -> Option<i32> {
   //   context.borrow_mut().trace_begin_trial(subject, self)
@@ -254,12 +255,12 @@ impl PreEquation {
   }
 
   // endregion
-  
+
   // region Compiler related methods
-  
-  
+
+
   // endregion Compiler related methods
-  
+
   // region `check*` methods
 
   /// Normalize lhs and recursively collect the indices and occurs sets of this term and its descendants
@@ -291,7 +292,7 @@ impl PreEquation {
         self.variable_info.add_unbound_variables(&unbound_variables);
 
         if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
-          let mindex = self.variable_info.unbound_variables.min_value().unwrap();
+          let mindex = self.variable_info.unbound_variables.min_value().unwrap() as VariableIndex;
           let min_variable = self.variable_info.index_to_variable(mindex).unwrap();
 
           let mut self_string_simple: String = "".to_string();
@@ -317,7 +318,7 @@ impl PreEquation {
       Membership { .. } => {
         // Doesn't use bound_variables.
         if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
-          let mindex = self.variable_info.unbound_variables.min_value().unwrap();
+          let mindex = self.variable_info.unbound_variables.min_value().unwrap() as VariableIndex;
           let min_variable = self.variable_info.index_to_variable(mindex).unwrap();
 
           let mut self_string_simple: String = "".to_string();
@@ -336,7 +337,7 @@ impl PreEquation {
           // No legitimate use for such sort constraints so mark it as bad.
           self.attributes.insert(PreEquationAttribute::Bad);
         }
-        
+
       }
     }
   }
@@ -376,13 +377,13 @@ impl PreEquation {
       todo!("Uncomment the following line.");
       // let success: bool = self.solve_condition(find_first, trial_ref, context, state);
       let success = true;
-      
+
       // if trace_status() {
       //   if context.borrow().trace_abort() {
       //     state.clear();
       //     return false; // return false since condition variables may be unbound
       //   }
-      // 
+      //
       //   context.borrow_mut().trace_end_trial(*trial_ref, success);
       // }
 
@@ -483,7 +484,7 @@ impl PreEquation {
 */
 
   // endregion `check*` methods
-  
+
 }
 
 impl Formattable for PreEquation {

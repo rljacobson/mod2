@@ -8,10 +8,10 @@
 use crate::{
   api::{
     automaton::BxRHSAutomaton,
-    dag_node::DagNodePtr
+    dag_node::{DagNodePtr, MaybeDagNode}
   },
   core::{
-    substitution::{MaybeDagNode, Substitution},
+    substitution::Substitution,
     VariableInfo,
   },
 };

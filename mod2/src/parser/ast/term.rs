@@ -55,7 +55,7 @@ impl TermAST {
 
       TermAST::Identifier(name) => {
         if let Some(var_term) = variables.get(name) {
-          return var_term.copy();
+          return var_term.deep_copy();
         }
         let symbol = get_or_create_symbol(name, symbols);
         symbol.make_term(vec![])
