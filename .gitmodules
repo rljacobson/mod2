@@ -1,0 +1,3 @@
+[submodule "doc/Maude Internals"]
+	path = doc/Maude Internals
+	url = https://github.com/rljacobson/maude_interals.git
