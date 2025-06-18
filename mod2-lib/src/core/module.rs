@@ -40,9 +40,10 @@ use crate::{
   core::{
     pre_equation::PreEquation,
     sort::{
-      collection::SortCollection,
-      kind::{BxKind, Kind},
-      kind_error::KindError
+      SortCollection,
+      BxKind,
+      Kind,
+      KindError
     }
   },
 };

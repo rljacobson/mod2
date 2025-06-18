@@ -50,10 +50,8 @@ impl VariableInfo {
 
   #[inline(always)]
   pub(crate) fn index_to_variable(&self, index: VariableIndex) -> MaybeTerm {
-    if index >= 0 {
-      if let Some(d) = self.variables.get(index as usize) {
-        return d.clone();
-      }
+    if let Some(d) = self.variables.get(index as usize) {
+      return d.clone();
     }
     None
   }
@@ -111,8 +109,7 @@ impl VariableInfo {
   }
 
   pub fn use_index(&mut self, index: VariableIndex) {
-    // ToDo: What if `index < 0`? Added condition that `index>=0` to avoid negative index.
-    if index >= 0 && index >= MAX_PROTECTED_VARIABLE_COUNT {
+    if index >= MAX_PROTECTED_VARIABLE_COUNT {
       let index = (index - MAX_PROTECTED_VARIABLE_COUNT) as usize;
 
       self.construction_indices[index].last_use_time = self.construction_indices.len() as u32;

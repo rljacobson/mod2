@@ -109,10 +109,7 @@ pub trait DagNode {
     // The empty case
     if self.core().args.is_null() {
       assert!(
-        match self.arity() {
-          Arity::Value(v) if v > 0 => false,
-          _ => true,
-        }
+        self.arity().is_zero()
       );
       Box::new(std::iter::empty())
     }
@@ -121,17 +118,8 @@ pub trait DagNode {
     else if self.core().needs_destruction() {
       assert!( !self.symbol().is_variable() );
       assert!(
-        match self.arity() {
-          Arity::Value(v) if v > 1 => true,
-
-          Arity::Variadic
-          | Arity::Any => true,
-
-          _ => {
-            println!("Arity of node is {:?}", self.arity());
-            false
-          },
-        }
+        self.arity().get() > 1,
+        "Arity of node is {:?}", self.arity()
       );
 
       let node_vector: DagNodeVectorRefMut = arg_to_node_vec(self.core().args);
@@ -140,16 +128,7 @@ pub trait DagNode {
     // The singleton case
     else {
       assert!( !self.symbol().is_variable() );
-      assert!(
-        match self.arity() {
-          Arity::Value(v) if v == 1 => true,
-
-          Arity::Variadic
-          | Arity::Any => true,
-
-          _ => false,
-        }
-      );
+      assert_eq!(self.arity().get(), 1);
 
       let node = arg_to_dag_node(self.core().args);
 
@@ -179,12 +158,8 @@ pub trait DagNode {
     // Singleton case
     else {
       let existing_child = arg_to_dag_node(self.core_mut().args);
-      let arity = if let Arity::Value(arity) = self.arity() {
-        max(arity, 2)
-      } else {
-        2
-      };
-      let node_vec   = DagNodeVector::with_capacity(arity as usize);
+      let arity          = max(self.arity().get()                       , 2);
+      let node_vec       = DagNodeVector::with_capacity(arity as usize);
 
       node_vec.push(existing_child);
       node_vec.push(new_child);

@@ -8,17 +8,26 @@ use std::{
   fmt::Write
 };
 
-use mod2_abs::{numeric::{
-  traits::{One, Zero},
-  BigInt,
-}, debug, NatSet, tracing::warn, error, HashSet, HashMap, warning};
+use mod2_abs::{
+  numeric::{
+    traits::One,
+    traits::Zero,
+    BigInt
+  },
+  HashMap,
+  HashSet,
+  NatSet,
+  debug,
+  error,
+  warning,
+};
 
 use crate::{
   core::{
     sort::{
       SortIndex,
       SortPtr,
-      kind::KindPtr,
+      KindPtr,
     },
     symbol::op_declaration::{ConstructorStatus, OpDeclaration}
   },
@@ -34,8 +43,7 @@ pub type BxSortTable = Box<SortTable>;
 // ToDo: Most of these vectors are likely to be small. Benchmark with tiny_vec.
 #[derive(PartialEq, Eq)]
 pub struct SortTable {
-  arity                    : Arity,              // possibly `Any`, etc.
-  arg_count                : i16,
+  arity                    : Arity,              // The count of arguments in the op decl
   op_declarations          : Vec<OpDeclaration>,
   arg_kinds                : Vec<KindPtr>,       // "component vector"
   pub sort_diagram         : Vec<SortIndex>,
@@ -47,8 +55,7 @@ pub struct SortTable {
 impl Default for SortTable {
   fn default() -> Self {
     Self {
-      arity                    : Arity::Unspecified,
-      arg_count                : 0,
+      arity                    : Arity::ZERO,
       op_declarations          : Vec::new(),
       arg_kinds                : Vec::new(),
       sort_diagram             : Vec::new(),
@@ -64,6 +71,13 @@ impl SortTable {
     SortTable::default()
   }
 
+  /// Creates a new sort table with the given arity
+  pub fn with_arity(arity: Arity) -> Self {
+    Self{
+      arity,
+      ..Default::default()
+    }
+  }
 
   /// Is the symbol strictly a constructor (non constructor)? Used to determine if
   /// every member of the kind can share a single constructor.
@@ -78,17 +92,7 @@ impl SortTable {
 
   #[inline(always)]
   pub fn arity(&self) -> Arity {
-    if self.arg_count == 0 {
-      assert!(
-        match self.arity {
-          Arity::Value(v) if v > 0 => false,
-          _ => true
-        }
-      );
-      self.arity
-    } else {
-      self.arg_count.into()
-    }
+    self.arity
   }
 
   #[inline(always)]
@@ -107,14 +111,14 @@ impl SortTable {
   #[inline(always)]
   pub fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
     if self.op_declarations.is_empty() {
-      self.arg_count = op_declaration.arity();
+      self.arity = op_declaration.arity();
     } else {
       assert_eq!(
-        (op_declaration.len() - 1) as i16,
-        self.arg_count,
+        (op_declaration.len() - 1) as u16,
+        self.arity.get(),
         "bad domain length of {} instead of {}",
-        (op_declaration.len() - 1) as i16,
-        self.arg_count
+        (op_declaration.len() - 1) as u16,
+        self.arity.get()
       );
     }
 
@@ -131,7 +135,7 @@ impl SortTable {
     // ToDo: Is this function fallible? Should it return `Option<KindPtr>`?
     //       If this is only ever called after `Module::compute_kind_closures()`, this is safe.
     assert!(!self.op_declarations.is_empty(), "cannot get range kind for symbol with no op declarations");
-    unsafe { (&self.op_declarations[0])[self.arg_count as usize].kind.unwrap_unchecked() }
+    unsafe { (&self.op_declarations[0])[self.arity.get() as usize].kind.unwrap_unchecked() }
   }
 
   /// If an operator has been declared with multiple range sort, this
@@ -140,7 +144,7 @@ impl SortTable {
   #[inline(always)]
   pub fn get_range_sort(&self) -> SortPtr {
     assert!(!self.op_declarations.is_empty(), "cannot get range sort for symbol with no op declarations");
-    (&self.op_declarations[0])[self.arg_count as usize]
+    (&self.op_declarations[0])[self.arity.get() as usize]
   }
 
   #[inline(always)]
@@ -182,7 +186,7 @@ impl SortTable {
     let s = &self.op_declarations[subsumer];
     let v = &self.op_declarations[victim];
 
-    for i in 0..self.arg_count as usize {
+    for i in 0..self.arity.get() as usize {
       if !v[i].leq(s[i]) {
         return false;
       }
@@ -202,7 +206,7 @@ impl SortTable {
       let target = range.sort( SortIndex::try_from(i).unwrap() );
 
       for j in 0..declaration_count {
-        if (&self.op_declarations[j])[self.arg_count as usize].leq(target) {
+        if (&self.op_declarations[j])[self.arity.get() as usize].leq(target) {
           for k in 0..j {
             if self.maximal_op_decl_set_table[i].contains(k) {
               if self.domain_subsumes(k, j) {
@@ -222,7 +226,7 @@ impl SortTable {
   /// Called from `Module::close_theory()`. The `symbol_ptr` is the owner and is passed for error and debug logging.
   pub fn compile_op_declaration(&mut self, symbol_ptr: SymbolPtr) {
     debug_assert!(self.op_declarations.len() > 0);
-    self.arg_kinds.reserve((self.arg_count + 1) as usize);
+    self.arg_kinds.reserve((self.arity.get() + 1) as usize);
 
     for (i, arg) in self.op_declarations[0].sort_spec.iter().enumerate() {
       let kind = unsafe{ arg.kind.unwrap_unchecked() };
@@ -262,7 +266,7 @@ impl SortTable {
       all.insert(i);
     }
 
-    if self.arg_count == 0 {
+    if self.arity.is_zero() {
       let (sort_index, unique) = self.find_min_sort_index(all);
       assert!(unique, "sort declarations for constant do not have a unique least sort.");
       self.sort_diagram.push(sort_index);
@@ -275,7 +279,7 @@ impl SortTable {
     let mut current_base                = 0;
     let mut bad_terminals               = HashSet::new();
 
-    for i in 0..self.arg_count as usize {
+    for i in 0..self.arity.get() as usize {
       let component         = self.arg_kinds[i];
       let nr_sorts          = component.sort_count();
       let nr_current_states = current_states.len();
@@ -283,7 +287,7 @@ impl SortTable {
       let next_base = current_base + nr_sorts * nr_current_states;
       self.sort_diagram.resize(next_base, SortIndex::ZERO);
 
-      let nr_next_sorts = if i == (self.arg_count - 1) as  usize {
+      let nr_next_sorts = if i == (self.arity.get() - 1) as  usize {
         0
       } else {
         self.arg_kinds[i + 1].sort_count()
@@ -332,7 +336,7 @@ impl SortTable {
 
     if single_non_error_sort_index.is_positive() {
       self.single_non_error_sort = Some(
-        self.arg_kinds[self.arg_count as usize].sort(single_non_error_sort_index),
+        self.arg_kinds[self.arity.get() as usize].sort(single_non_error_sort_index),
       );
     }
 
@@ -349,7 +353,7 @@ impl SortTable {
   /// and a bool to indicate whether the minimal sort is unambiguous. Used to determine
   /// the result sort for a given combination of argument sorts in the sort diagram.
   fn find_min_sort_index(&self, state: &NatSet) -> (SortIndex, bool) {
-    let arg_count = self.arg_count as usize;
+    let arg_count = self.arity.get() as usize;
 
     // Start with the error sort
     let mut min_sort   = self.arg_kinds[arg_count].sort(SortIndex::ERROR);
@@ -405,7 +409,7 @@ impl SortTable {
   /// corresponding argument sort from `arg_nr` onward is greater than or equal to the
   /// other's. Used in minimization to eliminate redundant declarations.
   fn partially_subsumes(&self, subsumer: usize, victim: usize, arg_idx: usize) -> bool {
-    let arg_count      = self.arg_count as usize;
+    let arg_count      = self.arity.get() as usize;
     let subsumer_sorts = &self.op_declarations[subsumer].sort_spec;
     let victim_sorts   = &self.op_declarations[victim].sort_spec;
 
@@ -456,7 +460,7 @@ impl SortTable {
     }
 
     let diagram = if prereg_problem { &self.sort_diagram } else { &self.constructor_diagram };
-    let nr_args = self.arg_count as usize;
+    let nr_args = self.arity.get() as usize;
 
     let mut spanning_tree: HashMap<usize, Node> = HashMap::new();
     spanning_tree.insert(0, Node {
@@ -558,9 +562,9 @@ impl SortTable {
     let mut nodes: HashSet<SortIndex> = HashSet::new();
     nodes.insert(SortIndex::ZERO);
 
-    let range = self.arg_kinds[self.arg_count as usize]; // Result component
+    let range = self.arg_kinds[self.arity.get() as usize]; // Result component
 
-    if self.arg_count == 0 {
+    if self.arity.is_zero() {
       let target = self.sort_diagram[0];
       writeln!(
         f,
@@ -572,7 +576,7 @@ impl SortTable {
       return Ok(());
     }
 
-    for i in 0..(self.arg_count as usize) {
+    for i in 0..(self.arity.get() as usize) {
       let component = self.arg_kinds[i];
       let nr_sorts = component.sort_count();
       let mut next_nodes = HashSet::new();
@@ -598,7 +602,7 @@ impl SortTable {
             component.sort(k.try_into().unwrap())
           )?;
 
-          if i == self.arg_count as usize - 1 {
+          if i == self.arity.get() as usize - 1 {
             writeln!(
               f,
               "sort {} ({})",

@@ -34,7 +34,7 @@ use mod2_abs::{
 use mod2_lib::{
   core::{
     pre_equation::condition::Condition,
-    sort::collection::SortCollection
+    sort::SortCollection
   },
   api::{
     symbol::SymbolPtr,

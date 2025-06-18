@@ -70,7 +70,7 @@ pub fn build_random_tree(
   let mut rng   = rand::rng();
 
   // Get the parent node's arity from its symbol
-  let parent_arity = if let Arity::Value(v) = parent.arity() { v as usize } else { 0 };
+  let parent_arity = parent.arity().get();
 
   // For each child based on the parent's arity, create a new node
   for i in 0..parent_arity as usize {
@@ -87,10 +87,8 @@ pub fn build_random_tree(
 
     // Insert the child into the parent node
     let mut parent_mut = parent;
-    if let Arity::Value(v) = parent_mut.arity(){
-      if i > v as usize {
-        panic!("Incorrect arity");
-      }
+    if i > parent_mut.arity().get() as usize {
+      panic!("Incorrect arity");
     }
     parent_mut.insert_child(child_node);
 
@@ -106,11 +104,7 @@ pub fn build_random_tree(
 /// - `is_tail`: Whether the current node is the last child of its parent.
 pub fn print_tree(node: DagNodePtr, prefix: String, is_tail: bool) {
   let is_head = prefix.is_empty();
-  let arity = if let Arity::Value(v) = node.arity() {
-    v
-  } else {
-    0
-  };
+  let arity = node.arity().get();
 
   if arity as usize != node.len() {
     panic!("Incorrect arity/len. arity: {}  len: {}", arity, node.len());
@@ -153,7 +147,7 @@ fn make_symbols() -> Vec<SymbolPtr> {
   (0..=10).map(|x| {
             // let name = IString::from(format!("sym({})", x).as_str());
             let name = IString::from("sym");
-            SymbolPtr::new(heap_construct!(FreeSymbol::with_arity(name, Arity::Value(x))))
+            SymbolPtr::new(heap_construct!(FreeSymbol::with_arity(name, Arity::new_unchecked(x))))
           })
       .collect::<Vec<_>>()
 }
@@ -226,7 +220,7 @@ fn test_garbage_collection() {
 #[test]
 fn test_arena_exhaustion() {
   let _guard = TEST_MUTEX.lock();
-  let symbol = FreeSymbol::with_arity(IString::from("mysymbol"), Arity::Value(1));
+  let symbol = FreeSymbol::with_arity(IString::from("mysymbol"), Arity::new_unchecked(1));
   let symbol_ptr = SymbolPtr::new(heap_construct!(symbol));
   let root: DagNodePtr = DagNodeCore::new(symbol_ptr);
   println!("root: {}", root);
@@ -270,7 +264,7 @@ fn create_destroy_variable_dag_node() {
       allocator.collect_garbage();
     }
     // Create a dummy `DagNode` to force lazy sweep
-    let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::None);
+    let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::ZERO);
     let dummy_node = FreeDagNode::new(dummy_symbol.as_ptr());
     _ = dummy_node.len(); // Don't optimize away
 

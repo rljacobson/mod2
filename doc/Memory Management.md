@@ -7,7 +7,7 @@ Implementation Strategy: Anything that has a defined owner can be held in an `Bo
 
 ### `DagNodes`
 
-`DagNode`s are garbage collected. An owner of a `DagNode` has to hold it in a 
+`DagNode`s are garbage collected. An owner of a `DagNode` has to hold it in a `RootContainer`.
 
 ## Code Map of Ownership
 

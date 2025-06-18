@@ -31,7 +31,7 @@ pub(crate) mod automata;
 
 
 // Stubs
-pub(crate) struct StateTransitionGraph;
+pub struct StateTransitionGraph;
 
 // use shared_vector::SharedVector;
 use crate::api::dag_node::DagNodePtr;

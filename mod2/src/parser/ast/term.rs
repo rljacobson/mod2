@@ -24,7 +24,7 @@ use mod2_lib::{
     },
     term::{BxTerm, Term},
   },
-  core::sort::collection::SortCollection
+  core::sort::SortCollection
 };
 use crate::parser::ast::get_or_create_symbol;
 
@@ -95,17 +95,17 @@ impl TermAST {
 mod tests {
   use crate::parser::parser::TermParser;
   use super::*;
-  
+
   #[test]
   fn test_construct() {
     let mut parser = TermParser::default();
     let input = "f(\"hello\", 1, 2.0, true, g(x, y, z, false))";
     let term = parser.parse(input).unwrap();
-    
+
     let mut symbols = HashMap::new();
     let mut sorts = SortCollection::new();
     let mut variables = HashMap::new();
-    
+
     let term = term.construct(&mut symbols, &mut sorts, &mut variables);
     println!("{:?}", term);
   }

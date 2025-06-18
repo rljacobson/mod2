@@ -6,15 +6,18 @@
 - `Kind::sort(idx)` indexes into `self.sorts`
 - `sortIndex` is used as an array index in `SortTable::get_maximal_op_decl_set()`
 - `index_variables` free function in `pre_equation/mod.rs`
+- Arity needs to be changed to be a constant nonnegative int fixed at symbol construction.
 
 # Next Steps
+
+- `PreEquation::check_condition_find_first`
 
 - compiler
    - `Term::compile_lhs`, `Term::compile_rhs`
    - Implement `FreeTerm::compile_lhs`
    - uncomment `api/free_theory/compiler.rs`
    - `core::automata::*` - uncomment `binding_lhs_automaton`, `copy_rhs_automaton`, and `trivial_rhs_automata`.
- 
+
 - rewriter
   - rewriting methods on `core::rewriting_context::context::RewritingContext`
   - `StateTransitionGraph`
@@ -25,6 +28,11 @@
   * FreeBinaryRHSAutomaton
   * FreeUnaryRHSAutomaton
   * FreeNullaryRHSAutomaton
+
+# Stubs
+
+- Implement `StateTransitionGraph`
+
 
 # Saved for later
 

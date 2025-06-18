@@ -14,7 +14,7 @@ use mod2_abs::IString;
 use mod2_lib::{
   core::{
     BxModule,
-    sort::collection::SortCollection
+    sort::SortCollection
   },
   api::{
     term::BxTerm,

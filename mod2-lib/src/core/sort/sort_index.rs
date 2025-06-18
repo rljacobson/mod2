@@ -115,13 +115,13 @@ impl SortIndex {
   /// Returns numeric value if it exists.
   #[inline(always)]
   pub fn get(&self) -> Option<u16> {
-    self.0.map(|x| x.get_unchecked())
+    self.0.map(|x| x.get())
   }
 
   /// Returns numeric value. Panics if there is no numeric value.
   #[inline(always)]
-  pub const fn get_unchecked(&self) -> u16 {
-    self.0.unwrap().get_unchecked()
+  pub fn get_unchecked(&self) -> u16 {
+    self.0.unwrap().get()
   }
 
   /// Returns a `usize` of the index value.
@@ -132,7 +132,7 @@ impl SortIndex {
 
   /// Returns a `usize` of the index value. Panics if there is no index value.
   #[inline(always)]
-  pub const fn idx_unchecked(&self) -> usize {
+  pub fn idx_unchecked(&self) -> usize {
     self.get_unchecked() as usize
   }
 

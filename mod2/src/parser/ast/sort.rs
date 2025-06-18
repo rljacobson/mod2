@@ -6,7 +6,7 @@ use mod2_lib::{
   },
   core::{
     sort::{
-      collection::SortCollection,
+      SortCollection,
       SortPtr,
     },
     symbol::TypeSignature

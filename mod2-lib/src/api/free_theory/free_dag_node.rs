@@ -115,7 +115,7 @@ impl DagNode for FreeDagNode {
       // Detected a non-canonical argument, need to make a new copy. It is convenient to
       // copy the arguments first. Everything up to `idx` is already canonical, so just
       // copy those to the new node.
-      let mut new_args = Vec::with_capacity(self.arity().as_numeric() as usize);
+      let mut new_args = Vec::with_capacity(self.arity().get() as usize);
       new_args.extend(self.iter_args().take(idx-1));
       // The `idx`'th argument was already made canonical.
       new_args.push(canonical_dag_node);
@@ -139,7 +139,7 @@ impl DagNode for FreeDagNode {
   fn make_canonical_copy(&self, hash_cons_set: &mut HashConsSet) -> DagNodePtr {
     // Almost identical to `FreeDagNode::make_clone()`.
     // It is convenient to copy the arguments first.
-    let mut new_args = Vec::with_capacity(self.arity().as_numeric() as usize);
+    let mut new_args = Vec::with_capacity(self.arity().get() as usize);
     new_args.extend(self.iter_args().map(|d| hash_cons_set.insert(d)));
 
     // Now create a new copy of self with these args.
@@ -155,7 +155,7 @@ impl DagNode for FreeDagNode {
   /// Constructs a shallow copy of this node.
   fn make_clone(&self) -> DagNodePtr {
     // It is convenient to copy the arguments first. We only copy the pointers; we don't clone them.
-    let mut new_args = Vec::with_capacity(self.arity().as_numeric() as usize);
+    let mut new_args = Vec::with_capacity(self.arity().get() as usize);
     new_args.extend(self.iter_args());
 
     // Now create a new copy of self with these args.
@@ -187,8 +187,7 @@ impl DagNode for FreeDagNode {
   fn compute_base_sort(&mut self) -> SortIndex {
     let symbol = self.symbol();
     // assert_eq!(self as *const _, subject.symbol() as *const _, "bad symbol");
-    let arg_count = symbol.arity();
-    if arg_count.as_numeric() == 0 {
+    if symbol.arity().is_zero() {
       let idx = symbol.sort_table().traverse(0, SortIndex::ZERO);
       self.set_sort_index(idx); // Maude: HACK
       return idx;

@@ -15,14 +15,14 @@ use mod2_lib::{
     variable_theory::VariableTerm,
   },
   core::{
-    BxModule, 
+    BxModule,
     Module,
     pre_equation::{
       PreEquation,
       PreEquationKind,
       condition::Conditions
     },
-    sort::collection::SortCollection,
+    sort::SortCollection,
     symbol::SymbolType
   },
 };
@@ -108,7 +108,7 @@ impl ModuleAST {
       }
     }
 
-    
+
     // Variable Declarations
     let mut variables: HashMap<IString, BxTerm> = HashMap::with_capacity(var_decls.len());
     for var_decl in var_decls {
@@ -117,7 +117,7 @@ impl ModuleAST {
       variables.insert(name, var);
     }
 
-    
+
     // Symbol Declarations
     for sym_decl in sym_decls {
       sym_decl.construct(&mut symbols, &mut sorts);

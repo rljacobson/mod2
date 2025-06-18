@@ -26,7 +26,7 @@ use mod2_lib::{
     Arity,
   },
   core::{
-    sort::collection::SortCollection,
+    sort::SortCollection,
     symbol::{
       OpDeclaration,
       SymbolAttribute,
@@ -58,7 +58,7 @@ impl SymbolDeclarationAST {
     &self,
     symbols: &mut HashMap<IString, SymbolPtr>,
     sorts  : &mut SortCollection
-  ) -> BxTerm 
+  ) -> BxTerm
   {
     let maybe_type_signature: Option<TypeSignature> = match &self.sort_spec {
       Some(sort_spec) => {
@@ -69,9 +69,9 @@ impl SymbolDeclarationAST {
       }
     };
 
-    // ToDo: Right now we only make symbols of type `NASymbol<T>` and `FreeSymbol`. When other theories are implemented, 
+    // ToDo: Right now we only make symbols of type `NASymbol<T>` and `FreeSymbol`. When other theories are implemented,
     //       the symbol type will need to be determined by the `attributes`.
-    
+
     construct_symbol_term_from_decl(
       symbols,
       sorts,
@@ -141,24 +141,24 @@ pub fn construct_symbol_term_from_decl(
     },
     _ => name.clone()
   };
-  
+
   let symbol = match symbols.entry(symbol_name.clone()) {
-  
+
       Entry::Occupied(mut entry) => {
         // Operators (functions) can be overloaded. E.g., for A < B and X < Y, we could have
         //    symbol f: A A -> X;
         //    symbol f: B B -> Y;
         let symbol = entry.get_mut();
-  
+
         if let Some(type_signature) = type_signature {
           let constructor_status = attributes.contains(SymbolAttribute::Constructor);
           let op_declaration     = OpDeclaration::new(type_signature, constructor_status.into());
           symbol.add_op_declaration(op_declaration);
         }
-  
+
         *symbol
       },
-  
+
       Entry::Vacant(entry) => {
         // The symbol doesn't exist. Create it.
         // Deduce the theory from the given attributes and instantiate the correct symbol type.
@@ -168,34 +168,36 @@ pub fn construct_symbol_term_from_decl(
             | SymbolType::Operator
             | SymbolType::Data => {
               // ToDo: Enrich this when more theories are implemented.
-              let ptr = heap_construct!(FreeSymbol::new(name.clone(), Arity::Unspecified, attributes, symbol_type));
+              assert!(sorts.len() > 0);
+              let arity = Arity::new_unchecked((sorts.len()-1) as u16);
+              let ptr = heap_construct!(FreeSymbol::new(name.clone(), arity, attributes, symbol_type));
               let mut symbol = SymbolPtr::new(ptr);
-  
+
               if let Some(type_signature) = type_signature {
                 let constructor_status = attributes.contains(SymbolAttribute::Constructor);
                 let op_declaration = OpDeclaration::new(type_signature, constructor_status.into());
                 symbol.add_op_declaration(op_declaration);
               }
-  
+
               entry.insert(symbol);
               symbol
             }
-  
+
             SymbolType::Variable => {
               // Variables have symbols named after their sort, so we use `symbol_name`.
-              let ptr = heap_construct!(VariableSymbol::new(symbol_name, Arity::Unspecified, attributes, symbol_type));
+              let ptr = heap_construct!(VariableSymbol::new(symbol_name, Arity::ZERO, attributes, symbol_type));
               let mut symbol = SymbolPtr::new(ptr);
-  
+
               if let Some(type_signature) = type_signature {
                 let constructor_status = attributes.contains(SymbolAttribute::Constructor);
                 let op_declaration = OpDeclaration::new(type_signature, constructor_status.into());
                 symbol.add_op_declaration(op_declaration);
               }
-  
+
               entry.insert(symbol);
               symbol
             }
-  
+
             // The following symbols do NOT get added to symbols owned by the module.
             // ToDo: Do some more validation, e.g. are the attributes compatible?
             SymbolType::True => {
@@ -217,22 +219,22 @@ pub fn construct_symbol_term_from_decl(
               return Box::new(NaturalTerm::from_str(name.deref()));
             }
           };
-  
-        
-  
+
+
+
         symbol
       }
-  
+
     };
-  
+
   match symbol_type {
     SymbolType::Variable => {
       Box::new(VariableTerm::new(name, symbol))
     }
-    
+
     _ => {
       symbol.make_term(vec![])
     }
   }
-  
+
 }

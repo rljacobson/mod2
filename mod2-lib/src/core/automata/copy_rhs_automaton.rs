@@ -82,7 +82,7 @@ impl RHSAutomaton for CopyRHSAutomaton {
     let orig = matcher.value(self.original_index);
 
     if let Some(mut orig_dag_node) = orig {
-      let mut new_dag_node = orig_dag_node.copy_eager_upto_reduced();
+      let new_dag_node = orig_dag_node.copy_eager_upto_reduced();
       orig_dag_node.clear_copied_pointers();
 
       if let Some(mut new_dag_node) = new_dag_node {

@@ -4,10 +4,7 @@ Membership constraints, also called sort constraints, specify subsort relationsh
 
 */
 
-use std::{
-  cmp::Ordering,
-  ops::{Deref, DerefMut}
-};
+use std::cmp::Ordering;
 use mod2_abs::warning;
 use crate::{
   core::{
@@ -17,7 +14,6 @@ use crate::{
   api::dag_node::DagNodePtr,
 };
 use super::{
-  PreEquation as SortConstraint,
   PreEquationKind,
   PreEquationPtr as SortConstraintPtr
 };

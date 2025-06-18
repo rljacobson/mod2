@@ -44,11 +44,12 @@ use crate::{
   core::{
     automata::{
       CopyRHSAutomaton,
-      RHSBuilder
+      RHSBuilder,
+      BindingLHSAutomaton
     },
     format::Formattable,
     sort::{
-      kind::KindPtr,
+      KindPtr,
       SortIndex,
       SortPtr
     },
@@ -58,13 +59,13 @@ use crate::{
       TermCore
     },
     TermBag,
-    VariableInfo
+    VariableInfo,
+    VariableIndex
   },
   impl_display_debug_for_formattable,
   HashType,
 };
-use crate::core::automata::BindingLHSAutomaton;
-use crate::core::VariableIndex;
+
 
 pub type BxTerm    = Box<dyn Term>;
 pub type MaybeTerm = Option<TermPtr>;
@@ -351,7 +352,7 @@ pub trait Term: Formattable {
     eager_context  : bool,
   ) -> VariableIndex {
     if let Some((mut found_term, _)) = available_terms.find(self.as_ptr(), eager_context) {
-      let mut found_term = found_term.deref_mut();
+      let found_term = found_term.deref_mut();
 
       if found_term.core_mut().save_index.is_none() {
         if let Some(variable_term) = found_term.as_any().downcast_ref::<VariableTerm>() {
@@ -454,7 +455,7 @@ pub trait Term: Formattable {
     let sort_table = symbol.sort_table();
     let kind       = sort_table.range_kind(); // should be const
 
-    if symbol.arity() == Arity::Value(0) {
+    if symbol.arity().is_zero() {
       self.set_sort_info(kind, sort_table.traverse(0, SortIndex::ZERO)); // HACK
       return;
     }

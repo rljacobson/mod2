@@ -59,12 +59,12 @@ pub struct FreeLHSAutomaton {
 
 impl FreeLHSAutomaton {
   pub fn new(
-    mut free_symbols  : Vec<FreeOccurrence>,
-    uncertain_vars: Vec<FreeOccurrence>,
-    bound_vars    : Vec<FreeOccurrence>,
-    gnd_aliens    : Vec<FreeOccurrence>,
-    non_gnd_aliens: Vec<FreeOccurrence>,
-    best_sequence : Vec<u32>,
+    mut free_symbols: Vec<FreeOccurrence>,
+    uncertain_vars  : Vec<FreeOccurrence>,
+    bound_vars      : Vec<FreeOccurrence>,
+    gnd_aliens      : Vec<FreeOccurrence>,
+    non_gnd_aliens  : Vec<FreeOccurrence>,
+    best_sequence   : Vec<ArgIndex>,
     mut sub_automata: Vec<Option<BxLHSAutomaton>>,
   ) -> Box<Self> {
     let free_symbol_count = free_symbols.len();
@@ -94,7 +94,7 @@ impl FreeLHSAutomaton {
           save_index: term.core().save_index,
         };
 
-        if symbol.arity().as_numeric() > 0 {
+        if symbol.arity().get() > 0 {
           term.slot_index = slot_nr;
           slot_nr += 1;
         }
@@ -190,7 +190,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
       return (false, None);
     }
 
-    if self.top_symbol.arity().as_numeric() == 0 {
+    if self.top_symbol.arity().is_zero() {
       return (true, None);
     }
 
@@ -212,7 +212,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
           solution.bind(save_index, Some(d.clone()));
         }
 
-        if i.symbol.arity().as_numeric() != 0 {
+        if !i.symbol.arity().is_zero() {
           stack_idx += 1;
           self.stack[stack_idx] = d.iter_args().collect::<Vec<_>>();
         }

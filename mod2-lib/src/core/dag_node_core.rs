@@ -207,14 +207,12 @@ impl DagNodeCore {
     node_mut.inline = [0; 24];
 
     // ToDo: Improve API for args. E.g. make `DagNodeVector` generic.
-    if let Arity::Value(arity) = symbol.arity() {
-      if arity > 1 {
-        // ToDo: The vector probably shouldn't be allocated here.
-        let vec       = DagNodeVector::with_capacity(arity as usize);
-        node_mut.args = (vec as *mut DagNodeVector) as *mut u8;
-        node_mut.flags.insert(DagNodeFlag::NeedsDestruction);
-      }
-    };
+    if symbol.arity().get() > 1 {
+      // ToDo: The vector probably shouldn't be allocated here.
+      let vec       = DagNodeVector::with_capacity(symbol.arity().get() as usize);
+      node_mut.args = (vec as *mut DagNodeVector) as *mut u8;
+      node_mut.flags.insert(DagNodeFlag::NeedsDestruction);
+    }
 
     node_mut.theory_tag = theory;
     node_mut.symbol     = symbol;

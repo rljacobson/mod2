@@ -22,6 +22,7 @@ Recall:
 
 use std::ops::{BitOr, BitOrAssign, Index, IndexMut};
 use mod2_abs::SmallVec;
+use crate::api::Arity;
 use crate::core::sort::SortPtr;
 
 
@@ -92,8 +93,9 @@ impl OpDeclaration {
   }
 
   #[inline(always)]
-  pub fn arity(&self) -> i16 {
-    (self.sort_spec.len() - 1) as i16
+  pub fn arity(&self) -> Arity {
+    // Subtract 1 to exclude the range sort
+    ((self.sort_spec.len() - 1) as u16).into()
   }
 }
 

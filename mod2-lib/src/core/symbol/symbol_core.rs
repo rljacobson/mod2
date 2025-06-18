@@ -23,7 +23,6 @@ use crate::{
 
 pub struct SymbolCore {
   pub name       : IString,
-  pub arity      : Arity,
   pub attributes : SymbolAttributes,
   pub symbol_type: SymbolType,
 
@@ -57,15 +56,14 @@ impl SymbolCore {
     // Compute hash
     static SYMBOL_COUNT: AtomicU32 = AtomicU32::new(0);
     SYMBOL_COUNT.fetch_add(1, Ordering::Relaxed);
-    let numeric_arity: HashType = arity.as_numeric() as HashType;
+    let numeric_arity: HashType = arity.get() as HashType;
     let hash_value = SYMBOL_COUNT.load(Ordering::Relaxed) | (numeric_arity << 24); // Maude: self.arity << 24
 
     let symbol = SymbolCore {
       name,
-      arity,
       attributes,
       symbol_type,
-      sort_table: SortTable::default(),
+      sort_table: SortTable::with_arity(arity),
       sort_constraint_table: SortConstraintTable::new(),
       hash_value,
       strategy: Default::default(),
@@ -81,7 +79,7 @@ impl SymbolCore {
 
   #[inline(always)]
   pub fn with_name(name: IString)  -> SymbolCore {
-    SymbolCore::new(name, Arity::None, SymbolAttributes::default(), SymbolType::default())
+    SymbolCore::new(name, Arity::ZERO, SymbolAttributes::default(), SymbolType::default())
   }
 
   #[inline(always)]
@@ -112,10 +110,9 @@ impl SymbolCore {
 
 impl Display for SymbolCore {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self.arity {
-      Arity::Variadic => write!(f, "{}ᵥ", self.name),
-      Arity::Value(arity) => write!(f, "{}{}", self.name, int_to_subscript(arity as u32)),
-      _ => write!(f, "{}", self.name),
+    match self.arity().get() {
+      0u16 => write!(f, "{}", self.name),
+      arity => write!(f, "{}{}", self.name, int_to_subscript(arity as u32)),
     }
   }
 }

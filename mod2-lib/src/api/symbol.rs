@@ -28,7 +28,7 @@ use crate::{
       SymbolCore,
       OpDeclaration
     },
-    sort::kind::KindPtr,
+    sort::KindPtr,
     strategy::Strategy,
   },
   impl_display_debug_for_formattable,
@@ -72,7 +72,7 @@ pub trait Symbol {
 
   #[inline(always)]
   fn arity(&self) -> Arity {
-    self.core().arity()
+    self.sort_table().arity()
   }
 
   #[inline(always)]

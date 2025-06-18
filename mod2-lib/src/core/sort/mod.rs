@@ -111,11 +111,15 @@ To compare two sorts `A` and `B` during runtime:
 
  */
 
-pub mod kind;
-pub mod sort;
-pub mod collection;
-pub mod kind_error;
+mod kind;
+mod sort;
+mod collection;
+mod kind_error;
 mod sort_index;
 
+// Flatten module hierarchy 
 pub use sort::*;
 pub use sort_index::SortIndex;
+pub use kind_error::*;
+pub use kind::*;
+pub use collection::*;

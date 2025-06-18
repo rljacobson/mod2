@@ -88,8 +88,8 @@ mod tests {
   
   #[test]
   fn test_symbol_creation(){
-    let f = FreeSymbol::with_arity("f".into(), Arity::Any);
-    assert_eq!(f.arity(), Arity::Any);
+    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(3));
+    assert_eq!(f.arity().get(), 3);
     assert_eq!(f.name().deref(), "f");
   }
 }

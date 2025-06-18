@@ -55,18 +55,18 @@ use std::{
   },
   ops::Deref
 };
-use std::ops::SubAssign;
 use mod2_abs::{heap_construct, join_iter, UnsafePtr};
 
 use crate::{
   core::{
     sort::{
-      sort::SortPtr,
-      kind_error::KindError
+      SortPtr,
+      KindError,
+      Sort, 
+      SortIndex
     }
   }
 };
-use crate::core::sort::{Sort, SortIndex};
 
 // Convenience types
 /// Each `Sort` holds a `KindPtr` to its `Kind`. However, it isn't clear if the `KindPtr` is ever dereferenced,

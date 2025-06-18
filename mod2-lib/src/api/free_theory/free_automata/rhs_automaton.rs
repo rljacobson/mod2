@@ -2,12 +2,12 @@
 
 The RHS automaton for the free theory has six variations specialized for arities 0-3:
 
-    * FreeFast3RHSAutomaton
-    * FreeFast2RHSAutomaton
-    * FreeTernaryRHSAutomaton
-    * FreeBinaryRHSAutomaton
-    * FreeUnaryRHSAutomaton
-    * FreeNullaryRHSAutomaton
+  * FreeFast3RHSAutomaton
+  * FreeFast2RHSAutomaton
+  * FreeTernaryRHSAutomaton
+  * FreeBinaryRHSAutomaton
+  * FreeUnaryRHSAutomaton
+  * FreeNullaryRHSAutomaton
 
  */
 

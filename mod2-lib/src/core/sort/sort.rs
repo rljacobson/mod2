@@ -34,7 +34,7 @@ use mod2_abs::{
   UnsafePtr,
 };
 use crate::{
-  api::{built_in::get_built_in_sort, Arity},
+  api::{built_in::get_built_in_sort},
   core::{
     sort::{
       kind::KindPtr,
@@ -113,16 +113,6 @@ impl Sort {
       ..Self::default()
     }
   }
-
-  /// Returns `Arity::Any` for special sort Any, `Arity::None` for special sort None, and `0` otherwise.
-  pub fn arity(&self) -> Arity {
-    match &self.name  {
-      v if *v == IString::from("Any")  => Arity::Any,
-      v if *v == IString::from("None") => Arity::None,
-      _ =>  Arity::Value(0)
-    }
-  }
-
 
   /// Antisymmetrically inserts `other` as a subsort of `self` and `self` as a supersort of `other`.
   pub fn insert_subsort(&mut self, mut other: SortPtr) {

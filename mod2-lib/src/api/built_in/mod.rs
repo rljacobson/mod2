@@ -66,7 +66,7 @@ macro_rules! make_symbol {
           let symbol_name = IString::from(name_lit);
           let symbol_core = SymbolCore::new(
             symbol_name.clone(),
-            Arity::Value(0),
+            Arity::ZERO,
             SymbolAttribute::Constructor.into(),
             $symbol_type,
           );

@@ -10,7 +10,7 @@ use lalrpop_util::{
   ParseError
 };
 use mod2_abs::IString;
-use mod2_lib::core::sort::collection::SortCollection;
+use mod2_lib::core::sort::SortCollection;
 use crate::parse_to_module;
 
 #[test]

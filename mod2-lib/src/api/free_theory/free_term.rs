@@ -440,7 +440,7 @@ impl Term for FreeTerm {
 // Only used locally. Other theories will have their own local version.
 #[derive(Default)]
 struct ConstraintPropagationSequence {
-  sequence   : Vec<u32>,
+  sequence   : Vec<ArgIndex>,
   bound      : NatSet,
   cardinality: i32,
 }

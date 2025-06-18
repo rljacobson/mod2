@@ -31,7 +31,7 @@ use crate::{
   },
   core::{
     sort::{
-      kind::KindPtr,
+      KindPtr,
       SortIndex
     },
     VariableIndex,

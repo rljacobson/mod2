@@ -83,10 +83,9 @@ impl Substitution {
 
   // Todo: Is this the best way to implement a getter? I think we did it this way so it returned a value.
   // ToDo: Should this take an VariableIndex?
-  /// This getter takes an `i32` so it can check for negative indices, i.e. `NONE`.
   #[inline(always)]
   pub fn get(&self, index: VariableIndex) -> MaybeDagNode {
-    assert!(index >= 0, "-ve index {}", index);
+    // assert!(index >= 0, "-ve index {}", index);
     assert!(
       (index as usize) < self.bindings.len(),
       "index too big {} vs {}",
