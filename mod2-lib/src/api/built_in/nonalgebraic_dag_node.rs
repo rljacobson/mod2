@@ -87,7 +87,7 @@ macro_rules! impl_na_dag_node {
       impl NADagNode<$natype> {
         pub fn new(value: $natype) -> DagNodePtr {
           let symbol   = unsafe{ get_built_in_symbol(stringify!($natype)).unwrap_unchecked() };
-          let mut node = DagNodeCore::with_theory(symbol, <$natype as NADataType>::THEORY);
+          let mut node = DagNodeCore::new(symbol);
           // The unwrap is guaranteed to succeed by construction.
           node.as_any_mut().downcast_mut::<Self>().unwrap().set_value(value);
 
@@ -115,7 +115,7 @@ impl NADagNode<Bool> {
     } else {
       unsafe { get_built_in_symbol("false").unwrap_unchecked() }
     };
-    let mut node = DagNodeCore::with_theory(symbol, <Bool as NADataType>::THEORY);
+    let mut node = DagNodeCore::new(symbol);
     // The unwrap is guaranteed to succeed by construction.
     node.as_any_mut().downcast_mut::<Self>().unwrap().set_value(value);
 
@@ -134,7 +134,7 @@ impl NADagNode<Bool> {
 impl NADagNode<StringBuiltIn> {
   pub fn new(value: StringBuiltIn) -> DagNodePtr {
     let symbol   = unsafe{ get_built_in_symbol("String").unwrap_unchecked() };
-    let mut node = DagNodeCore::with_theory(symbol, EquationalTheory::String);
+    let mut node = DagNodeCore::new(symbol);
 
     // Needs destruction to drop the `String` in `DagNodeCode::inline`.
     node.set_flags(DagNodeFlag::NeedsDestruction.into());

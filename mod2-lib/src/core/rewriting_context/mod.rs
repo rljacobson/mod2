@@ -23,9 +23,8 @@ mod context;
 
 use std::fmt::{Display, Formatter};
 use enumflags2::{bitflags, BitFlags};
-use crate::core::gc::root_container::BxRootVec;
 
-pub use context::{RewritingContext, BxRewritingContext};
+pub use context::RewritingContext;
 
 #[bitflags]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -74,19 +73,4 @@ impl Display for RewriteType {
       }
     }
   }
-}
-
-
-pub fn make_subcontext(parent: BxRewritingContext, root: Option<BxRootVec>, purpose: Purpose) -> BxRewritingContext {
-  let interpreter = { 
-    parent.as_ref().interpreter
-  };
-
-  RewritingContext::with_parent(
-    root,
-    Some(parent),
-    purpose,
-    true,
-    interpreter,
-  )
 }

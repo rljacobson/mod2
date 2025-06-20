@@ -13,11 +13,16 @@ use crate::{
       Bool,
       Float,
       Integer,
-      NaturalNumber
+      NaturalNumber,
+      NADataType
     },
-    term::BxTerm
+    term::BxTerm,
+    dag_node::DagNodePtr
   },
-  core::symbol::SymbolCore,
+  core::{
+    symbol::SymbolCore,
+    EquationalTheory
+  }
 };
 
 pub type StringSymbol  = NASymbol<String>;
@@ -32,7 +37,7 @@ pub struct NASymbol<T> {
   phantom_data: PhantomData<T>,
 }
 
-impl<T: 'static> NASymbol<T>{
+impl<T: NADataType> NASymbol<T>{
   pub fn new(symbol_core: SymbolCore) -> NASymbol<T>{
     NASymbol{
       core        : symbol_core,
@@ -41,7 +46,7 @@ impl<T: 'static> NASymbol<T>{
   }
 }
 
-impl<T: 'static> Symbol for  NASymbol<T>{
+impl<T: NADataType> Symbol for  NASymbol<T>{
   // impl_as_any_ptr_fns!(Symbol, NASymbol);
   fn as_any(&self) -> &dyn std::any::Any { self }
   fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -50,8 +55,11 @@ impl<T: 'static> Symbol for  NASymbol<T>{
   }
 
   fn make_term(&self, _args: Vec<BxTerm>) -> BxTerm {
-    // Use NATerm<T>::new(value: T) instead.
-    unimplemented!()
+    panic!("cannot call Symbol::make_term() on a non-algebraic symbol");
+  }
+
+  fn make_dag_node(&self, _: *mut u8) -> DagNodePtr { 
+    panic!("cannot call Symbol::make_dag_node() on a non-algebraic symbol");
   }
 
   fn core(&self) -> &SymbolCore {
@@ -60,6 +68,10 @@ impl<T: 'static> Symbol for  NASymbol<T>{
 
   fn core_mut(&mut self) -> &mut SymbolCore {
     &mut self.core
+  }
+  
+  fn theory(&self) -> EquationalTheory {
+    T::THEORY
   }
 }
 

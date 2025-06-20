@@ -26,7 +26,6 @@ use crate::{
   }
 };
 
-
 #[derive(Clone, Default)]
 pub struct Substitution {
   bindings: Vec<MaybeDagNode>,
@@ -140,7 +139,7 @@ impl Substitution {
 
   #[inline(always)]
   pub fn bind(&mut self, index: VariableIndex, maybe_value: Option<DagNodePtr>) {
-    assert!(index >= 0, "Negative index {}", index);
+    // assert!(index >= 0, "Negative index {}", index);
     assert!(
       (index as usize) < self.bindings.len(),
       "Index too big {} vs {}",

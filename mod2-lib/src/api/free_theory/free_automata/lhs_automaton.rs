@@ -4,7 +4,6 @@ Free theory automaton.
 
 */
 
-use std::ops::DerefMut;
 // Free Theory
 use super::super::{
   BoundVariable,
@@ -17,25 +16,24 @@ use super::super::{
   NonGroundAlien
 };
 use crate::{
-  core::{
-    NodeList,
-    substitution::Substitution,
-    VariableIndex
-  },
   api::{
-    variable_theory::VariableTerm,
-    term::Term,
-    symbol::SymbolPtr,
-    subproblem::MaybeSubproblem,
-    dag_node::DagNodePtr,
     automaton::{BxLHSAutomaton, LHSAutomaton},
+    dag_node::DagNodePtr,
+    subproblem::MaybeSubproblem,
+    symbol::SymbolPtr,
+    term::Term,
+    variable_theory::VariableTerm,
     ArgIndex
   },
-  NONE
+  core::{
+    substitution::Substitution,
+    NodeList
+  }
 };
 use crate::api::dag_node::DagNode;
 use crate::api::subproblem::SubproblemSequence;
 use crate::core::sort::SortIndex;
+use crate::core::VariableIndex;
 
 #[derive(Clone)]
 pub struct FreeSubterm {

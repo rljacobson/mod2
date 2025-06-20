@@ -15,11 +15,10 @@ use crate::{
   },
   core::{
     substitution::Substitution,
-    VariableInfo,
-    VariableIndex
+    VariableInfo
   }
 };
-
+use crate::core::VariableIndex;
 
 pub struct CopyRHSAutomaton {
   original_index: VariableIndex,
@@ -69,7 +68,7 @@ impl RHSAutomaton for CopyRHSAutomaton {
         orig_dag_node
       );
 
-      let mut new_dag_node = orig_dag_node.copy_eager_upto_reduced();
+      let new_dag_node = orig_dag_node.copy_eager_upto_reduced();
       orig_dag_node.clear_copied_pointers();
       matcher.bind(self.copy_index, new_dag_node.clone());
       new_dag_node

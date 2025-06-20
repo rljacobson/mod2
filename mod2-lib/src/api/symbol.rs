@@ -16,6 +16,7 @@ use mod2_abs::{decl_as_any_ptr_fns, IString, Set, UnsafePtr};
 use crate::{
   api::{
     Arity,
+    dag_node::DagNodePtr,
     term::{
       BxTerm,
       TermPtr
@@ -30,10 +31,12 @@ use crate::{
     },
     sort::KindPtr,
     strategy::Strategy,
+    EquationalTheory,
   },
   impl_display_debug_for_formattable,
   HashType,
 };
+
 
 pub type SymbolPtr = UnsafePtr<dyn Symbol>;
 pub type SymbolSet = Set<SymbolPtr>;
@@ -46,11 +49,16 @@ pub trait Symbol {
 
   /// A type-erased way of asking a symbol to make a term of compatible type.
   fn make_term(&self, args: Vec<BxTerm>) -> BxTerm;
+  
+  /// A type-erased way of asking a symbol to make a DAG node of compatible type.
+  fn make_dag_node(&self, args: *mut u8) -> DagNodePtr;
 
   // region Member Getters and Setters
   /// Trait level access to members for shared implementation
   fn core(&self) -> &SymbolCore;
   fn core_mut(&mut self) -> &mut SymbolCore;
+  
+  fn theory(&self) -> EquationalTheory;
 
   #[inline(always)]
   fn is_variable(&self) -> bool {

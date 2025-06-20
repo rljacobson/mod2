@@ -163,7 +163,8 @@ fn test_allocate_dag_node() {
     Some(node) => { node }
   };
 
-  node_mut.theory_tag = EquationalTheory::Free;
+  // Write to it to hopefully catch invalid memory access.
+  node_mut.inline[0] = 32;
 }
 
 
@@ -239,7 +240,9 @@ fn test_arena_exhaustion() {
         node
       }
     };
-    node_mut.theory_tag = EquationalTheory::Free;
+    // Write to it to hopefully catch invalid memory access.
+    node_mut.inline[0] = 34;
+    node_mut.symbol = symbol_ptr;
     let node_ptr = DagNodeCore::upgrade(node_ptr);
     last_node.insert_child(node_ptr);
     last_node    = node_ptr;

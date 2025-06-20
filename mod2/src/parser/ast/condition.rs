@@ -79,6 +79,9 @@ impl ConditionAST {
         Condition::Equality {
           lhs_term: lhs.construct(symbols, sorts, variables),
           rhs_term: rhs.construct(symbols, sorts, variables),
+          builder: Default::default(),
+          lhs_index: 0,
+          rhs_index: 0,
         }
       }
 
@@ -86,7 +89,9 @@ impl ConditionAST {
         let sort = sort.construct(sorts);
         Condition::SortMembership {
           lhs_term: lhs.construct(symbols, sorts, variables),
-          sort
+          sort,
+          builder: Default::default(),
+          lhs_index: 0,
         }
       }
 
@@ -94,6 +99,9 @@ impl ConditionAST {
         Condition::Match {
           lhs_term: lhs.construct(symbols, sorts, variables),
           rhs_term: rhs.construct(symbols, sorts, variables),
+          builder: Default::default(),
+          lhs_matcher: None,
+          rhs_index: 0,
         }
       }
 
@@ -101,6 +109,9 @@ impl ConditionAST {
         Condition::Rewrite {
           lhs_term: lhs.construct(symbols, sorts, variables),
           rhs_term: rhs.construct(symbols, sorts, variables),
+          builder: Default::default(),
+          rhs_matcher: None,
+          lhs_index: 0,
         }
       }
 
@@ -109,6 +120,9 @@ impl ConditionAST {
         Condition::Equality {
           lhs_term: lhs.construct(symbols, sorts, variables),
           rhs_term: Box::new(BoolTerm::new(true)),
+          builder: Default::default(),
+          lhs_index: 0,
+          rhs_index: 0,
         }
       }
 

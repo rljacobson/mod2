@@ -8,27 +8,7 @@ use std::{
 use mod2_abs::{hash::hash2 as term_hash, impl_as_any_ptr_fns, NatSet, PartialOrdering};
 
 use crate::{
-  core::{
-    automata::RHSBuilder,
-    dag_node_core::{
-      DagNodeCore,
-      DagNodeFlag,
-    },
-    format::{
-      FormatStyle,
-      Formattable,
-    },
-    substitution::Substitution,
-    term_core::TermCore,
-    TermBag,
-    VariableInfo,
-    symbol::SymbolTranslationMap,
-    VariableIndex
-  },
-  impl_display_debug_for_formattable,
-  HashType,
   api::{
-    ArgIndex,
     automaton::{
       BxLHSAutomaton,
       LHSAutomaton,
@@ -42,8 +22,8 @@ use crate::{
     },
     dag_node_cache::DagNodeCache,
     free_theory::{
-      free_dag_node::FreeDagNode,
       free_automata::FreeLHSAutomaton,
+      free_dag_node::FreeDagNode,
       FreeOccurrence,
       FreeOccurrences
     },
@@ -54,9 +34,29 @@ use crate::{
       TermPtr
     },
     variable_theory::VariableTerm,
+    ArgIndex,
   },
+  core::{
+    automata::RHSBuilder,
+    dag_node_core::{
+      DagNodeCore,
+      DagNodeFlag,
+    },
+    format::{
+      FormatStyle,
+      Formattable,
+    },
+    substitution::Substitution,
+    symbol::SymbolTranslationMap,
+    term_core::TermCore,
+    TermBag,
+    VariableInfo
+  },
+  impl_display_debug_for_formattable,
+  HashType,
 };
 use crate::api::free_theory::free_automata::FreeRHSAutomaton;
+use crate::core::VariableIndex;
 
 pub struct FreeTerm{
   core                 : TermCore,

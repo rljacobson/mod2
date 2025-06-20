@@ -1,16 +1,11 @@
 use mod2_abs::{impl_as_any_ptr_fns, IString};
 use crate::{
   api::{
-    symbol::{
-      Symbol,
-      SymbolPtr
-    },
+    symbol::{Symbol, SymbolPtr},
     Arity,
-    term::{
-      BxTerm,
-      TermPtr
-    },
-    variable_theory::VariableTerm,
+    term::{BxTerm, TermPtr},
+    variable_theory::{VariableTerm, VariableDagNode},
+    dag_node::DagNodePtr,
   },
   core::{
     sort::SortPtr,
@@ -22,9 +17,11 @@ use crate::{
     },
     format::{FormatStyle, Formattable},
     term_core::TermCore,
+    EquationalTheory,
   },
   impl_display_debug_for_formattable,
 };
+
 
 pub struct VariableSymbol {
   core: SymbolCore
@@ -71,9 +68,8 @@ impl Symbol for VariableSymbol {
   }
 
   fn make_term(&self, _args: Vec<BxTerm>) -> BxTerm {
-    // Box::new(VariableTerm::new(name, self.as_ptr()))
-    // Use `VariableTerm::new(name, self.as_ptr())`
-    unimplemented!();
+    // Box::new(VariableTerm::new(self.name(), self.as_ptr()))
+    panic!("cannot call Symbol::make_term() on a VariableSymbol");
   }
 
   #[inline(always)]
@@ -85,6 +81,12 @@ impl Symbol for VariableSymbol {
   fn core_mut(&mut self) -> &mut SymbolCore {
     &mut self.core
   }
+  
+  fn make_dag_node(&self, _: *mut u8) -> DagNodePtr {
+    panic!("cannot call Symbol::make_dag_node() on a VariableSymbol");
+  }
+  
+  fn theory(&self) -> EquationalTheory { EquationalTheory::Variable }
 }
 
 

@@ -63,6 +63,7 @@ use crate::{
   HashType
 };
 
+
 /// The index into `DagNodeCode::inline` at which we store the `index` of `VariableDagNode`.
 const VARIABLE_INDEX_OFFSET: usize = size_of::<IString>();
 
@@ -72,7 +73,7 @@ pub struct VariableDagNode(DagNodeCore);
 impl VariableDagNode {
 
   pub fn new(symbol: SymbolPtr, name: IString, index: VariableIndex) -> DagNodePtr {
-    let mut node = DagNodeCore::with_theory(symbol, EquationalTheory::Variable);
+    let mut node = DagNodeCore::new(symbol);
     {
       // Scope of this as `VariableDagNode`,
       let node_mut = node.as_any_mut().downcast_mut::<VariableDagNode>().unwrap();

@@ -13,22 +13,21 @@ use std::{
 
   ,
 };
-use std::ptr::null_mut;
-use mod2_abs::{hash::hash2, NatSet, UnsafePtr};
+use mod2_abs::{hash::hash2, NatSet};
 use crate::{
   api::{
     automaton::BxLHSAutomaton,
     built_in::{
       get_built_in_symbol,
+      nonalgebraic_lhs_automaton::NonalgebraicLHSAutomaton,
+      nonalgebraic_rhs_automaton::NonalgebraicRHSAutomaton,
       Bool,
       Float,
       Integer,
       NADagNode,
       NADataType,
       NaturalNumber,
-      StringBuiltIn,
-      nonalgebraic_lhs_automaton::NonalgebraicLHSAutomaton,
-      nonalgebraic_rhs_automaton::NonalgebraicRHSAutomaton
+      StringBuiltIn
     },
     dag_node::{DagNode, DagNodePtr},
     dag_node_cache::DagNodeCache,
@@ -45,7 +44,6 @@ use crate::{
   },
   HashType,
 };
-use crate::core::dag_node_core::{DagNodeCore, DagNodeFlag, INLINE_BYTE_COUNT};
 
 pub type BoolTerm    = NATerm<Bool>;
 pub type FloatTerm   = NATerm<Float>;

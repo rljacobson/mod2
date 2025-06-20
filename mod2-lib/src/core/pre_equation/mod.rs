@@ -15,25 +15,24 @@ use enumflags2::{bitflags, BitFlags};
 use mod2_abs::{join_string, warning, IString, NatSet, UnsafePtr};
 
 use crate::{
-  impl_display_debug_for_formattable,
   api::{
-    dag_node::DagNodePtr,
-    term::BxTerm,
     automaton::BxLHSAutomaton,
-    subproblem::MaybeSubproblem
+    dag_node::DagNodePtr,
+    subproblem::MaybeSubproblem,
+    term::BxTerm
   },
   core::{
-    gc::ok_to_collect_garbage,
-    pre_equation::{
-      condition::Conditions,
-      condition::ConditionState
-    },
-    VariableInfo,
-    VariableIndex,
     format::{FormatStyle, Formattable},
+    gc::ok_to_collect_garbage,
     interpreter::InterpreterAttribute,
-    rewriting_context::RewritingContext
-  }
+    pre_equation::{
+      condition::ConditionState,
+      condition::Conditions
+    },
+    rewriting_context::RewritingContext,
+    VariableInfo
+  },
+  impl_display_debug_for_formattable
 };
 use super::sort::SortPtr;
 pub use sort_constraint_table::SortConstraintTable;
@@ -96,6 +95,7 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
+use crate::core::VariableIndex;
 
 impl PreEquationKind {
   pub fn noun(&self) -> &'static str {
@@ -347,7 +347,7 @@ impl PreEquation {
   pub(crate) fn check_condition_find_first(
     &mut self,
     mut find_first: bool,
-    subject       : DagNodePtr, // Used only for tracing
+    _subject      : DagNodePtr, // Used only for tracing
     context       : &mut RewritingContext,
     mut subproblem: MaybeSubproblem,
     trial_ref     : &mut Option<i32>,
@@ -375,8 +375,8 @@ impl PreEquation {
       // }
 
       // todo!("Uncomment the following line.");
-      // let success: bool = self.solve_condition(find_first, trial_ref, context, state);
-      let success = true;
+      let success: bool = self.solve_condition(find_first, trial_ref, context, state);
+      // let success = true;
 
       // if trace_status() {
       //   if context.borrow().trace_abort() {
@@ -430,11 +430,11 @@ impl PreEquation {
 
     result
   }
-/*
+
   fn solve_condition(
     &mut self,
     mut find_first: bool,
-    trial_ref: &mut Option<i32>,
+    _trial_ref: &mut Option<i32>,
     solution: &mut RewritingContext,
     state: &mut Vec<ConditionState>,
   ) -> bool {
@@ -481,7 +481,6 @@ impl PreEquation {
 
     find_first
   }
-*/
 
   // endregion `check*` methods
 

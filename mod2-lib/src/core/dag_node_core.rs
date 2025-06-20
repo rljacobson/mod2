@@ -142,7 +142,7 @@ pub type DagNodeFlags = BitFlags<DagNodeFlag, u8>;
 /// Keep the fields ordered to optimize memory layout.
 pub struct DagNodeCore {
   pub(crate) symbol: SymbolPtr,
-  
+
   /// Used only during a copy operation. Maude uses the `symbol` field for this purpose.
   pub(crate) forwarding_ptr: Option<DagNodePtr>,
 
@@ -181,7 +181,6 @@ pub struct DagNodeCore {
   /// the destructor/finalizer.
   pub(crate) args      : *mut u8,
   pub(crate) sort_index: SortIndex, // sort index within kind
-  pub(crate) theory_tag: EquationalTheory,
   pub(crate) flags     : DagNodeFlags,
 
   // Opt out of `Unpin`
@@ -193,11 +192,6 @@ impl DagNodeCore {
   // region Constructors
 
   pub fn new(symbol: SymbolPtr) -> DagNodePtr {
-    DagNodeCore::with_theory(symbol, EquationalTheory::default())
-  }
-
-  // ToDo: The theory should be deducible from the symbol.
-  pub fn with_theory(symbol: SymbolPtr, theory: EquationalTheory) -> DagNodePtr {
     let node     = allocate_dag_node();
     let node_mut = unsafe { &mut *node };
 
@@ -214,11 +208,30 @@ impl DagNodeCore {
       node_mut.flags.insert(DagNodeFlag::NeedsDestruction);
     }
 
-    node_mut.theory_tag = theory;
     node_mut.symbol     = symbol;
 
     DagNodeCore::upgrade(node)
   }
+  
+  pub fn with_args(symbol: SymbolPtr, args: *mut u8) -> DagNodePtr {
+    let node     = allocate_dag_node();
+    let node_mut = unsafe { &mut *node };
+    
+    // Re-initialize memory
+    node_mut.args   = args;
+    node_mut.flags  = DagNodeFlags::empty();
+    node_mut.inline = [0; 24];
+
+    // ToDo: Improve API for args. E.g. make `DagNodeVector` generic.
+    if symbol.arity().get() > 1 {
+      node_mut.flags.insert(DagNodeFlag::NeedsDestruction);
+    }
+
+    node_mut.symbol     = symbol;
+
+    DagNodeCore::upgrade(node)
+  }
+  
 
   // endregion Constructors
 
@@ -257,7 +270,7 @@ impl DagNodeCore {
   #[inline(always)]
   pub fn upgrade(thin_dag_node_ptr: ThinDagNodePtr) -> DagNodePtr {
     assert!(!thin_dag_node_ptr.is_null());
-    match unsafe { thin_dag_node_ptr.as_ref_unchecked().theory_tag } {
+    match unsafe { thin_dag_node_ptr.as_ref_unchecked().symbol.theory() } {
 
       EquationalTheory::Free => {
         let fat_ptr: *mut dyn DagNode = std::ptr::from_raw_parts_mut(thin_dag_node_ptr, FREE_DAG_NODE_VTABLE);

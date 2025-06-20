@@ -7,21 +7,30 @@ apply. Conditions are like a "lite" version of `PreEquation`.
 */
 
 use std::fmt::Display;
+use std::ops::Deref;
 use mod2_abs::NatSet;
 use crate::{
   api::{
+    automaton::BxLHSAutomaton,
     automaton::LHSAutomaton,
     subproblem::Subproblem,
-    term::BxTerm
+    term::{
+      BxTerm,
+      TermPtr
+    }
   },
   core::{
+    automata::RHSBuilder,
     rewriting_context::RewritingContext,
     sort::SortPtr,
     substitution::Substitution,
     StateTransitionGraph,
-    VariableInfo
+    VariableInfo,
+    VariableIndex
   }
 };
+use Condition::*;
+
 
 pub type Conditions  = Vec<BxCondition>;
 pub type BxCondition = Box<Condition>;
@@ -50,32 +59,53 @@ pub enum Condition {
   ///
   /// Boolean expressions are shortcut versions of equality conditions of the form `expr = true`.
   Equality {
-    lhs_term: BxTerm,
-    rhs_term: BxTerm
+    lhs_term : BxTerm,
+    rhs_term : BxTerm,
+    builder  : RHSBuilder,
+    lhs_index: VariableIndex,
+    rhs_index: VariableIndex,
   },
 
   /// Also called a sort test condition, `X :: Y`
   SortMembership {
-    lhs_term: BxTerm,
-    sort    : SortPtr
+    lhs_term : BxTerm,
+    sort     : SortPtr,
+    builder  : RHSBuilder,
+    lhs_index: VariableIndex,
   },
 
   /// Also called an Assignment condition, `x := y`
   Match {
-    lhs_term: BxTerm,
-    rhs_term: BxTerm
+    lhs_term   : BxTerm,
+    rhs_term   : BxTerm,
+    builder    : RHSBuilder,
+    lhs_matcher: Option<BxLHSAutomaton>,
+    rhs_index  : VariableIndex,
   },
 
   /// Also called a rule condition, `x => y`
   Rewrite {
-    lhs_term: BxTerm,
-    rhs_term: BxTerm
+    lhs_term   : BxTerm,
+    rhs_term   : BxTerm,
+    builder    : RHSBuilder,
+    rhs_matcher: Option<BxLHSAutomaton>,
+    lhs_index  : VariableIndex,
   },
 }
-use Condition::*;
-use crate::core::rewriting_context::{make_subcontext, Purpose};
+
 
 impl Condition {
+  fn lhs_term(&self) -> TermPtr {
+    match self {
+      Equality { lhs_term, .. } 
+      | SortMembership { lhs_term, .. }
+      | Match { lhs_term, .. }
+      | Rewrite { lhs_term, .. } => {
+        lhs_term.as_ptr()
+      }
+    }
+  }
+  
   pub fn check(&mut self, variable_info: &mut VariableInfo, bound_variables: &mut NatSet) {
     let mut unbound_variables = NatSet::new();
 
@@ -94,12 +124,12 @@ impl Condition {
       }
     }
 
-    // assert!(
-    //   !bound_variables.contains(&self.lhs.occurs_below()),
-    //   "{:?}: all the variables in the left-hand side of Match condition fragment {:?} are bound before the
-    // matching takes place.",   self.lhs,
-    //   self
-    // );
+    assert!(
+      !bound_variables.is_superset(self.lhs_term().occurs_below()),
+      "{}: all the variables in the left-hand side of Match condition fragment {} are bound before the
+    matching takes place.",   self.lhs_term(),
+      self
+    );
 
     // Handle variables in the subject.
     match self {
@@ -114,7 +144,7 @@ impl Condition {
       _ => { /* noop */ }
     }
 
-    unbound_variables.difference(bound_variables);
+    unbound_variables.difference_in_place(bound_variables);
     variable_info.add_unbound_variables(&unbound_variables);
 
     // We will bind these variables.
@@ -126,8 +156,7 @@ impl Condition {
     }
   }
 
-/*
-  pub fn solve(&mut self, find_first: bool, solution: &mut RewritingContext, state: &mut Vec<ConditionState>) -> bool {
+  pub fn solve(&mut self, find_first: bool, solution: &mut RewritingContext, _state: &mut Vec<ConditionState>) -> bool {
     match self {
       Match { .. } => todo!("Implement match condition solve"),
 
@@ -143,42 +172,42 @@ impl Condition {
 
         builder.safe_construct(&mut solution.substitution);
         let lhs_root = solution.substitution.get(*lhs_index);
-        let mut lhs_context = make_subcontext(solution, lhs_root, Purpose::ConditionEval);
+        let mut lhs_context = RewritingContext::new(lhs_root);
         let rhs_root = solution.substitution.get(*rhs_index);
-        let mut rhs_context = make_subcontext(solution, rhs_root, Purpose::ConditionEval);
+        let mut rhs_context = RewritingContext::new(rhs_root);
 
         lhs_context.reduce();
         solution.add_counts_from(&lhs_context);
         rhs_context.reduce();
         solution.add_counts_from(&rhs_context);
 
-        *lhs_context.root.unwrap().borrow_mut() == *rhs_context.root.unwrap().borrow_mut()
+        (*lhs_context.root.unwrap().as_ref()).deref() == (*rhs_context.root.unwrap().as_ref()).deref()
       }
 
       Rewrite { .. } => todo!("Implement rewrite condition solve"),
 
       SortMembership { .. } => todo!("Implement sort test condition solve"),
     }
-  }*/
+  }
 }
 
 impl Display for Condition {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
 
-      Condition::Equality { lhs_term, rhs_term } => {
+      Condition::Equality { lhs_term, rhs_term, .. } => {
         write!(f, "{} = {}", *lhs_term, *rhs_term)
       }
 
-      Condition::SortMembership { lhs_term, sort } => {
+      Condition::SortMembership { lhs_term, sort, .. } => {
         write!(f, "{} : {}", *lhs_term, sort)
       }
 
-      Condition::Match { lhs_term, rhs_term } => {
+      Condition::Match { lhs_term, rhs_term, .. } => {
         write!(f, "{} := {}", *lhs_term, *rhs_term)
       }
 
-      Condition::Rewrite { lhs_term, rhs_term } => {
+      Condition::Rewrite { lhs_term, rhs_term, .. } => {
         write!(f, "{} => {}", *lhs_term, *rhs_term)
       }
 

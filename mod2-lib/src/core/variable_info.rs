@@ -6,7 +6,10 @@ Information about a variable that gets passed down through the compilation funct
 
 use std::ops::{Deref, Index};
 use mod2_abs::{debug, Graph, NatSet};
-use crate::api::term::{MaybeTerm, TermPtr};
+use crate::{
+  api::term::{MaybeTerm, TermPtr},
+  core::VariableIndex
+};
 
 /// This is the boundary between real and virtual variables. An `index` represents a real variable
 /// iff `index < MAX_NR_PROTECTED_VARIABLES`.
@@ -211,6 +214,3 @@ impl Index<usize> for VariableInfo {
     &self.variables[index]
   }
 }
-
-/// The type used to store variable indices.
-pub type VariableIndex = u32;

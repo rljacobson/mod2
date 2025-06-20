@@ -18,23 +18,21 @@ use std::{
 use enumflags2::{bitflags, BitFlags};
 
 use mod2_abs::{
-  NatSet,
-  optimizable_int::OptU32
+  optimizable_int::OptU32,
+  NatSet
 };
 use crate::{
-  api::{
-    symbol::{
-      SymbolSet,
-      SymbolPtr,
-      Symbol
-    }
+  api::symbol::{
+    Symbol,
+    SymbolPtr,
+    SymbolSet
   },
   core::{
     sort::{
       KindPtr,
       SortIndex
     },
-    VariableIndex,
+    VariableIndex
   },
   HashType,
 };

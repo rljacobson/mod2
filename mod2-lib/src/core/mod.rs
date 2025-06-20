@@ -28,7 +28,7 @@ mod hash_cons_set;
 mod memo_map;
 pub(crate) mod rewriting_context;
 pub(crate) mod automata;
-
+mod dag_node_args;
 
 // Stubs
 pub struct StateTransitionGraph;
@@ -40,9 +40,11 @@ pub type NodeList = Vec<DagNodePtr>;
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;
 pub(crate) use narrowing_variable_info::NarrowingVariableInfo;
-pub(crate) use variable_info::{VariableInfo, VariableIndex};
+pub(crate) use variable_info::VariableInfo;
 pub(crate) use term_bag::TermBag;
 pub(crate) use hash_cons_set::HashConsSet;
+pub(crate) use redex_position::*;
+pub(crate) use dag_node_args::*;
 
 // Public API
 pub use module::*;
@@ -52,6 +54,29 @@ pub use theory::*;
 // ToDo: Should this be `()`?
 pub type Byte = u8;
 
+/// The type used to store variable indices.
+pub type VariableIndex = u32;
+
+// NONE = -1, ROOT_OK = -2, an index when >= 0
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum IndexMarker {
+  None,
+  RootOk,
+  Index(VariableIndex)
+}
+
+impl IndexMarker {
+  #[allow(non_upper_case_globals)]
+  pub const Undefined: IndexMarker = IndexMarker::None;
+  
+  pub fn idx(&self) -> VariableIndex {
+    if let IndexMarker::Index(i) = self {
+      *i
+    } else { 
+      panic!("`IndexMarker` is not numeric");
+    }
+  }
+}
 
 #[cfg(test)]
 mod tests {
@@ -60,11 +85,11 @@ mod tests {
     api::symbol::SymbolPtr,
     core::{
       dag_node_core::{
-        DagNodeFlags,
-        DagNodeCore
+        DagNodeCore,
+        DagNodeFlags
       },
-      EquationalTheory,
       term_core::TermCore,
+      EquationalTheory,
     },
   };
 

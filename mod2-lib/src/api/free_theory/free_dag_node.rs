@@ -43,11 +43,11 @@ pub struct FreeDagNode(DagNodeCore);
 impl FreeDagNode {
 
   pub fn new(symbol: SymbolPtr) -> DagNodePtr {
-    DagNodeCore::with_theory(symbol, EquationalTheory::Free)
+    DagNodeCore::new(symbol)
   }
 
   pub fn with_args(symbol: SymbolPtr, args: &mut Vec<DagNodePtr>) -> DagNodePtr {
-    let mut node = DagNodeCore::with_theory(symbol, EquationalTheory::Free);
+    let mut node = DagNodeCore::new(symbol);
 
     node.set_flags(DagNodeFlag::NeedsDestruction.into());
     node.core_mut().args = (DagNodeVector::from_slice(args) as *mut DagNodeVector) as *mut u8;
@@ -174,13 +174,13 @@ impl DagNode for FreeDagNode {
       // ToDo: When strategies are implemented, everything might not be eager, so this code changes.
       node_vec.extend(self.iter_args().map(|mut node| node.copy_eager_upto_reduced_aux()));
 
-      let mut new_node = DagNodeCore::with_theory(self.symbol(), EquationalTheory::Free);
+      let mut new_node = DagNodeCore::new(self.symbol());
       new_node.core_mut().args = node_vec_to_args(node_vec);
       
       new_node
     } else {
       // A copy is just a DAG node with the same symbol
-      DagNodeCore::with_theory(self.symbol(), EquationalTheory::Free)
+      DagNodeCore::new(self.symbol())
     }
   }
 

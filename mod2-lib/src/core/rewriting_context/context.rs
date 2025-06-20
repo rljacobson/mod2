@@ -1,13 +1,14 @@
 use crate::{
-  core::{
-    substitution::Substitution,
-    rewriting_context::{ContextAttribute, ContextAttributes, Purpose},
-    redex_position::RedexPosition,
-    interpreter::InterpreterPtr,
-    gc::root_container::{BxRootVec, RootVec}
-  },
   api::dag_node::DagNodePtr,
+  core::{
+    gc::root_container::{BxRootVec, RootVec},
+    redex_position::RedexPosition,
+    rewriting_context::{ContextAttribute, ContextAttributes},
+    substitution::Substitution,
+    IndexMarker
+  },
 };
+use crate::core::VariableIndex;
 
 pub type BxRewritingContext = Box<RewritingContext>;
 
@@ -26,22 +27,17 @@ pub struct RewritingContext {
   // ToDo: These need to be marked!
   redex_stack  : Vec<RedexPosition>,
   redex_stack_roots: BxRootVec, // Solution to marking redex_stack
-  stale_marker : i32, // NONE = -1, ROOT_OK = -2, an index when >= 0
-  lazy_marker  : i32, // NONE = -1, an index when >= 0
-  current_index: i32,
-
-  // "User Level" members
-  parent          : Option<BxRewritingContext>,
-  pub interpreter : InterpreterPtr,
+  stale_marker : IndexMarker,   // NONE = -1, ROOT_OK = -2, an index when >= 0
+  lazy_marker  : IndexMarker,   // NONE = -1, an index when >= 0
+  current_index: VariableIndex,
+  
   pub substitution: Substitution,
-  purpose         : Purpose,
-  trial_count     : usize,
   attributes      : ContextAttributes,
 
 }
 
 impl RewritingContext {
-  pub fn new(root: Option<DagNodePtr>, interpreter: InterpreterPtr) -> BxRewritingContext {
+  pub fn new(root: Option<DagNodePtr>) -> BxRewritingContext {
     Box::new(
       RewritingContext {
         root                   : root.map(|r| RootVec::with_node(r)),
@@ -52,49 +48,11 @@ impl RewritingContext {
         variant_narrowing_count: 0,
         redex_stack            : vec![],
         redex_stack_roots      : RootVec::new(),
-        stale_marker           : 0,
-        lazy_marker            : 0,
+        stale_marker           : IndexMarker::RootOk,
+        lazy_marker            : IndexMarker::None,
         current_index          : 0,
-        parent                 : None,
-        interpreter,
-        substitution: Substitution::default(),
-        purpose     : Purpose::TopLevelEval,
-        trial_count : 0,
-        attributes  : ContextAttributes::default(),
-      }
-    )
-  }
-
-  pub fn with_parent(
-    root              : Option<BxRootVec>,
-    parent            : Option<BxRewritingContext>,
-    purpose           : Purpose,
-    enable_local_trace: bool,
-    interpreter       : InterpreterPtr,
-  ) -> BxRewritingContext {
-    Box::new(
-      RewritingContext {
-        root,
-        equation_count         : 0,
-        membership_count       : 0,
-        narrowing_count        : 0,
-        rule_count             : 0,
-        variant_narrowing_count: 0,
-        redex_stack            : vec![],
-        redex_stack_roots      : RootVec::new(),
-        stale_marker           : 0,
-        lazy_marker            : 0,
-        current_index          : 0,
-        parent,
-        interpreter,
-        substitution: Default::default(),
-        purpose,
-        trial_count : 0,
-        attributes  : if enable_local_trace {
-          ContextAttribute::LocalTrace.into()
-        } else {
-          ContextAttributes::default()
-        },
+        substitution           : Substitution::default(),
+        attributes             : ContextAttributes::default(),
       }
     )
   }
@@ -158,40 +116,36 @@ impl RewritingContext {
 
   // endregion
 
-/*
-Rewriting code...
-
   // region Rebuilding Stale DagNodes
 
   fn rebuild_upto_root(&mut self) {
-    let mut i: i32;
-    let mut current_idx: i32;
+    let mut current_idx: VariableIndex;
     // println!("\nroot was {:?}", self.root_node);
     // println!("rebuilding from {}", self.current_index);
-    assert!(self.current_index >= 0, "bad currentIndex");
+    // assert!(self.current_index >= 0, "bad currentIndex");
 
     // Locate deepest stack node with a stale parent.
     current_idx = self.current_index; // All staleness guaranteed to be above current_index
     while self.redex_stack[current_idx as usize].parent_index != self.stale_marker {
-      current_idx = self.redex_stack[current_idx as usize].parent_index;
+      current_idx = self.redex_stack[current_idx as usize].parent_index.idx();
     }
 
     // We assume that we only have to rebuild the spine from staleMarker to root.
-    i = self.stale_marker;
+    let mut i = self.stale_marker;
 
-    while i != UNDEFINED {
+    while i != IndexMarker::None {
       self.remake_stale_dag_node(i, current_idx);
-      current_idx = i;
-      i = self.redex_stack[i as usize].parent_index;
+      current_idx = i.idx();
+      i = self.redex_stack[i.idx() as usize].parent_index;
     }
 
-    self.root = Some(self.redex_stack[0].dag_node);
-    self.stale_marker = ROOT_OK;
+    self.root = Some(RootVec::with_node(self.redex_stack[0].dag_node));
+    self.stale_marker = IndexMarker::RootOk;
 
     // println!("root is {:?}", self.root_node);
   }
 
-  fn remake_stale_dag_node(&mut self, stale_index: i32, child_index: i32) {
+  fn remake_stale_dag_node(&mut self, stale_index: IndexMarker, child_index: VariableIndex) {
     // Find first stacked argument of stale dag node.
     let mut first_idx = child_index as usize;
     while self.redex_stack[first_idx - 1].parent_index == stale_index {
@@ -207,27 +161,22 @@ Rewriting code...
 
     // Replace stale dag node with a copy in which stacked arguments
     // replace corresponding arguments in the original.
-    let remade = self.redex_stack[stale_index as usize]
+    let remade = self.redex_stack[stale_index.idx() as usize]
       .dag_node
       .copy_with_replacements(&self.redex_stack, first_idx, last_idx);
-    self.redex_stack[stale_index as usize].dag_node = remade;
+    self.redex_stack[stale_index.idx() as usize].dag_node = remade;
   }
 
   // endregion
 
 
   #[inline(always)]
-  pub fn finished(&mut self) {
-    self.substitution.finished()
-  }
-
-  #[inline(always)]
   pub fn reduce(&mut self) {
     if let Some(root) = &self.root {
-      self.reduce_dag_node(root.node());
+      // self.reduce_dag_node(root.node());
     }
   }
-
+/*
   #[inline(always)]
   pub fn reduce_dag_node(&mut self, mut dag_node: DagNodePtr) {
     while !dag_node.is_reduced() {
@@ -242,14 +191,14 @@ Rewriting code...
 
   /// Computes the true sort of root.
   #[inline(always)]
-  fn fast_compute_true_sort(&mut self, dag_node: DagNodePtr) {
+  fn fast_compute_true_sort(&mut self, mut dag_node: DagNodePtr) {
     // let root = self.root.unwrap();
-    let t = dag_node.borrow().symbol().core().unique_sort_index;
+    let t = dag_node.symbol().core().unique_sort_index;
 
     if t < 0 {
-      dag_node.borrow_mut().compute_base_sort(); // usual case
+      dag_node.compute_base_sort(); // usual case
     } else if t > 0 {
-      dag_node.borrow_mut().set_sort_index(t); // unique sort case
+      dag_node.set_sort_index(t); // unique sort case
     } else {
       self.slow_compute_true_sort(dag_node); // most general case
     }
@@ -258,9 +207,8 @@ Rewriting code...
   /// Computes the true sort of root.
   fn slow_compute_true_sort(&mut self, dag_node: DagNodePtr) {
     // let root = self.root.unwrap();
-    let mut symbol = dag_node.borrow_mut().symbol();
+    let mut symbol = dag_node.symbol();
     symbol.sort_constraint_table()
           .constrain_to_smaller_sort(dag_node.clone(), self);
-  }
-  */
+  }*/
 }

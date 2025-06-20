@@ -49,7 +49,10 @@ use crate::{
       }
     },
     sort::{SortPtr, SortIndex},
+    RedexPosition,
     HashConsSet,
+    DagNodeArguments, 
+    EquationalTheory
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -102,8 +105,17 @@ pub trait DagNode {
   }
 
   /// MUST override if `Self::args` is not a [`DagNodeVector`].
+  #[inline(always)]
+  fn get_arguments(&self) -> DagNodeArguments {
+    DagNodeArguments::from_node(self.as_ptr())
+  }
+
+  /// MUST override if `Self::args` is not a [`DagNodeVector`].
+  ///
   /// Implement an empty iterator with:
   ///      `Box::new(std::iter::empty::<DagNodePtr>())`
+  ///
+  /// ToDo: Unify with `DagNodeArguments`.
   fn iter_args(&self) -> Box<dyn Iterator<Item=DagNodePtr>> {
 
     // The empty case
@@ -171,10 +183,16 @@ pub trait DagNode {
   }
 
 
-  /// Gives the top symbol of this term.
+  /// Gives the top symbol of this `DagNode`.
   #[inline(always)]
   fn symbol(&self) -> SymbolPtr {
     self.core().symbol
+  }
+  
+  /// Gives the equational theory for this `DagNode`.
+  #[inline(always)]
+  fn theory(&self) -> EquationalTheory {
+    self.symbol().theory()
   }
 
   // ToDo: Implement DagNodeCore::get_sort() when `SortTable` is implemented.
@@ -320,7 +338,7 @@ pub trait DagNode {
 
     assert_eq!(symbol, other.symbol(), "symbols differ");
 
-    if other.core().theory_tag != self.core().theory_tag {
+    if other.theory() != self.theory() {
       // if let None = other.as_any().downcast_ref::<FreeDagNode>() {}
       // Not even the same theory. It's not clear what to return in this case, so just compare symbols.
       return symbol.compare(&*other.symbol());
@@ -421,7 +439,6 @@ pub trait DagNode {
     // Overwrite all `DagNodeCore` fields.
     node_mut.args       = self.shallow_copy_args();
     node_mut.inline     = self.core().inline;
-    node_mut.theory_tag = self.core().theory_tag;
     node_mut.symbol     = self.symbol();
     node_mut.sort_index = self.sort_index();
     // Copy over just the rewriting flags
@@ -446,6 +463,33 @@ pub trait DagNode {
 
   /// The implementor-specific part of `copy_eager_upto_reduced()`
   fn copy_eager_upto_reduced_aux(&mut self) -> DagNodePtr;
+
+  fn copy_with_replacements(&self, redex_stack: &Vec<RedexPosition>, first_idx: usize, last_idx: usize) -> DagNodePtr {
+    let mut arguments = DagNodeArguments::from_args(self.shallow_copy_args(), self.arity());
+
+    match &mut arguments {
+
+      DagNodeArguments::Inline(args) => {
+        if redex_stack[first_idx].arg_index == 0 {
+          // The only argument should be replaced.
+          *args = redex_stack[first_idx].dag_node;
+        }
+      }
+
+      DagNodeArguments::Vec(node_vec) => {
+        for idx in first_idx..=last_idx.min((self.arity().get()-1) as usize) {
+          node_vec[redex_stack[idx].arg_index as usize] = redex_stack[redex_stack[idx].arg_index as usize].dag_node;
+        }
+      }
+
+      _ => {
+        // Nothing to do.
+      }
+    }
+
+    // Construct DAG node
+    self.symbol().make_dag_node(arguments.as_args())
+  }
 
   // endregion Copy Constructors
 
@@ -485,6 +529,8 @@ pub trait DagNode {
     }
   } // end fn mark
 
+  /// Returns a arg pointer pointing to either a DAG node vector or a single `DagNode`, or null if we have no
+  /// arguments.
   fn shallow_copy_args(&self) -> *mut u8 {
     if !self.core().args.is_null() && self.core().needs_destruction() {
       // Reallocate

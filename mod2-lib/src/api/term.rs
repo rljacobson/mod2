@@ -38,14 +38,13 @@ use crate::{
       SymbolPtr,
       SymbolSet
     },
-    variable_theory::VariableTerm,
-    Arity
+    variable_theory::VariableTerm
   },
   core::{
     automata::{
+      BindingLHSAutomaton,
       CopyRHSAutomaton,
-      RHSBuilder,
-      BindingLHSAutomaton
+      RHSBuilder
     },
     format::Formattable,
     sort::{

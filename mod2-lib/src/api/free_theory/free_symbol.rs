@@ -8,6 +8,8 @@ use crate::{
     },
     sort::SortPtr,
     format::{FormatStyle, Formattable},
+    dag_node_core::DagNodeCore,
+    EquationalTheory
   },
   api::{
     symbol::{
@@ -19,7 +21,8 @@ use crate::{
     term::{
       BxTerm,
       TermPtr
-    }
+    },
+    dag_node::DagNodePtr
   },
   impl_display_debug_for_formattable,
 };
@@ -56,6 +59,10 @@ impl Symbol for FreeSymbol {
   fn make_term(&self, args: Vec<BxTerm>) -> BxTerm {
     Box::new(FreeTerm::new(self.as_ptr(), args))
   }
+  
+  fn make_dag_node(&self, args: *mut u8) -> DagNodePtr {
+    DagNodeCore::with_args(self.as_ptr(), args)
+  }
 
   fn core(&self) -> &SymbolCore {
     &self.core
@@ -63,6 +70,10 @@ impl Symbol for FreeSymbol {
 
   fn core_mut(&mut self) -> &mut SymbolCore {
     &mut self.core
+  }
+  
+  fn theory(&self) -> EquationalTheory {
+    EquationalTheory::Free
   }
 }
 

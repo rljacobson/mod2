@@ -48,7 +48,7 @@ impl FreeRHSAutomaton {
   }
 
   /// Constructs a new RHS automaton specialized to the provided arity and free variable count.
-  pub fn with_arity_and_free_variable_count(max_arity: u32, free_variable_count: u32) -> Box<dyn RHSAutomaton> {
+  pub fn with_arity_and_free_variable_count(_max_arity: u32, _free_variable_count: u32) -> Box<dyn RHSAutomaton> {
     // if max_arity > 3 {
       Box::new(FreeRHSAutomaton::new()) // general case
       /*

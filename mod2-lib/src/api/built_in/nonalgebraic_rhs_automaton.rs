@@ -1,21 +1,19 @@
 use std::any::Any;
 use crate::{
-  core::{
-    VariableIndex,
-    VariableInfo,
-    substitution::Substitution
-  },
   api::{
-    term::TermPtr,
-    dag_node_cache::DagNodeCache,
+    automaton::RHSAutomaton,
     dag_node::{DagNodePtr, MaybeDagNode},
-    built_in::{
-      nonalgebraic_lhs_automaton::NonalgebraicLHSAutomaton,
-      NADataType
-    },
-    automaton::RHSAutomaton
+    dag_node_cache::DagNodeCache
+    ,
+    term::TermPtr
+  },
+  core::{
+    substitution::Substitution,
+    VariableInfo,
+    VariableIndex
   },
 };
+
 
 pub struct NonalgebraicRHSAutomaton {
   pub term       : TermPtr,
