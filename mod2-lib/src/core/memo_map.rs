@@ -12,7 +12,7 @@ is provided by `MemoTable`. In our implementation, we combine `MemoTable` with `
 */
 
 use crate::{
-  api::dag_node::DagNodePtr,
+  api::DagNodePtr,
   core::{
     gc::root_container::{RootMap, RootVec},
     HashConsSet,
@@ -33,7 +33,7 @@ impl MemoMap {
   /// If a memoized result exists, overwrites the subject with a clone of the cached result,
   /// increments the equation count in the context, and returns `true`. If no memoized
   /// result exists, appends the subject’s index to the `sourceSet` and returns `false`.
-  // ToDo: Overwriting in-place is really problematic with fat pointers. 
+  // ToDo: Overwriting in-place is really problematic with fat pointers.
   pub fn memo_rewrite(&mut self, source_set: &mut RootVec, subject: &mut DagNodePtr, context: &mut RewritingContext) -> bool {
     if let Some(mut canonical_to_dag) = self.get_to_dag(*subject) {
       if context.is_trace_enabled() {
@@ -55,7 +55,7 @@ impl MemoMap {
       false
     }
   }
-  
+
   /// Inserts a mapping `from_dag` ↦ `to_dag`.
   fn assign_to_dag(&mut self, from_dag: DagNodePtr, to_dag: DagNodePtr) {
     let canonical_to_dag = self.dags.insert(to_dag);

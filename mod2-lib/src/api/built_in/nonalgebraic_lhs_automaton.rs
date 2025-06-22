@@ -1,5 +1,5 @@
 use crate::api::automaton::LHSAutomaton;
-use crate::api::dag_node::DagNodePtr;
+use crate::api::{DagNodePtr, MaybeExtensionInfo};
 use crate::api::subproblem::MaybeSubproblem;
 use crate::api::term::TermPtr;
 use crate::core::substitution::Substitution;
@@ -15,7 +15,7 @@ impl NonalgebraicLHSAutomaton {
 }
 
 impl LHSAutomaton for NonalgebraicLHSAutomaton {
-  fn match_(&mut self, subject: DagNodePtr, _solution: &mut Substitution) -> (bool, MaybeSubproblem) {
+  fn match_(&mut self, subject: DagNodePtr, _solution: &mut Substitution, _extension_info: MaybeExtensionInfo) -> (bool, MaybeSubproblem) {
     (self.term.compare_dag_node(subject).is_eq(), None)
   }
 }

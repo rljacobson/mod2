@@ -57,8 +57,11 @@ pub trait NADataType: Any + Clone + Display + Sized {
   }
 
   fn make_dag_node(value: Self) -> DagNodePtr;
-  
-  fn compute_base_sort(dag_node: &mut NADagNode<Self>) -> SortIndex;
+
+  fn compute_base_sort(dag_node: &mut NADagNode<Self>) {
+    let idx = dag_node.symbol().sort_table().traverse(0, SortIndex::ZERO);
+    dag_node.set_sort_index(idx); // Maude: HACK
+  }
 }
 
 impl NADataType for Bool {
@@ -66,7 +69,6 @@ impl NADataType for Bool {
   fn hashable_bits(&self) -> HashType { *self as u8 as u32 }
   fn compare(&self, other: &Self) -> Ordering { other.cmp(self) }
   fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
-  fn compute_base_sort(dag_node: &mut NADagNode<Self>) -> SortIndex { dag_node.sort_index() }
 }
 
 impl NADataType for Float {
@@ -83,12 +85,10 @@ impl NADataType for Float {
     ordered_self.cmp(&ordered_other)
   }
   fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
-  fn compute_base_sort(dag_node: &mut NADagNode<Self>) -> SortIndex {
+  fn compute_base_sort(dag_node: &mut NADagNode<Self>) {
     if dag_node.value().is_finite() {
-      // ToDo: This should fetch the sort from the symbol.
-      dag_node.sort_index()
-      // let symbol: NASymbol<Self> = dag_node.symbol().as_any().downcast_ref().unwrap();
-      // symbol.sor
+      let idx = dag_node.symbol().sort_table().traverse(0, SortIndex::ZERO);
+      dag_node.set_sort_index(idx); // Maude: HACK
     } else {
       // ToDo: Implement sorts for infinite floats.
       todo!("Sort for infinity is unimplemented.")
@@ -106,7 +106,6 @@ impl NADataType for Integer {
 
   fn compare(&self, other: &Self) -> Ordering { other.cmp(self) }
   fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
-  fn compute_base_sort(dag_node: &mut NADagNode<Self>) -> SortIndex { dag_node.sort_index() }
 }
 
 impl NADataType for NaturalNumber {
@@ -118,7 +117,6 @@ impl NADataType for NaturalNumber {
 
   fn compare(&self, other: &Self) -> Ordering { self.cmp(&other) }
   fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
-  fn compute_base_sort(dag_node: &mut NADagNode<Self>) -> SortIndex { dag_node.sort_index() }
 }
 
 impl NADataType for StringBuiltIn {
@@ -157,6 +155,5 @@ impl NADataType for StringBuiltIn {
     value
   }
   fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
-  fn compute_base_sort(dag_node: &mut NADagNode<Self>) -> SortIndex { dag_node.sort_index() }
 }
 

@@ -1,13 +1,22 @@
-use std::collections::{HashMap, HashSet};
-use std::ops::{Deref, DerefMut};
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::{
+  sync::{
+    atomic::{AtomicPtr, Ordering},
+    Mutex,
+    MutexGuard
+  },
+  ptr::NonNull,
+  ops::{Deref, DerefMut},
+  collections::{HashMap, HashSet},
+};
 use mod2_abs::{smallvec, SmallVec};
-use crate::api::dag_node::{DagNode, DagNodePtr};
-use crate::core::gc::node_allocator::NodeAllocator;
-use crate::core::gc::root_container::RootSet;
-use crate::HashType;
+use crate::{
+  api::{DagNode, DagNodePtr},
+  core::gc::{
+    node_allocator::NodeAllocator,
+    root_container::RootSet
+  },
+  HashType
+};
 
 /// Global linked list of `RootMap` nodes
 static LIST_HEAD: Mutex<AtomicPtr<RootMap>> = Mutex::new(AtomicPtr::new(std::ptr::null_mut()));
@@ -106,6 +115,14 @@ impl RootMap {
 
 }
 
+impl Clone for Box<RootMap> {
+  fn clone(&self) -> Box<RootMap> {
+    let mut container = RootMap::new();
+    container.node_map = self.node_map.clone();
+    container
+  }
+}
+
 impl Drop for RootMap {
   fn drop(&mut self) {
     self.unlink();
@@ -125,3 +142,11 @@ impl DerefMut for RootMap {
     &mut self.node_map
   }
 }
+
+impl PartialEq for RootMap {
+  fn eq(&self, other: &Self) -> bool {
+    self.node_map == other.node_map
+  }
+}
+
+impl Eq for RootMap {}

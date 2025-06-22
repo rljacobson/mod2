@@ -30,7 +30,7 @@ use std::{
   ptr::NonNull,
   sync::atomic::Ordering,
 };
-use crate::api::dag_node::DagNode;
+use crate::api::DagNode;
 
 // These always need to be boxed
 pub use root_map::RootMap;

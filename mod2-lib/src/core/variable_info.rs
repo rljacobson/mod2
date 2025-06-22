@@ -7,7 +7,7 @@ Information about a variable that gets passed down through the compilation funct
 use std::ops::{Deref, Index};
 use mod2_abs::{debug, Graph, NatSet};
 use crate::{
-  api::term::{MaybeTerm, TermPtr},
+  api::{MaybeTerm, TermPtr},
   core::VariableIndex
 };
 

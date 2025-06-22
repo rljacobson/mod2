@@ -3,7 +3,7 @@
 Definitions related to symbols. Symbols can be thought of as names to which additional information is attached, such as
 arity and theory axioms.
 
-In an expression like, `f[x, Thing1, 45]`, the symbols are `f`, `x`, and `Thing1`.
+In an expression like, `f[x, Thing1, 45]`, the symbols are `f`, `x`, `Thing1`, and an implicit `Float`.
 
 */
 
@@ -17,11 +17,12 @@ pub use symbol_core::SymbolCore;
 pub use sort_table::{SortTable, BxSortTable};
 pub use op_declaration::*;
 
+// ToDo: Implement `SymbolTranslationMap`.
+// Stub
 pub struct SymbolTranslationMap;
 
-
-
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug, Hash)]
+#[repr(u8)]
 pub enum SymbolType {
   #[default]
   Standard,
@@ -41,13 +42,13 @@ pub enum SymbolType {
 impl SymbolType {
   pub fn is_build_in_data_type(&self) -> bool {
     match self {
-      SymbolType::True 
-      | SymbolType::False 
-      | SymbolType::String 
-      | SymbolType::Float 
-      | SymbolType::Integer 
+      SymbolType::True
+      | SymbolType::False
+      | SymbolType::String
+      | SymbolType::Float
+      | SymbolType::Integer
       | SymbolType::NaturalNumber => true,
-      
+
       _ => false
     }
   }
@@ -55,7 +56,7 @@ impl SymbolType {
 
 
 #[bitflags]
-#[repr(u32)]
+#[repr(u16)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum SymbolAttribute {
   // Syntactic attributes
@@ -79,7 +80,7 @@ pub enum SymbolAttribute {
   Iterated,
 }
 
-pub type SymbolAttributes = BitFlags<SymbolAttribute, u32>;
+pub type SymbolAttributes = BitFlags<SymbolAttribute, u16>;
 
 impl SymbolAttribute {
   //	Conjunctions

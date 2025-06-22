@@ -34,8 +34,8 @@ use mod2_abs::{
 
 use crate::{
   api::{
-    symbol::SymbolPtr,
-    term::BxTerm
+    SymbolPtr,
+    BxTerm
   },
   core::{
     pre_equation::PreEquation,

@@ -25,10 +25,11 @@ use std::{
 use mod2_abs::{Outcome, UnsafePtr};
 use crate::{
   api::{
-    symbol::SymbolPtr,
+    SymbolPtr,
     Arity,
-    term::Term,
-    subproblem::MaybeSubproblem
+    Term,
+    MaybeSubproblem,
+    MaybeExtensionInfo
   },
   core::{
     dag_node_core::{
@@ -51,8 +52,11 @@ use crate::{
     sort::{SortPtr, SortIndex},
     RedexPosition,
     HashConsSet,
-    DagNodeArguments, 
-    EquationalTheory
+    DagNodeArguments,
+    EquationalTheory,
+    rewriting_context::RewritingContext,
+    substitution::Substitution,
+    VariableIndex
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -63,12 +67,13 @@ pub type DagNodePtr          = UnsafePtr<dyn DagNode + 'static>;
 pub type MaybeDagNode        = Option<DagNodePtr>;
 pub type DagNodeVector       = GCVector<DagNodePtr>;
 pub type DagNodeVectorRefMut = GCVectorRefMut<DagNodePtr>;
+pub type Multiplicity        = u8;
 
 /// Commutative theories can have this more compact representation
 #[derive(Copy, Clone)]
 pub struct DagPair {
   pub(crate) dag_node    : DagNodePtr,
-  pub(crate) multiplicity: u8,
+  pub(crate) multiplicity: Multiplicity,
 }
 
 
@@ -188,35 +193,24 @@ pub trait DagNode {
   fn symbol(&self) -> SymbolPtr {
     self.core().symbol
   }
-  
+
   /// Gives the equational theory for this `DagNode`.
   #[inline(always)]
   fn theory(&self) -> EquationalTheory {
     self.symbol().theory()
   }
 
-  // ToDo: Implement DagNodeCore::get_sort() when `SortTable` is implemented.
   #[inline(always)]
-  fn get_sort(&self) -> Option<SortPtr> {
-    unimplemented!()
-    /*
-    let sort_index: i8 = self.sort_index();
+  fn sort(&self) -> Option<SortPtr> {
+    let sort_index = self.sort_index();
     match sort_index {
-      n if n == SpecialSort::Unknown as i8 => None,
+      SortIndex::UNKNOWN => None,
 
       // Anything else
       sort_index => {
-        self
-            .dag_node_members()
-            .top_symbol
-            .sort_table()
-            .range_component()
-            .borrow()
-            .sort(sort_index)
-            .upgrade()
+        Some(self.symbol().range_kind().sorts[sort_index.get_unchecked() as usize])
       }
     }
-    */
   }
 
 
@@ -392,10 +386,10 @@ pub trait DagNode {
     }
     else {
       // It's not clear what to do in this case, if the case can even happen.
-      if other.core().args.is_null() {
-        return Ordering::Greater;
+      return if other.core().args.is_null() {
+        Ordering::Greater
       } else {
-        return Ordering::Less;
+        Ordering::Less
       }
     }
 
@@ -415,7 +409,7 @@ pub trait DagNode {
   /// Tests whether `self`'s sort is less than or equal to other's sort
   fn leq_sort(&self, sort: SortPtr) -> bool {
     assert_ne!(self.sort_index(), SortIndex::UNKNOWN, "unknown sort");
-    self.get_sort().unwrap().leq(sort)
+    self.sort().unwrap().leq(sort)
   }
 
   // endregion Comparison
@@ -554,10 +548,13 @@ pub trait DagNode {
   // region Compiler related methods
 
   /// Sets the sort_index of self. This is a method on Symbol in Maude.
-  fn compute_base_sort(&mut self) -> SortIndex;
+  /// Called from `Symbol::fast_compute_true_sort()`, This virtual method
+  /// determines the sort index for a DAG node based on its symbol type and
+  /// the sorts of its arguments. Each symbol theory implements its own logic.
+  fn compute_base_sort(&mut self);
 
   fn check_sort(&mut self, bound_sort: SortPtr) -> (Outcome, MaybeSubproblem) {
-    if self.get_sort().is_some() {
+    if self.sort().is_some() {
       return (self.leq_sort(bound_sort).into(), None);
     }
 
@@ -580,6 +577,40 @@ pub trait DagNode {
     return (Outcome::Success, None);
   }
   // endregion Compiler related methods
+
+  // region Rewriting related methods
+
+  /// Reduces this DAG node to its canonical form by applying equations and built-in operations.
+  /// This is the primary entry point for equational rewriting - it repeatedly applies equations
+  /// until no more reductions are possible. The method delegates to the symbol's `eqRewrite()`
+  /// method to perform symbol-specific rewriting operations.
+  fn reduce(&mut self, context: &mut RewritingContext) {
+    while !self.is_reduced() {
+      let mut symbol = self.symbol();
+
+      if !symbol.rewrite(self.as_ptr(), context) {
+        self.set_reduced();
+        symbol.fast_compute_true_sort(self.as_ptr(), context);
+      }
+    }
+  }
+
+  // endregion Rewriting related methods
+
+  // region Matching related methods
+
+  /// This method must be overridden in theories that need extension, namely associative theories.
+  fn match_variable_with_extension(
+    &self,
+    _index         : VariableIndex,
+    _sort          : SortPtr,
+    _solution      : &mut Substitution,
+    _extension_info: MaybeExtensionInfo
+  ) -> (bool, MaybeSubproblem) {
+    (false, None)
+  }
+
+  // endregion Matching related methods
 
 }
 
@@ -632,7 +663,7 @@ impl_display_debug_for_formattable!(dyn DagNode);
 
 // endregion trait impls for DagNode
 
-// Unsafe private free functions
+// Unsafe free functions
 
 /// Reinterprets `args` as a `DagNodePtr`. The caller MUST be sure
 /// that `args` actually points to a `DagNode`.

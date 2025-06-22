@@ -11,11 +11,12 @@ use std::{
 };
 
 use crate::{
+  api::DagNodeVector,
   core::{
     gc::acquire_storage_allocator
-  }
+  },
 };
-use crate::api::dag_node::DagNodeVector;
+
 
 pub type GCVectorRefMut<T> = &'static mut GCVector<T>;
 
@@ -152,7 +153,7 @@ impl<T: Copy + 'static> GCVector<T> {
 
     Some(self.data[self.length])
   }
-  
+
   /// Pushes all elements of `iter` onto self. Right now you need to ensure that the vector
   /// has the capacity for all of the items beforehand.
   pub fn extend(&mut self, iter: impl Iterator<Item=T>) {

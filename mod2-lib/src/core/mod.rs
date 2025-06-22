@@ -34,7 +34,7 @@ mod dag_node_args;
 pub struct StateTransitionGraph;
 
 // use shared_vector::SharedVector;
-use crate::api::dag_node::DagNodePtr;
+use crate::api::DagNodePtr;
 pub type NodeList = Vec<DagNodePtr>;
 
 // Reexports to flatten some of the smaller modules
@@ -68,11 +68,11 @@ pub enum IndexMarker {
 impl IndexMarker {
   #[allow(non_upper_case_globals)]
   pub const Undefined: IndexMarker = IndexMarker::None;
-  
+
   pub fn idx(&self) -> VariableIndex {
     if let IndexMarker::Index(i) = self {
       *i
-    } else { 
+    } else {
       panic!("`IndexMarker` is not numeric");
     }
   }
@@ -82,7 +82,7 @@ impl IndexMarker {
 mod tests {
   use mod2_abs::IString;
   use crate::{
-    api::symbol::SymbolPtr,
+    api::SymbolPtr,
     core::{
       dag_node_core::{
         DagNodeCore,

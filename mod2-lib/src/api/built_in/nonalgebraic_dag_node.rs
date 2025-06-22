@@ -221,7 +221,7 @@ impl<T: NADataType> DagNode for NADagNode<T> {
     T::finalize_dag_node(self);
   }
 
-  fn compute_base_sort(&mut self) -> SortIndex {
+  fn compute_base_sort(&mut self){
     T::compute_base_sort(self)
   }
 }

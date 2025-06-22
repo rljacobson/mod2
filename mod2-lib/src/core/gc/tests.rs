@@ -5,23 +5,19 @@ use mod2_abs::{heap_construct, IString};
 use mod2_abs::log::set_global_logging_threshold;
 use crate::{
   api::{
-    dag_node::{
-      DagNode,
-      DagNodePtr
-    },
     free_theory::{
       FreeDagNode,
       FreeSymbol
-    },
-    symbol::{
-      Symbol,
-      SymbolPtr
     },
     variable_theory::{
       VariableDagNode,
       VariableSymbol
     },
-    Arity
+    Arity,
+    DagNode,
+    DagNodePtr,
+    Symbol,
+    SymbolPtr,
   },
   core::{
     dag_node_core::{

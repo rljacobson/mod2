@@ -113,9 +113,10 @@ use std::collections::hash_map::Entry;
 use mod2_abs::{heap_construct, HashMap, IString, SmallVec};
 use mod2_lib::{
   api::{
-    symbol::{Symbol, SymbolPtr},
     built_in::get_built_in_symbol,
-    free_theory::FreeSymbol
+    free_theory::FreeSymbol,
+    Symbol, 
+    SymbolPtr,
   },
   core::sort::SortPtr
 };

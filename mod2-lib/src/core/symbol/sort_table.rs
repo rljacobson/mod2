@@ -32,7 +32,7 @@ use crate::{
     symbol::op_declaration::{ConstructorStatus, OpDeclaration}
   },
   api::{
-    symbol::SymbolPtr,
+    SymbolPtr,
     Arity
   },
 };

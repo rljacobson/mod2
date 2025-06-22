@@ -7,12 +7,10 @@ use mod2_abs::IString;
 
 use mod2_lib::{
   api::{
-    symbol::{
-      Symbol,
-      SymbolPtr
-    },
-    term::BxTerm,
     variable_theory::VariableTerm,
+    BxTerm,
+    Symbol,
+    SymbolPtr,
   },
   core::{
     BxModule,

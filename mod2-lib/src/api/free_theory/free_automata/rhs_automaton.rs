@@ -11,12 +11,19 @@ The RHS automaton for the free theory has six variations specialized for arities
 
  */
 
-use std::{cell::RefCell, rc::Rc};
-use std::ops::DerefMut;
+use std::{
+  cell::RefCell,
+  rc::Rc,
+  ops::DerefMut
+};
 use crate::{
-  core::{substitution::Substitution, VariableInfo},
+  core::{
+    VariableIndex,
+    VariableInfo,
+    dag_node_core::DagNodeCore,
+    substitution::Substitution,
+  },
   api::{
-    dag_node::MaybeDagNode,
     free_theory::{
       free_automata::{
         // FreeBinaryRHSAutomaton,
@@ -29,13 +36,17 @@ use crate::{
       },
       FreeDagNode,
     },
+    DagNode,
+    DagNodePtr,
+    DagNodeVector,
+    DagNodeVectorRefMut,
+    MaybeDagNode,
+    RHSAutomaton,
+    SymbolPtr,
+    arg_to_dag_node,
+    arg_to_node_vec,
   },
 };
-use crate::api::automaton::RHSAutomaton;
-use crate::api::dag_node::{arg_to_dag_node, arg_to_node_vec, DagNode, DagNodePtr, DagNodeVector, DagNodeVectorRefMut};
-use crate::api::symbol::SymbolPtr;
-use crate::core::dag_node_core::DagNodeCore;
-use crate::core::VariableIndex;
 
 #[derive(Default)]
 pub struct FreeRHSAutomaton {

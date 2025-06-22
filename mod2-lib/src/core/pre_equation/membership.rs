@@ -13,7 +13,7 @@ use mod2_abs::{
   IString
 };
 use crate::{
-  api::term::BxTerm,
+  api::BxTerm,
   core::{
     format::{
       FormatStyle,
@@ -25,11 +25,12 @@ use crate::{
       PreEquationAttribute,
       PreEquationKind
     },
-    sort::SortPtr
+    sort::SortPtr,
+    VariableIndex
   },
   UNDEFINED,
 };
-use crate::core::VariableIndex;
+
 
 pub fn new(name: Option<IString>, lhs_term: BxTerm, sort: SortPtr, condition: Conditions) -> PreEquation {
   PreEquation {

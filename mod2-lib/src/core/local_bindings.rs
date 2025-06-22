@@ -9,10 +9,13 @@ other validation is performed.
 
 
 use crate::{
-  api::dag_node::DagNodePtr,
-  core::substitution::Substitution
+  api::DagNodePtr,
+  core::{
+    substitution::Substitution,
+    VariableIndex
+  }
 };
-use crate::core::VariableIndex;
+
 
 pub struct Binding {
   active:         bool,

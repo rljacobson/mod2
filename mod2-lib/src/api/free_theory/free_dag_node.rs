@@ -17,25 +17,24 @@ use crate::{
       ThinDagNodePtr
     },
     EquationalTheory,
-    HashConsSet
+    HashConsSet,
+    sort::SortIndex
   },
   api::{
-    dag_node::{
-      DagNodeVectorRefMut,
-      DagNodeVector,
-      DagNode,
-      DagNodePtr,
-      arg_to_dag_node,
-      arg_to_node_vec
-    },
     Arity,
+    DagNode,
+    DagNodePtr,
+    DagNodeVector,
+    DagNodeVectorRefMut,
+    arg_to_dag_node,
+    arg_to_node_vec,
+    node_vec_to_args,
     symbol::SymbolPtr,
-    term::Term
+    term::Term,
   },
-  HashType
+  HashType,
 };
-use crate::api::dag_node::node_vec_to_args;
-use crate::core::sort::SortIndex;
+
 
 #[repr(transparent)]
 pub struct FreeDagNode(DagNodeCore);
@@ -176,7 +175,7 @@ impl DagNode for FreeDagNode {
 
       let mut new_node = DagNodeCore::new(self.symbol());
       new_node.core_mut().args = node_vec_to_args(node_vec);
-      
+
       new_node
     } else {
       // A copy is just a DAG node with the same symbol
@@ -184,13 +183,14 @@ impl DagNode for FreeDagNode {
     }
   }
 
-  fn compute_base_sort(&mut self) -> SortIndex {
+
+  fn compute_base_sort(&mut self) {
     let symbol = self.symbol();
     // assert_eq!(self as *const _, subject.symbol() as *const _, "bad symbol");
     if symbol.arity().is_zero() {
       let idx = symbol.sort_table().traverse(0, SortIndex::ZERO);
       self.set_sort_index(idx); // Maude: HACK
-      return idx;
+      return;
     }
 
     let mut state = SortIndex::ZERO;
@@ -207,6 +207,5 @@ impl DagNode for FreeDagNode {
       state = symbol.sort_table().traverse(state.idx_unchecked(), term_idx);
     }
     self.set_sort_index(state);
-    state
   }
 }

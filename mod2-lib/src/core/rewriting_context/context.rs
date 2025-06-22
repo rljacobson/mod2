@@ -1,14 +1,14 @@
 use crate::{
-  api::dag_node::DagNodePtr,
+  api::DagNodePtr,
   core::{
     gc::root_container::{BxRootVec, RootVec},
     redex_position::RedexPosition,
     rewriting_context::{ContextAttribute, ContextAttributes},
     substitution::Substitution,
-    IndexMarker
+    IndexMarker,
+    VariableIndex
   },
 };
-use crate::core::VariableIndex;
 
 pub type BxRewritingContext = Box<RewritingContext>;
 
@@ -79,14 +79,12 @@ impl RewritingContext {
 
   #[inline(always)]
   pub fn trace_abort(&self) -> bool {
-    let attribute = ContextAttribute::Abort;
-    self.attributes.contains(attribute)
+    self.attributes.contains(ContextAttribute::Abort)
   }
 
   #[inline(always)]
   pub fn is_trace_enabled(&self) -> bool {
-    let attribute = ContextAttribute::Trace;
-    self.attributes.contains(attribute)
+    self.attributes.contains(ContextAttribute::Trace)
   }
 
   // region Statistics
@@ -168,47 +166,12 @@ impl RewritingContext {
   }
 
   // endregion
-
-
+  
   #[inline(always)]
   pub fn reduce(&mut self) {
     if let Some(root) = &self.root {
-      // self.reduce_dag_node(root.node());
-    }
-  }
-/*
-  #[inline(always)]
-  pub fn reduce_dag_node(&mut self, mut dag_node: DagNodePtr) {
-    while !dag_node.is_reduced() {
-      let mut symbol = dag_node.symbol();
-
-      if !(symbol.rewrite(dag_node, self)) {
-        dag_node.set_reduced();
-        self.fast_compute_true_sort(dag_node.clone());
-      }
+      root.node().reduce(self);
     }
   }
 
-  /// Computes the true sort of root.
-  #[inline(always)]
-  fn fast_compute_true_sort(&mut self, mut dag_node: DagNodePtr) {
-    // let root = self.root.unwrap();
-    let t = dag_node.symbol().core().unique_sort_index;
-
-    if t < 0 {
-      dag_node.compute_base_sort(); // usual case
-    } else if t > 0 {
-      dag_node.set_sort_index(t); // unique sort case
-    } else {
-      self.slow_compute_true_sort(dag_node); // most general case
-    }
-  }
-
-  /// Computes the true sort of root.
-  fn slow_compute_true_sort(&mut self, dag_node: DagNodePtr) {
-    // let root = self.root.unwrap();
-    let mut symbol = dag_node.symbol();
-    symbol.sort_constraint_table()
-          .constrain_to_smaller_sort(dag_node.clone(), self);
-  }*/
 }

@@ -258,16 +258,16 @@ impl Term for FreeTerm {
   ) -> (BxLHSAutomaton, bool) {
     // We bin the arg terms according to the following categories.
     // First gather all symbols lying in or directly under free skeleton.
-    let mut free_symbols = FreeOccurrences::new();
+    let mut free_symbols  = FreeOccurrences::new();
     let mut other_symbols = FreeOccurrences::new();
     // See if we can fail on the free skeleton.
     self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
 
     // Now classify occurrences of non Free-Theory symbols into 4 types
-    let mut bound_variables = FreeOccurrences::new(); // guaranteed bound when matched against
+    let mut bound_variables     = FreeOccurrences::new(); // guaranteed bound when matched against
     let mut uncertain_variables = FreeOccurrences::new(); // status when matched against uncertain
-    let mut ground_aliens = FreeOccurrences::new(); // ground alien subterms
-    let mut non_ground_aliens = FreeOccurrences::new(); // non-ground alien subterms
+    let mut ground_aliens       = FreeOccurrences::new(); // ground alien subterms
+    let mut non_ground_aliens   = FreeOccurrences::new(); // non-ground alien subterms
 
 
     for mut occurrence in other_symbols {
@@ -296,8 +296,8 @@ impl Term for FreeTerm {
     // Now we have to find a best sequence in which to match the
     // non-ground alien subterms and generate subautomata for them
 
-    let mut best_sequence = ConstraintPropagationSequence::default();
-    let mut sub_automata = Vec::with_capacity(non_ground_aliens.len());
+    let mut best_sequence     = ConstraintPropagationSequence::default();
+    let mut sub_automata      = Vec::with_capacity(non_ground_aliens.len());
     let mut subproblem_likely = false;
 
     if non_ground_aliens.len() > 0 {
@@ -412,13 +412,13 @@ impl Term for FreeTerm {
       }
 
       let arg_count = self.args.len();
-      let symbol = self.symbol();
+      let symbol    = self.symbol();
 
       if at_top {
         for i in 0..arg_count {
           self.args[i].find_available_terms_aux(
             available_terms,
-            eager_context && symbol.strategy().eager_argument(i),
+            eager_context && symbol.eager_argument(i),
             false,
           );
         }
@@ -427,7 +427,7 @@ impl Term for FreeTerm {
         for i in 0..arg_count {
           self.args[i].find_available_terms_aux(
             available_terms,
-            eager_context && symbol.strategy().evaluated_argument(i),
+            eager_context && symbol.evaluated_argument(i),
             false,
           );
         }
@@ -452,11 +452,11 @@ impl FreeTerm {
   /// Traverse the free skeleton, calling compile_rhs() on all non-free subterms.
   pub fn compile_rhs_aliens(
     &mut self,
-    rhs_builder: &mut RHSBuilder,
-    variable_info: &mut VariableInfo,
-    available_terms: &mut TermBag,
-    eager_context: bool,
-    max_arity: &mut u32,
+    rhs_builder        : &mut RHSBuilder,
+    variable_info      : &mut VariableInfo,
+    available_terms    : &mut TermBag,
+    eager_context      : bool,
+    max_arity          : &mut u32,
     free_variable_count: &mut u32,
   ) {
     let arg_count = self.args.len() as u32;
@@ -465,7 +465,7 @@ impl FreeTerm {
     }
     let symbol = self.symbol();
     for i in 0..arg_count as usize {
-      let arg_eager = eager_context && symbol.strategy().eager_argument(i);
+      let arg_eager = eager_context && symbol.eager_argument(i);
       let term = &mut self.args[i];
       if let Some(free_term) = term.as_any_mut().downcast_mut::<FreeTerm>() {
         *free_variable_count += 1;
@@ -696,16 +696,21 @@ impl FreeTerm {
 
       for (_, idx) in &order {
         let idx = *idx;
-        let arg_is_eager = eager_context && symbol.strategy().eager_argument(idx);
+        let arg_is_eager = eager_context && symbol.eager_argument(idx);
         let mut term = self.args[idx].as_ptr();
 
         // Argument is free - see if we need to compile it into current automaton.
         if !available_terms.contains(term, arg_is_eager) {
-          let source = if let Some(free_term) = term.as_any_mut().downcast_mut::<FreeTerm>() {
-            free_term.compile_into_automaton(automaton, rhs_builder, variable_info, available_terms, arg_is_eager)
-          } else {
-            unreachable!()
-          };
+          let free_term = term.as_any_mut()
+                              .downcast_mut::<FreeTerm>()
+                              .expect("term should be a FreeTerm");
+          let source = free_term.compile_into_automaton(
+            automaton,
+            rhs_builder,
+            variable_info,
+            available_terms,
+            arg_is_eager,
+          );
           sources[idx] = source;
           term.core_mut().save_index = Some(source as VariableIndex);
           available_terms.insert_built_term(term, arg_is_eager);
@@ -794,76 +799,6 @@ impl FreeTerm {
       ))
     }
 
-    pub fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {
-      // First gather all symbols lying in or directly under free skeleton.
-      let mut free_symbols = Vec::new();
-      let mut other_symbols = Vec::new();
-      self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
-
-      // Now extract the non-ground aliens and update BoundUniquely with variables
-      // that lie directly under the free skeleton and thus will receive an unique binding.
-      let mut non_ground_aliens = Vec::new();
-      for occurrence in &other_symbols {
-        let t = occurrence.term();
-        if let Some(variable_term) = t.as_any_mut().downcast_mut::<VariableTerm>() {
-          bound_uniquely.insert(variable_term.index as usize);
-        } else if !t.ground() {
-          non_ground_aliens.push(occurrence.clone());
-        }
-      }
-
-      if !non_ground_aliens.is_empty() {
-        // debug_advisory(&format!(
-        //   "FreeTerm::analyseConstraintPropagation() : looking at {} and saw {} nonground aliens",
-        //   self,
-        //   non_ground_aliens.len()
-        // ));
-
-        // Now we have to find a best sequence in which to match the non-ground alien subterms. Sequences that pin down
-        // unique values for variables allow those values to be propagated.
-        let mut best_sequence = ConstraintPropagationSequence::default();
-
-        Self::find_constraint_propagation_sequence_helper(
-          &non_ground_aliens,
-          &mut vec![],
-          &bound_uniquely,
-          0,
-          &mut best_sequence,
-        );
-
-        bound_uniquely.union_in_place(&best_sequence.bound);
-      }
-    }
-
-    /// The theory-specific part of find_available_terms
-    pub fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
-      if self.ground() {
-        return;
-      }
-
-      let arg_count = self.args.len();
-      let symbol = self.symbol();
-
-      if at_top {
-        for i in 0..arg_count {
-          find_available_terms(
-            self.args[i].clone(),
-            available_terms,
-            eager_context && symbol.strategy().eager_argument(i),
-            false,
-          );
-        }
-      } else {
-        for i in 0..arg_count {
-          find_available_terms(
-            self.args[i].clone(),
-            available_terms,
-            eager_context && symbol.strategy().evaluated_argument(i),
-            false,
-          );
-        }
-      }
-    }
 
     */
 }

@@ -10,8 +10,9 @@ use std::any::Any;
 use mod2_abs::debug;
 use crate::{
   api::{
-    automaton::RHSAutomaton,
-    dag_node::{DagNodePtr, MaybeDagNode}
+    RHSAutomaton,
+    DagNodePtr, 
+    MaybeDagNode
   },
   core::{
     substitution::Substitution,

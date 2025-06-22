@@ -32,7 +32,7 @@ use mod2_abs::{
   warning
 };
 use crate::{
-  api::term::{TermPtr},
+  api::TermPtr,
   HashType
 };
 

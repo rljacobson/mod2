@@ -1,11 +1,19 @@
-use std::collections::HashSet;
-use std::ops::{Deref, DerefMut};
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::{
+  sync::{
+    atomic::{AtomicPtr, Ordering},
+    Mutex,
+    MutexGuard
+  },
+  ptr::NonNull,
+  ops::{Deref, DerefMut},
+  collections::HashSet,
+};
 use mod2_abs::{smallvec, SmallVec};
-use crate::api::dag_node::{DagNode, DagNodePtr};
-use crate::core::gc::root_container::root_map::RootMap;
+use crate::{
+  api::{DagNode, DagNodePtr},
+  core::gc::root_container::root_map::RootMap
+};
+use crate::core::gc::root_container::RootVec;
 
 /// Global linked list of `RootSet` nodes
 static LIST_HEAD: Mutex<AtomicPtr<RootSet>> = Mutex::new(AtomicPtr::new(std::ptr::null_mut()));
@@ -104,6 +112,14 @@ impl RootSet {
 
 }
 
+impl Clone for Box<RootSet> {
+  fn clone(&self) -> Box<RootSet> {
+    let mut container = RootSet::new();
+    container.nodes = self.nodes.clone();
+    container
+  }
+}
+
 impl Drop for RootSet {
   fn drop(&mut self) {
     self.unlink();
@@ -123,3 +139,11 @@ impl DerefMut for RootSet {
     &mut self.nodes
   }
 }
+
+impl PartialEq for RootSet {
+  fn eq(&self, other: &Self) -> bool {
+    self.nodes == other.nodes
+  }
+}
+
+impl Eq for RootSet {}

@@ -14,14 +14,13 @@ use mod2_lib::{
       StringTerm
     },
     free_theory::FreeSymbol,
-    symbol::{
-      Symbol,
-      SymbolPtr,
-    },
-    term::{BxTerm, Term},
+    BxTerm,
+    Symbol,
+    SymbolPtr,
+    Term,
     variable_theory::{
       VariableSymbol,
-      VariableTerm
+      VariableTerm,
     },
     Arity,
   },

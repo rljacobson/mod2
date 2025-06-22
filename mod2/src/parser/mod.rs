@@ -17,8 +17,8 @@ use mod2_lib::{
     sort::SortCollection
   },
   api::{
-    term::BxTerm,
-    symbol::SymbolPtr
+    BxTerm,
+    SymbolPtr
   },
 };
 use crate::parser::parser::{ModuleParser, TermParser};

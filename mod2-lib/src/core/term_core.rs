@@ -22,7 +22,7 @@ use mod2_abs::{
   NatSet
 };
 use crate::{
-  api::symbol::{
+  api::{
     Symbol,
     SymbolPtr,
     SymbolSet

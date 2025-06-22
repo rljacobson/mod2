@@ -32,20 +32,16 @@ use mod2_abs::{
 };
 use crate::{
   api::{
-    dag_node::{
-      arg_to_dag_node,
-      arg_to_node_vec,
-      DagNode,
-      DagNodePtr,
-      DagNodeVector,
-      DagNodeVectorRefMut
-    },
-    symbol::{
-      Symbol,
-      SymbolPtr
-    },
-    variable_theory::VariableSymbol,
     Arity,
+    DagNode,
+    DagNodePtr,
+    DagNodeVector,
+    DagNodeVectorRefMut,
+    Symbol,
+    SymbolPtr,
+    arg_to_dag_node,
+    arg_to_node_vec,
+    variable_theory::VariableSymbol,
   },
   core::{
     dag_node_core::{
@@ -205,11 +201,10 @@ impl DagNode for VariableDagNode {
     drop(droppable_istring);
   }
 
-  fn compute_base_sort(&mut self) -> SortIndex {
+  fn compute_base_sort(&mut self) {
     if let Some(symbol) = self.symbol().as_any().downcast_ref::<VariableSymbol>() {
       let symbol_index = symbol.sort().index_within_kind;
       self.set_sort_index(symbol_index);
-      symbol_index
     } else {
       unreachable!("Failed to downcast to VariableSymbol. This is a bug.");
     }

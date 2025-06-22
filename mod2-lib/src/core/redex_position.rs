@@ -7,7 +7,7 @@ A `RedexPosition` holds position information of a potential redex.
 use enumflags2::{bitflags, BitFlags};
 use crate::{
   api::{
-    dag_node::DagNodePtr,
+    DagNodePtr,
     ArgIndex
   },
   core::IndexMarker

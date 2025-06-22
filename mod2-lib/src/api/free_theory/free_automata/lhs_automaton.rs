@@ -17,23 +17,25 @@ use super::super::{
 };
 use crate::{
   api::{
-    automaton::{BxLHSAutomaton, LHSAutomaton},
-    dag_node::DagNodePtr,
-    subproblem::MaybeSubproblem,
-    symbol::SymbolPtr,
-    term::Term,
+    ArgIndex,
+    BxLHSAutomaton,
+    DagNode,
+    DagNodePtr,
+    LHSAutomaton,
+    MaybeExtensionInfo,
+    MaybeSubproblem,
+    SubproblemSequence,
+    SymbolPtr,
+    Term,
     variable_theory::VariableTerm,
-    ArgIndex
   },
   core::{
+    sort::SortIndex,
     substitution::Substitution,
-    NodeList
+    NodeList,
+    VariableIndex
   }
 };
-use crate::api::dag_node::DagNode;
-use crate::api::subproblem::SubproblemSequence;
-use crate::core::sort::SortIndex;
-use crate::core::VariableIndex;
 
 #[derive(Clone)]
 pub struct FreeSubterm {
@@ -82,7 +84,7 @@ impl FreeLHSAutomaton {
           let parent: &FreeTerm = free_symbols[oc_position].downcast_term::<FreeTerm>();
           parent.slot_index
         };
-        
+
         let term  : &mut FreeTerm = free_symbols[i].downcast_term_mut::<FreeTerm>();
         let symbol: SymbolPtr     = term.symbol();
         let free_subterm          = FreeSubterm {
@@ -179,10 +181,11 @@ impl FreeLHSAutomaton {
 impl LHSAutomaton for FreeLHSAutomaton {
   fn match_(
     &mut self,
-    mut subject: DagNodePtr,
-    solution   : &mut Substitution,
-    // extension_info: Option<&mut dyn ExtensionInfo>,
-  ) -> (bool, MaybeSubproblem) {
+    mut subject    : DagNodePtr,
+    solution       : &mut Substitution,
+    _extension_info: MaybeExtensionInfo
+  ) -> (bool, MaybeSubproblem) 
+  {
     // ToDo: What variant of comparison should this be?
     if subject.symbol() != self.top_symbol {
       return (false, None);
@@ -263,7 +266,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
           if let (true, subproblem) = i.automaton.match_(
             self.stack[i.position as usize][i.arg_index as usize].clone(),
             solution,
-            // None
+            None
           ) {
             // Destructure `subproblem`
             if let Some(sp) = subproblem {

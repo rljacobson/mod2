@@ -6,18 +6,18 @@ apply. Conditions are like a "lite" version of `PreEquation`.
 
 */
 
-use std::fmt::Display;
-use std::ops::Deref;
+use std::{
+  fmt::Display,
+  ops::Deref
+};
 use mod2_abs::NatSet;
 use crate::{
   api::{
-    automaton::BxLHSAutomaton,
-    automaton::LHSAutomaton,
-    subproblem::Subproblem,
-    term::{
-      BxTerm,
-      TermPtr
-    }
+    BxLHSAutomaton,
+    LHSAutomaton,
+    Subproblem,
+    BxTerm,
+    TermPtr
   },
   core::{
     automata::RHSBuilder,

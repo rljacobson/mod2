@@ -15,7 +15,7 @@ use crate::{
     },
     format::{FormatStyle, Formattable},
   },
-  api::dag_node::DagNodePtr,
+  api::DagNodePtr,
 };
 
 /// Result of parsing the debugger command line.

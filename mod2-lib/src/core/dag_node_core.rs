@@ -28,7 +28,6 @@ use enumflags2::{bitflags, make_bitflags, BitFlags};
 
 use crate::{
   api::{
-    Arity,
     built_in::{
       StringBuiltIn,
       BoolDagNode,
@@ -37,14 +36,13 @@ use crate::{
       NaturalNumberDagNode,
       StringDagNode,
     },
-    dag_node::{
-      DagNode,
-      DagNodePtr,
-      DagNodeVector
-    },
     free_theory::FreeDagNode,
-    symbol::SymbolPtr,
     variable_theory::VariableDagNode,
+    Arity,
+    DagNode,
+    DagNodePtr,
+    DagNodeVector,
+    SymbolPtr,
   },
   core::{
     gc::allocate_dag_node,

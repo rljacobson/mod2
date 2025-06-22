@@ -8,22 +8,22 @@ building DAG nodes that represent the result of applying rewrite rules.
 
 The class defines four essential pure virtual methods that concrete implementations must provide:
 
-### Variable Index Management 
+### Variable Index Management
 - *`remapIndices(VariableInfo& variableInfo)`* - Updates variable indices during compilation
 
-### DAG Construction 
+### DAG Construction
 
 - *`construct(Substitution& matcher)`* - Creates new DAG nodes using variable bindings from pattern matching
 - *`replace(DagNode* old, Substitution& matcher)`* - Performs in-place replacement of existing DAG nodes
 
-### Stack Machine Support 
-- *`recordInfo(StackMachineRhsCompiler& compiler)`* - Provides compilation support for the stack-based 
+### Stack Machine Support
+- *`recordInfo(StackMachineRhsCompiler& compiler)`* - Provides compilation support for the stack-based
    interpreter, with a default implementation returning `false`
 
 ## Integration with Rewriting System
 
 The class is extensively used throughout the Maude codebase. `RhsBuilder` manages collections of
-`RhsAutomaton` instances, calling their methods during term construction. Terms compile themselves 
+`RhsAutomaton` instances, calling their methods during term construction. Terms compile themselves
 into `RhsAutomaton` instances through the `compileRhs` method.
 
 */
@@ -33,7 +33,7 @@ use crate::{
     substitution::Substitution,
     VariableInfo,
   },
-  api::dag_node::{DagNodePtr, MaybeDagNode},
+  api::{DagNodePtr, MaybeDagNode},
 };
 
 pub type BxRHSAutomaton = Box<dyn RHSAutomaton>;

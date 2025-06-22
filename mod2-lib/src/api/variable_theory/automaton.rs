@@ -9,6 +9,7 @@ use crate::{
     substitution::Substitution
   }
 };
+use crate::api::MaybeExtensionInfo;
 use crate::core::VariableIndex;
 
 pub struct VariableLHSAutomaton {
@@ -29,13 +30,14 @@ impl VariableLHSAutomaton {
 
 
 impl LHSAutomaton for VariableLHSAutomaton {
-  fn match_(&mut self, subject: DagNodePtr, solution: &mut Substitution) -> (bool, MaybeSubproblem) {
+  fn match_(&mut self, subject: DagNodePtr, solution: &mut Substitution, extension_info: MaybeExtensionInfo) -> (bool, MaybeSubproblem) {
     self.match_variable(
       subject,
       self.index,
       self.sort,
       self.copy_to_avoid_overwriting,
       solution,
+      extension_info
     )
   }
 }

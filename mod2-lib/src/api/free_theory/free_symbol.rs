@@ -26,6 +26,7 @@ use crate::{
   },
   impl_display_debug_for_formattable,
 };
+use crate::core::rewriting_context::RewritingContext;
 
 pub struct FreeSymbol {
   core: SymbolCore
@@ -41,7 +42,7 @@ impl FreeSymbol {
     let core = SymbolCore::new(name, arity, attributes, symbol_type);
     FreeSymbol{ core }
   }
-  
+
   pub fn with_arity(name: IString, arity: Arity) -> FreeSymbol {
     let core = SymbolCore::with_arity(name, arity);
     FreeSymbol { core }
@@ -59,7 +60,7 @@ impl Symbol for FreeSymbol {
   fn make_term(&self, args: Vec<BxTerm>) -> BxTerm {
     Box::new(FreeTerm::new(self.as_ptr(), args))
   }
-  
+
   fn make_dag_node(&self, args: *mut u8) -> DagNodePtr {
     DagNodeCore::with_args(self.as_ptr(), args)
   }
@@ -71,9 +72,25 @@ impl Symbol for FreeSymbol {
   fn core_mut(&mut self) -> &mut SymbolCore {
     &mut self.core
   }
-  
+
   fn theory(&self) -> EquationalTheory {
     EquationalTheory::Free
+  }
+
+  fn rewrite(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
+    assert_eq!(self.as_ptr(), subject.symbol());
+    if self.standard_strategy() {
+      for mut arg in subject.iter_args() {
+        arg.reduce(context);
+      }
+      // ToDo: Implement discrimination net
+      todo!("free symbol rewriting");
+      // self.discrimination_net.apply_replace(subject, context)
+    } else {
+      // ToDo: Implement nonstandard strategy rewriting
+      unimplemented!("nonstandard strategy rewriting not implemented");
+      // self.complex_strategy(subject, context)
+    }
   }
 }
 
@@ -96,7 +113,7 @@ impl_display_debug_for_formattable!(FreeSymbol);
 mod tests {
   use std::ops::Deref;
   use super::*;
-  
+
   #[test]
   fn test_symbol_creation(){
     let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(3));

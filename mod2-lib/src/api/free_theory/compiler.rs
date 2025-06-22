@@ -309,10 +309,10 @@ impl FreeTerm {
   #[inline(always)]
   fn compile_rhs_aux(
     &mut self,
-    rhs_builder: &mut RHSBuilder,
-    variable_info: &mut VariableInfo,
+    rhs_builder    : &mut RHSBuilder,
+    variable_info  : &mut VariableInfo,
     available_terms: &mut TermBag,
-    eager_context: bool,
+    eager_context  : bool,
   ) -> i32 {
     let mut max_arity = 0;
     let mut free_variable_count = 1;
@@ -343,11 +343,11 @@ impl FreeTerm {
   /// Use the given automaton to compile this RHS. Maude's compileRhs3
   pub fn compile_into_automaton(
     &self,
-    automaton: &mut dyn RHSAutomaton,
-    rhs_builder: &mut RHSBuilder,
-    variable_info: &mut VariableInfo,
+    automaton      : &mut dyn RHSAutomaton,
+    rhs_builder    : &mut RHSBuilder,
+    variable_info  : &mut VariableInfo,
     available_terms: &mut TermBag,
-    eager_context: bool,
+    eager_context  : bool,
   ) -> i32 {
     let arg_count = self.args.len();
 
@@ -404,14 +404,14 @@ impl FreeTerm {
 
   pub fn compile_remainder(&self, equation: &PreEquation, slot_translation: &Vec<i32>) -> FreeRemainder {
     // Gather all symbols lying in or directly under free skeleton
-    let mut free_symbols: Vec<FreeOccurrence> = Vec::new();
+    let mut free_symbols : Vec<FreeOccurrence> = Vec::new();
     let mut other_symbols: Vec<FreeOccurrence> = Vec::new();
     self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, NONE, NONE);
 
     // Now classify occurrences of non Free-Theory symbols into 4 types
-    let mut bound_variables: Vec<FreeOccurrence> = Vec::new(); // guaranteed bound when matched against
-    let mut free_variables: Vec<FreeOccurrence> = Vec::new(); // guaranteed unbound when matched against
-    let mut ground_aliens: Vec<FreeOccurrence> = Vec::new(); // ground alien subterms
+    let mut bound_variables  : Vec<FreeOccurrence> = Vec::new(); // guaranteed bound when matched against
+    let mut free_variables   : Vec<FreeOccurrence> = Vec::new(); // guaranteed unbound when matched against
+    let mut ground_aliens    : Vec<FreeOccurrence> = Vec::new(); // ground alien subterms
     let mut non_ground_aliens: Vec<FreeOccurrence> = Vec::new(); // non-ground alien subterms
 
     let mut bound_uniquely = NatSet::new();
@@ -468,7 +468,7 @@ impl FreeTerm {
 
   pub fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {
     // First gather all symbols lying in or directly under free skeleton.
-    let mut free_symbols = Vec::new();
+    let mut free_symbols  = Vec::new();
     let mut other_symbols = Vec::new();
     self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
 

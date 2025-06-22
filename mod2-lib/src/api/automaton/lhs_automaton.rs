@@ -7,15 +7,17 @@ The automaton that matches the LHS.
 use mod2_abs::Outcome;
 use crate::{
   api::{
-    dag_node::DagNodePtr,
-    subproblem::MaybeSubproblem,
+    DagNodePtr,
+    MaybeSubproblem,
+    MaybeExtensionInfo
   },
   core::{
     sort::SortPtr,
     substitution::Substitution,
+    VariableIndex
   },
 };
-use crate::core::VariableIndex;
+
 
 pub type BxLHSAutomaton = Box<dyn LHSAutomaton>;
 
@@ -25,7 +27,7 @@ pub trait LHSAutomaton {
     subject : DagNodePtr,
     solution: &mut Substitution,
     // returned_subproblem: Option<&mut dyn Subproblem>,
-    // extension_info: Option<&mut dyn ExtensionInfo>,
+    extension_info: MaybeExtensionInfo,
   ) -> (bool, MaybeSubproblem);
 
 
@@ -37,13 +39,16 @@ pub trait LHSAutomaton {
     sort                     : SortPtr,
     copy_to_avoid_overwriting: bool,
     solution                 : &mut Substitution,
-    // extension_info: Option<&ExtensionInfo>
-  ) -> (bool, MaybeSubproblem) {
-    // if let Some(ext_info) = extension_info {
-    //   return self.match_variable_with_extension(index, sort, solution, returned_subproblem, ext_info);
-    // }
+    extension_info           : MaybeExtensionInfo
+  ) -> (bool, MaybeSubproblem)
+  {
+    if extension_info.is_some() {
+      return dag_node.match_variable_with_extension(index, sort, solution, extension_info);
+    }
+    
     let maybe_dag_node = solution.get(index);
     match maybe_dag_node {
+      
       None => {
         if let (Outcome::Success, maybe_subproblem) = dag_node.check_sort(sort) {
           let dag_node_ref = if copy_to_avoid_overwriting {
@@ -57,6 +62,7 @@ pub trait LHSAutomaton {
           (false, None)
         }
       }
+      
       Some(existing_d) => {
         if dag_node.compare(existing_d).is_eq() {
           (true, None)
@@ -64,6 +70,7 @@ pub trait LHSAutomaton {
           (false, None)
         }
       }
+      
     }
   }
 }

@@ -1,11 +1,13 @@
 use mod2_abs::{impl_as_any_ptr_fns, IString};
 use crate::{
   api::{
-    symbol::{Symbol, SymbolPtr},
-    Arity,
-    term::{BxTerm, TermPtr},
     variable_theory::{VariableTerm, VariableDagNode},
-    dag_node::DagNodePtr,
+    Arity,
+    BxTerm, 
+    DagNodePtr,
+    Symbol, 
+    SymbolPtr,
+    TermPtr,
   },
   core::{
     sort::SortPtr,
@@ -21,7 +23,7 @@ use crate::{
   },
   impl_display_debug_for_formattable,
 };
-
+use crate::core::rewriting_context::RewritingContext;
 
 pub struct VariableSymbol {
   core: SymbolCore
@@ -72,6 +74,10 @@ impl Symbol for VariableSymbol {
     panic!("cannot call Symbol::make_term() on a VariableSymbol");
   }
 
+  fn make_dag_node(&self, _: *mut u8) -> DagNodePtr {
+    panic!("cannot call Symbol::make_dag_node() on a VariableSymbol");
+  }
+
   #[inline(always)]
   fn core(&self) -> &SymbolCore {
     &self.core
@@ -82,11 +88,11 @@ impl Symbol for VariableSymbol {
     &mut self.core
   }
   
-  fn make_dag_node(&self, _: *mut u8) -> DagNodePtr {
-    panic!("cannot call Symbol::make_dag_node() on a VariableSymbol");
-  }
-  
   fn theory(&self) -> EquationalTheory { EquationalTheory::Variable }
+
+  fn rewrite(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
+    self.core_mut().apply_replace(subject, context, None)
+  }
 }
 
 

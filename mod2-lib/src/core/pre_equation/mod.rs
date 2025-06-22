@@ -16,10 +16,10 @@ use mod2_abs::{join_string, warning, IString, NatSet, UnsafePtr};
 
 use crate::{
   api::{
-    automaton::BxLHSAutomaton,
-    dag_node::DagNodePtr,
-    subproblem::MaybeSubproblem,
-    term::BxTerm
+    BxLHSAutomaton,
+    DagNodePtr,
+    MaybeSubproblem,
+    BxTerm
   },
   core::{
     format::{FormatStyle, Formattable},
@@ -73,17 +73,17 @@ impl Display for PreEquationAttribute {
 /// Representation of Rule, Equation, Sort Constraint/Membership Axiom.
 pub enum PreEquationKind {
   Equation {
-    rhs_term: BxTerm,
-    // rhs_builder:         RHSBuilder,
+    rhs_term           : BxTerm,
+    rhs_builder        : RHSBuilder,
     fast_variable_count: i32,
     // instruction_seq    : Option<InstructionSequence>
   },
 
   Rule {
-    rhs_term: BxTerm,
-    // rhs_builder:                 RHSBuilder,
-    // non_extension_lhs_automaton: Option<RcLHSAutomaton>,
-    // extension_lhs_automaton:     Option<RcLHSAutomaton>,
+    rhs_term                   : BxTerm,
+    rhs_builder                : RHSBuilder,
+    non_extension_lhs_automaton: Option<BxLHSAutomaton>,
+    extension_lhs_automaton    : Option<BxLHSAutomaton>,
   },
 
   // Membership Axiom ("Sort constraint")
@@ -95,6 +95,7 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
+use crate::core::automata::RHSBuilder;
 use crate::core::VariableIndex;
 
 impl PreEquationKind {
@@ -118,9 +119,8 @@ impl PreEquationKind {
 }
 
 pub struct PreEquation {
-  pub name      : Option<IString>,
-  pub attributes: PreEquationAttributes,
-
+  pub name         : Option<IString>,
+  pub attributes   : PreEquationAttributes,
   pub pe_kind      : PreEquationKind,
   pub conditions   : Conditions,
   pub lhs_term     : BxTerm,
@@ -152,7 +152,12 @@ impl PreEquation {
       lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
-      pe_kind      : Rule{ rhs_term },
+      pe_kind      : Rule{ 
+        rhs_term, 
+        rhs_builder                : Default::default(),
+        non_extension_lhs_automaton: None,
+        extension_lhs_automaton    : None 
+      },
       index_within_parent_module: 0,
     }
   }
@@ -172,7 +177,11 @@ impl PreEquation {
       lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
-      pe_kind      : Equation{ rhs_term, fast_variable_count: 0 },
+      pe_kind      : Equation{ 
+        rhs_term, 
+        rhs_builder        : Default::default(),
+        fast_variable_count: 0 
+      },
       index_within_parent_module: 0,
     }
   }

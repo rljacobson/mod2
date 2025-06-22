@@ -1,6 +1,54 @@
 /*!
 
-Membership constraints, also called sort constraints, specify subsort relationships. 
+Membership constraints, also called sort constraints, specify subsort relationships.
+
+The `SortConstraintTable` class manages a collection of sort constraints indexed under a
+symbol for efficient sort constraint matching and application during sort computation.
+
+### Core Functionality
+
+**Sort Constraint Management**: The class maintains a private vector of
+*`SortConstraint*` objects and provides methods to add constraints via
+*`offer_sort_constraint()`, which calls the pure virtual `accept_sort_constraint()`
+*method that subclasses must implement to filter which constraints they accept.
+
+**Sort Constraint Application**: The primary functionality is provided by:
+- `constrain_to_smaller_sort()`: Public interface that delegates to the private implementation if constraints exist
+- `constrain_to_smaller_sort_2()`: The core implementation that attempts to apply sort constraints to refine a DAG
+  node's sort to a smaller (more specific) sort
+
+### Sort Constraint Processing Strategy
+
+The constraint application uses an iterative refinement approach:
+1. **Ordering**: Sort constraints are ordered with smallest sorts first using `sort_constraint_lt()`
+2. **Multi-pass filtering**: `order_sort_constraints()` uses successive passes to "comb out" usable constraints
+   as the symbol's sort is refined
+3. **Retry mechanism**: When a constraint successfully applies, the process restarts from the beginning since
+   earlier constraints may now be applicable
+
+### Limited Context Handling
+
+The implementation includes special handling for limited rewriting contexts, which don't support sort constraint
+application and are used for functionality that doesn't require sort constraints.
+
+### Additional Methods
+
+- `compile_sort_constraints()`: Compiles all stored sort constraints for execution
+- `sort_constraint_free()`: Checks if the table contains no sort constraints
+- `constrain_to_exact_sort()`: Currently delegates to the same implementation as `constrain_to_smaller_sort()`
+
+### Usage Pattern
+
+Subclasses inherit from `SortConstraintTable` and implement `accept_sort_constraint()`
+to define which sort constraints they handle, then use the public constraint
+application methods during sort computation to refine DAG node sorts.
+
+## Notes
+
+The class is part of Maude's core sort system and integrates with the tracing
+system for debugging sort constraint applications. The iterative refinement
+approach handles the complex interdependencies between sort constraints
+where applying one constraint may enable others to become applicable.
 
 */
 
@@ -11,13 +59,12 @@ use crate::{
     sort::{sort_leq_index, index_leq_sort},
     rewriting_context::RewritingContext,
   },
-  api::dag_node::DagNodePtr,
+  api::DagNodePtr,
 };
 use super::{
   PreEquationKind,
   PreEquationPtr as SortConstraintPtr
 };
-
 
 
 #[derive(Default)]
@@ -30,8 +77,8 @@ impl SortConstraintTable {
   pub fn new() -> SortConstraintTable {
     SortConstraintTable::default()
   }
-  
-  
+
+
   #[inline(always)]
   pub fn offer_sort_constraint(&mut self, sort_constraint: SortConstraintPtr) {
     if self.accept_sort_constraint(sort_constraint) {
@@ -77,7 +124,7 @@ impl SortConstraintTable {
     let mut all: Vec<Option<SortConstraintPtr>> = Vec::with_capacity(sort_constraint_count);
     all.extend(self.constraints.drain(..).map(Some));
     let mut added_sort_constraint: bool;
-    
+
     // Repeatedly loop over the `all` vector until we no longer add a sort constraint.
     loop {
       added_sort_constraint = false;
@@ -152,10 +199,12 @@ impl SortConstraintTable {
             {
               if let (true, mut subproblem) = lhs_automaton
                   .as_mut()
-                  .match_(subject.clone(), &mut context.substitution)
+                  .match_(subject.clone(), &mut context.substitution, None)
               {
-                if subproblem.is_none() || subproblem.as_mut().unwrap().solve(true, context) {
-                  
+                if subproblem.is_none() 
+                    || subproblem.as_mut().map_or(false, |s| s.solve(true, context)) 
+                {
+
                   if !sort_constraint.has_condition()
                       || sort_constraint.check_condition(subject.clone(), context, subproblem)
                   {

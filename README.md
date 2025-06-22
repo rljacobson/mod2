@@ -25,16 +25,17 @@ This project is a work in progress. For a more complete work, check out [Loris](
 
 ## mod2-lib algorithms
 
-- [ ] Sort infrastructure
-- [ ] Dagify
+- [X] Sort infrastructure
+- [X] Dagify
 - [ ] Compilers
-  - [ ] automata
+  - [X] automata
   - [ ] Stack Machine
+- [ ] Rewrite
 - [ ] Match
 - [ ] Free theory
   - [ ] Free net
-- [ ] Built-ins
-- [ ] Variable theory
+- [X] Built-ins
+- [X] Variable theory
 - [ ] Other theories
   - [ ] CUI
   - [ ] AU

@@ -5,10 +5,6 @@ use std::{
 use mod2_abs::impl_as_any_ptr_fns;
 use crate::{
   api::{
-    symbol::{
-      SymbolPtr,
-      Symbol
-    },
     built_in::{
       Bool,
       Float,
@@ -16,12 +12,15 @@ use crate::{
       NaturalNumber,
       NADataType
     },
-    term::BxTerm,
-    dag_node::DagNodePtr
+    BxTerm,
+    DagNodePtr,
+    Symbol,
+    SymbolPtr,
   },
   core::{
     symbol::SymbolCore,
-    EquationalTheory
+    EquationalTheory,
+    rewriting_context::RewritingContext,
   }
 };
 
@@ -72,6 +71,10 @@ impl<T: NADataType> Symbol for  NASymbol<T>{
   
   fn theory(&self) -> EquationalTheory {
     T::THEORY
+  }
+
+  fn rewrite(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
+    self.core_mut().apply_replace(subject, context, None)
   }
 }
 

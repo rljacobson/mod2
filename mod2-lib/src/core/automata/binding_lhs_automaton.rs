@@ -7,13 +7,17 @@ real work.
 
 use crate::{
   api::{
-    automaton::{BxLHSAutomaton, LHSAutomaton},
-    dag_node::DagNodePtr,
-    subproblem::MaybeSubproblem
+    BxLHSAutomaton,
+    LHSAutomaton,
+    DagNodePtr,
+    MaybeSubproblem,
+    MaybeExtensionInfo
   },
-  core::substitution::Substitution,
+  core::{
+    substitution::{Substitution},
+    VariableIndex
+  }
 };
-use crate::core::VariableIndex;
 
 pub(crate) struct BindingLHSAutomaton {
   variable_index:    VariableIndex,
@@ -35,11 +39,11 @@ impl BindingLHSAutomaton {
 impl LHSAutomaton for BindingLHSAutomaton {
   fn match_(
     &mut self,
-    subject: DagNodePtr,
-    solution: &mut Substitution,
-    // extension_info: Option<&mut dyn ExtensionInfo>,
+    subject       : DagNodePtr,
+    solution      : &mut Substitution,
+    extension_info: MaybeExtensionInfo,
   ) -> (bool, MaybeSubproblem) {
-    let (matched, maybe_subproblem) = self.real_lhs_automata.match_(subject, solution);
+    let (matched, maybe_subproblem) = self.real_lhs_automata.match_(subject, solution, extension_info);
     if matched {
       solution.bind(self.variable_index, Some(subject));
       return (matched, maybe_subproblem);

@@ -37,10 +37,11 @@ use mod2_lib::{
     sort::SortCollection
   },
   api::{
-    symbol::SymbolPtr,
-    term::{Term, BxTerm},
     built_in::{get_built_in_symbol, BoolTerm},
     free_theory::FreeTerm,
+    BxTerm,
+    SymbolPtr,
+    Term, 
   },
 };
 

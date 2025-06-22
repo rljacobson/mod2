@@ -7,8 +7,6 @@ use std::{
 use mod2_abs::{HashMap, IString, RcCell, rc_cell, heap_construct};
 use mod2_lib::{
   api::{
-    symbol::{Symbol, SymbolPtr},
-    free_theory::FreeTerm,
     built_in::{
       Bool,
       BoolTerm,
@@ -22,7 +20,11 @@ use mod2_lib::{
       StringTerm,
       get_built_in_symbol,
     },
-    term::{BxTerm, Term},
+    free_theory::FreeTerm,
+    BxTerm,
+    Symbol,
+    SymbolPtr,
+    Term,
   },
   core::sort::SortCollection
 };

@@ -1,10 +1,17 @@
-use std::ops::{Deref, DerefMut};
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::sync::{Mutex, MutexGuard};
+use std::{
+  sync::{
+    atomic::{AtomicPtr, Ordering},
+    Mutex,
+    MutexGuard
+  },
+  ptr::NonNull,
+  ops::{Deref, DerefMut},
+};
 use mod2_abs::{smallvec, SmallVec};
-use crate::api::dag_node::{DagNode, DagNodePtr};
-use crate::core::gc::root_container::root_map::RootMap;
+use crate::{
+  api::{DagNode, DagNodePtr},
+  core::gc::root_container::root_map::RootMap
+};
 
 /// Global linked list of `RootVec` nodes
 static LIST_HEAD: Mutex<AtomicPtr<RootVec>> = Mutex::new(AtomicPtr::new(std::ptr::null_mut()));
@@ -75,8 +82,8 @@ impl RootVec {
     container.link();
     container
   }
-  
-  /// Because this structure is so often used to hold a single node, this convenience method gives direct access to 
+
+  /// Because this structure is so often used to hold a single node, this convenience method gives direct access to
   /// the first node in `self.nodes`.
   pub fn node(&self) -> DagNodePtr {
     *self.nodes.first().unwrap()
@@ -124,6 +131,14 @@ impl RootVec {
 
 }
 
+impl Clone for Box<RootVec> {
+  fn clone(&self) -> Box<RootVec> {
+    let mut container = RootVec::new();
+    container.nodes = self.nodes.clone();
+    container
+  }
+}
+
 impl Drop for RootVec {
   fn drop(&mut self) {
     self.unlink();
@@ -143,3 +158,11 @@ impl DerefMut for RootVec {
     &mut self.nodes
   }
 }
+
+impl PartialEq for RootVec {
+  fn eq(&self, other: &Self) -> bool {
+    self.nodes == other.nodes
+  }
+}
+
+impl Eq for RootVec {}

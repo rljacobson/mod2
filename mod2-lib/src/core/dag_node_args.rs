@@ -5,13 +5,11 @@ use std::ptr::null_mut;
 use crate::{
   api::{
     Arity,
-    dag_node::{
-      arg_to_dag_node, 
-      arg_to_node_vec, 
-      DagNodePtr, 
-      DagNodeVector, 
-      DagNodeVectorRefMut
-    }
+    arg_to_dag_node,
+    arg_to_node_vec,
+    DagNodePtr,
+    DagNodeVector,
+    DagNodeVectorRefMut
   }
 };
 

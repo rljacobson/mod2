@@ -1,6 +1,7 @@
 /*!
 
-A `Subproblem` corresponds roughly to the `MatchGenerator`s of Loris.
+A `Subproblem` corresponds roughly to the `MatchGenerator`s of Loris. These traits must be
+derived from for equational theories that need to generate matching or unification subproblems.
 
 # Eker96
 
@@ -27,36 +28,15 @@ object with its state updated. Thus, solutions can be extracted from the subprob
 
 */
 
-use std::rc::Rc;
 use super::automaton::LHSAutomaton;
-use crate::{
-  api::dag_node::DagNodePtr,
-  core::{
-    rewriting_context::RewritingContext,
-    substitution::Substitution,
-    LocalBindings,
-  },
+use crate::core::{
+  rewriting_context::RewritingContext,
+  substitution::Substitution,
+  LocalBindings,
+  VariableIndex
 };
-use crate::core::VariableIndex;
-// These traits must be derived from for equational theories that need to generate
-// matching or unification subproblems or pass back extension information.
 
-// ToDo: This appears to be used as an output parameter for methods that create subproblems. So far
-//       I have omitted these because they aren't used for the free theory.
-pub trait ExtensionInfo {
-  // Todo: Implement `ExtensionInfo`.
-  /// sets the valid_after_match field
-  fn set_valid_after_match(&mut self, value: bool);
 
-  /// sets the matched_whole field
-  fn set_matched_whole(&mut self, value: bool);
-
-  /// sets the unmatched field
-  fn set_unmatched(&mut self, value: DagNodePtr);
-}
-
-pub type RcSubproblem = Rc<dyn Subproblem>;
-// pub type MaybeSubproblem = Option<RcSubproblem>;
 pub type MaybeSubproblem = Option<Box<dyn Subproblem>>;
 
 /// Represents a subproblem of a matching problem.
@@ -65,25 +45,30 @@ pub trait Subproblem {
 }
 
 pub struct VariableAbstractionSubproblem {
-  pub abstracted_pattern:   Box<dyn LHSAutomaton>,
+  pub abstracted_pattern  : Box<dyn LHSAutomaton>,
   pub abstraction_variable: VariableIndex,
-  pub variable_count:       u32,
-  pub difference:           Option<LocalBindings>,
-  pub subproblem:           Option<Box<dyn Subproblem>>,
-  pub local:                Substitution, // Todo: How does this differ from `difference`?
-  pub solved:               bool,
+  pub variable_count      : u32,
+  pub difference          : Option<LocalBindings>,
+  pub subproblem          : Option<Box<dyn Subproblem>>,
+  pub local               : Substitution, // Todo: How does this differ from `difference`?
+  pub solved              : bool,
 }
 
 impl VariableAbstractionSubproblem {
-  pub fn new(abstracted_pattern: Box<dyn LHSAutomaton>, abstraction_variable: VariableIndex, variable_count: u32) -> Self {
+  pub fn new(
+    abstracted_pattern: Box<dyn LHSAutomaton>, 
+    abstraction_variable: VariableIndex, 
+    variable_count: u32
+  ) -> Self 
+  {
     VariableAbstractionSubproblem {
       abstracted_pattern,
       abstraction_variable,
       variable_count,
       difference: Some(LocalBindings::default()),
       subproblem: None,
-      local: Default::default(),
-      solved: false,
+      local     : Default::default(),
+      solved    : false,
     }
   }
 }
@@ -98,7 +83,7 @@ impl Subproblem for VariableAbstractionSubproblem {
       let v = v.unwrap();
 
       // Todo: What about the potential subproblem? Is it pushed to self.subproblem? If so, why return it?
-      if let (false, _) = self.abstracted_pattern.match_(v, &mut self.local /* None */) {
+      if let (false, _) = self.abstracted_pattern.match_(v, &mut self.local, None) {
         return false;
       }
 
@@ -116,12 +101,10 @@ impl Subproblem for VariableAbstractionSubproblem {
       }
     } else {
       if let Some(subproblem) = &mut self.subproblem {
-        if subproblem.solve(true, context) {
+        if subproblem.solve(false, context) {
           return true;
         }
-      } else {
-        return true;
-      }
+      } 
     }
 
     if let Some(difference) = self.difference.as_mut() {

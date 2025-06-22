@@ -7,8 +7,9 @@
 
 use crate::{
   api::{
-    automaton::BxRHSAutomaton,
-    dag_node::{DagNodePtr, MaybeDagNode}
+    BxRHSAutomaton,
+    DagNodePtr, 
+    MaybeDagNode
   },
   core::{
     substitution::Substitution,

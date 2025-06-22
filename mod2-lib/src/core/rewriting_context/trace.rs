@@ -5,7 +5,7 @@ use mod2_abs::{
 };
 use super::{ContextAttribute, RewriteType};
 use crate::{
-  api::dag_node::{DagNode, DagNodePtr},
+  api::{DagNode, DagNodePtr},
   core::{
     substitution::{
       print_substitution_with_ignored,

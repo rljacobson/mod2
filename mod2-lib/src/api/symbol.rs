@@ -16,11 +16,10 @@ use mod2_abs::{decl_as_any_ptr_fns, IString, Set, UnsafePtr};
 use crate::{
   api::{
     Arity,
-    dag_node::DagNodePtr,
-    term::{
-      BxTerm,
-      TermPtr
-    }
+    BxTerm,
+    DagNode,
+    DagNodePtr, 
+    TermPtr,
   },
   core::{
     format::{FormatStyle, Formattable},
@@ -29,7 +28,8 @@ use crate::{
       SymbolCore,
       OpDeclaration
     },
-    sort::KindPtr,
+    rewriting_context::RewritingContext,
+    sort::{KindPtr, SortIndex},
     strategy::Strategy,
     EquationalTheory,
   },
@@ -104,8 +104,32 @@ pub trait Symbol {
   }
 
   #[inline(always)]
-  fn strategy(&self) -> &Strategy {
-    &self.core().strategy
+  fn strategy(&self) -> Option<&Strategy> {
+    self.core().strategy.as_deref()
+  }
+  
+  #[inline(always)]
+  fn standard_strategy(&self) -> bool {
+    // Uses the standard strategy if `self.strategy` is `None`.
+    self.core().strategy.is_none()
+  }
+
+  #[inline(always)]
+  fn eager_argument(&self, arg_count: usize) -> bool {
+    if let Some(strategy) = self.core().strategy.as_deref() {
+      strategy.eager.contains(arg_count)
+    } else { 
+      false
+    }
+  }
+
+  #[inline(always)]
+  fn evaluated_argument(&self, arg_count: usize) -> bool {
+    if let Some(strategy) = self.core().strategy.as_deref() {
+      strategy.evaluated.contains(arg_count)
+    } else {
+      false
+    }
   }
   
   #[inline(always)]
@@ -119,6 +143,8 @@ pub trait Symbol {
   fn compare(&self, other: &dyn Symbol) -> Ordering {
     self.hash().cmp(&other.hash())
   }
+  
+  // Compiler related methods
 
   #[inline(always)]
   fn add_op_declaration(&mut self, op_declaration: OpDeclaration) {
@@ -131,6 +157,43 @@ pub trait Symbol {
     let symbol_ptr = self.as_ptr();
     self.core_mut().sort_table.compile_op_declaration(symbol_ptr)
   }
+  
+  // Rewriting related methods
+
+  /// Performs symbol-specific equational rewriting on the given DAG node.  
+  /// This virtual method is called by the reduction machinery to apply equations  
+  /// and built-in operations specific to this symbol type. Returns `true` if
+  /// the subject was modified.
+  fn rewrite(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool;
+
+
+  fn fast_compute_true_sort(&mut self, mut subject: DagNodePtr, context: &mut RewritingContext) {
+    // let root = self.root.unwrap();
+    match self.core().unique_sort_index {
+      SortIndex::SLOW_CASE_UNIQUE_SORT => {
+        // most general case
+        self.slow_compute_true_sort(subject, context);
+      }
+
+      SortIndex::FAST_CASE_UNIQUE_SORT => {
+        // usual case
+        subject.compute_base_sort();
+      }
+      
+      other => {
+        // unique sort case
+        subject.set_sort_index(other);
+      }
+    }
+  }
+
+  /// Computes the true sort of root.
+  fn slow_compute_true_sort(&mut self, subject: DagNodePtr, context: &mut RewritingContext) {
+    self.core_mut()
+        .sort_constraint_table
+        .constrain_to_smaller_sort(subject.clone(), context);
+  }
+
 }
 
 

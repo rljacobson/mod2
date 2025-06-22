@@ -1,12 +1,7 @@
 # In Progress
 
-- `check*` methods on `PreEquation` 
-- compileLHS / compileRHS
-
-- `Kind::sort(idx)` indexes into `self.sorts`
-- `sortIndex` is used as an array index in `SortTable::get_maximal_op_decl_set()`
-- `index_variables` free function in `pre_equation/mod.rs`
-- Arity needs to be changed to be a constant nonnegative int fixed at symbol construction.
+- `RewritingContext::reduce`
+- `ExtensionInfo`, and add it to matching methods
 
 # Next Steps
 
@@ -36,6 +31,7 @@
 
 # Saved for later
 
+- `AUExtensionInfo`, `AUCExtensionInfo`, `SExtensionInfo`
 - `core::rewriting_context::trace`
 - `core::rewriting_context::debugger`
 
@@ -48,3 +44,8 @@ the vtable/theory doesn't change–which you can't–then it's ok.
 
 One option is to store the vtable pointer in `DagNodeCore` (or just use
 the theory tag) and reconstruct the fat pointer in `UnsafePointer`.
+
+## `SymbolType`
+
+The same symbol can have different `SymbolType`s in different modules. So the symbol 
+type of a symbol is maintained in the module, not in the symbol itself. 
