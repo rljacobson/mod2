@@ -89,6 +89,7 @@ impl SortIndex {
   pub const ERROR                : SortIndex = SortIndex(Some(OptU16::ZERO));
   pub const FIRST_USER_SORT      : SortIndex = SortIndex(Some(OptU16::new_unchecked(1)));
   pub const UNKNOWN              : SortIndex = SortIndex(None);
+  pub const UNDEFINED            : SortIndex = SortIndex(None);
   pub const UNINITIALIZED        : SortIndex = SortIndex(Some(OptU16::ZERO));
   pub const IMPOSSIBLE           : SortIndex = SortIndex(None);
   pub const FAST_CASE_UNIQUE_SORT: SortIndex = SortIndex(None);

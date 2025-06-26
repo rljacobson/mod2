@@ -1,7 +1,8 @@
 # In Progress
 
 - `RewritingContext::reduce`
-- `ExtensionInfo`, and add it to matching methods
+- `FreeSymbol::discrimination_net.apply_replace(subject, context)`
+- `FreeSymbol::complex_strategy`
 
 # Next Steps
 

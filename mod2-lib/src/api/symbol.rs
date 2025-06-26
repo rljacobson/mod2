@@ -194,6 +194,10 @@ pub trait Symbol {
         .constrain_to_smaller_sort(subject.clone(), context);
   }
 
+  fn constrain_to_smaller_sort(&mut self, subject: DagNodePtr, context: &mut RewritingContext) {
+    self.core_mut().sort_constraint_table.constrain_to_smaller_sort(subject, context);
+  }
+
 }
 
 

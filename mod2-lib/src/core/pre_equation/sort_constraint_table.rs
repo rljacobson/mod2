@@ -162,6 +162,12 @@ impl SortConstraintTable {
     unimplemented!()
   }
 
+  /// Attempts to constrain the given DAG node to a smaller sort by applying applicable
+  /// sort constraints. Iterates through sort constraints in order from smallest to largest
+  /// sort, applying the first matching constraint that can reduce the node's sort. If a
+  /// constraint successfully applies, the process restarts from the beginning to check
+  /// if earlier constraints can now apply to the newly constrained sort. Does nothing
+  /// if the symbol has no sort constraints or if the rewriting context is limited.
   pub(crate) fn constrain_to_smaller_sort(&mut self, mut subject: DagNodePtr, context: &mut RewritingContext) {
     if self.sort_constraint_free() {
       return;

@@ -3,6 +3,12 @@
 A `Subproblem` corresponds roughly to the `MatchGenerator`s of Loris. These traits must be
 derived from for equational theories that need to generate matching or unification subproblems.
 
+This module defines the following implementors:
+
+- `VariableAbstractionSubproblem`
+- `SubproblemSequence`
+- 
+
 # Eker96
 
 ## Matching Phase
@@ -27,15 +33,19 @@ possibilities have already been tried and the returned subproblem object is real
 object with its state updated. Thus, solutions can be extracted from the subproblem object as needed.
 
 */
+use mod2_abs::Outcome;
 
-use super::automaton::LHSAutomaton;
-use crate::core::{
-  rewriting_context::RewritingContext,
-  substitution::Substitution,
-  LocalBindings,
-  VariableIndex
+use crate::{
+  api::DagNodePtr,
+  core::{
+    LocalBindings,
+    VariableIndex,
+    rewriting_context::RewritingContext,
+    sort::{SortIndex, SortPtr},
+    substitution::Substitution,
+  }
 };
-
+use super::automaton::LHSAutomaton;
 
 pub type MaybeSubproblem = Option<Box<dyn Subproblem>>;
 
@@ -168,5 +178,36 @@ impl Subproblem for SubproblemSequence {
     }
 
     find_first
+  }
+}
+
+
+pub struct SortCheckSubproblem {
+  pub subject: DagNodePtr,
+  pub sort: SortPtr,
+  pub result: Outcome
+}
+
+impl SortCheckSubproblem {
+  pub fn new(subject: DagNodePtr, sort: SortPtr) -> SortCheckSubproblem {
+    SortCheckSubproblem{
+      subject,
+      sort,
+      result: Outcome::Undecided
+    }
+  }
+}
+
+impl Subproblem for SortCheckSubproblem {
+  fn solve(&mut self, find_first: bool, solution: &mut RewritingContext) -> bool {
+    if !find_first {
+      return false; // Maude: Only ever one way to solve; otherwise infinite loop.
+    }
+    
+    if self.result == Outcome::Undecided {
+      self.result = self.subject.check_sort_in_context(self.sort, solution);
+    }
+    
+    self.result == Outcome::Success
   }
 }

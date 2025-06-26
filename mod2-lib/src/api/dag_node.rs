@@ -29,7 +29,8 @@ use crate::{
     Arity,
     Term,
     MaybeSubproblem,
-    MaybeExtensionInfo
+    MaybeExtensionInfo,
+    SortCheckSubproblem,
   },
   core::{
     dag_node_core::{
@@ -49,14 +50,14 @@ use crate::{
         GCVectorRefMut
       }
     },
-    sort::{SortPtr, SortIndex},
-    RedexPosition,
-    HashConsSet,
     DagNodeArguments,
     EquationalTheory,
+    HashConsSet,
+    RedexPosition,
+    VariableIndex,
     rewriting_context::RewritingContext,
+    sort::{SortPtr, SortIndex},
     substitution::Substitution,
-    VariableIndex
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -553,6 +554,9 @@ pub trait DagNode {
   /// the sorts of its arguments. Each symbol theory implements its own logic.
   fn compute_base_sort(&mut self);
 
+  /// This version is designed for matching contexts where subproblems can be deferred.
+  /// When sort checking fails but the symbol has sort constraints, it creates a
+  /// `SortCheckSubproblem` for later resolution
   fn check_sort(&mut self, bound_sort: SortPtr) -> (Outcome, MaybeSubproblem) {
     if self.sort().is_some() {
       return (self.leq_sort(bound_sort).into(), None);
@@ -569,12 +573,35 @@ pub trait DagNode {
         return (Outcome::Failure, None);
       }
       self.set_sort_index(SortIndex::UNKNOWN);
-      // Todo: Implement `SortCheckSubproblem`.
-      // let returned_subproblem = SortCheckSubproblem::new(this, bound_sort);
-      // return (Outcome::Success, Some(returned_subproblem))
+      let returned_subproblem = Box::new(SortCheckSubproblem::new(self.as_ptr(), bound_sort));
+      return (Outcome::Success, Some(returned_subproblem))
     }
 
-    return (Outcome::Success, None);
+    (Outcome::Success, None)
+  }
+
+  /// This version is designed for rewriting contexts where sort constraints must be resolved immediately.
+  fn check_sort_in_context(&mut self, bound_sort: SortPtr, context: &mut RewritingContext) -> Outcome{
+    if self.sort_index().is_unknown() {
+      self.compute_base_sort();
+
+      if self.leq_sort(bound_sort) {
+        if !self.symbol().sort_constraint_free() {
+          self.set_sort_index(SortIndex::UNKNOWN);
+        }
+        return Outcome::Success;
+      }
+
+      if self.symbol().sort_constraint_free() {
+        return Outcome::Failure;
+      }
+
+      let mut local = RewritingContext::new(Some(self.as_ptr()));
+      self.symbol().constrain_to_smaller_sort(self.as_ptr(), &mut local);
+      context.add_counts_from(&local);
+    }
+
+    self.leq_sort(bound_sort).into()
   }
   // endregion Compiler related methods
 
