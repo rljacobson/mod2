@@ -143,7 +143,7 @@ fn make_symbols() -> Vec<SymbolPtr> {
   (0..=10).map(|x| {
             // let name = IString::from(format!("sym({})", x).as_str());
             let name = IString::from("sym");
-            SymbolPtr::new(heap_construct!(FreeSymbol::with_arity(name, Arity::new_unchecked(x))))
+            SymbolPtr::new(heap_construct!(FreeSymbol::with_arity(name, Arity::new_unchecked(x), None)))
           })
       .collect::<Vec<_>>()
 }
@@ -217,7 +217,7 @@ fn test_garbage_collection() {
 #[test]
 fn test_arena_exhaustion() {
   let _guard = TEST_MUTEX.lock();
-  let symbol = FreeSymbol::with_arity(IString::from("mysymbol"), Arity::new_unchecked(1));
+  let symbol = FreeSymbol::with_arity(IString::from("mysymbol"), Arity::new_unchecked(1), None);
   let symbol_ptr = SymbolPtr::new(heap_construct!(symbol));
   let root: DagNodePtr = DagNodeCore::new(symbol_ptr);
   println!("root: {}", root);
@@ -252,18 +252,18 @@ fn create_destroy_variable_dag_node() {
   let name = IString::from("Hello");
   set_global_logging_threshold(5);
   {
-    let symbol = VariableSymbol::with_name(name.clone());
+    let symbol = VariableSymbol::with_name(name.clone(), None);
     {
       let node = VariableDagNode::new(symbol.as_ptr(), name.clone(), 0);
       println!("{}", node);
-      // Node goes out of scope. 
+      // Node goes out of scope.
     }
     {
       let mut allocator = acquire_node_allocator("VariableDagNode finalizer test");
       allocator.collect_garbage();
     }
     // Create a dummy `DagNode` to force lazy sweep
-    let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::ZERO);
+    let dummy_symbol = FreeSymbol::with_arity("Free".into(), Arity::ZERO, None);
     let dummy_node = FreeDagNode::new(dummy_symbol.as_ptr());
     _ = dummy_node.len(); // Don't optimize away
 

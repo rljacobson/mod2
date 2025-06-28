@@ -18,13 +18,13 @@ use mod2_lib::{
     pre_equation::{
       PreEquation,
       PreEquationKind,
+      PreEquationAttributes,
       condition::Conditions
     },
     sort::SortCollection,
     symbol::SymbolType
   },
 };
-use mod2_lib::core::pre_equation::PreEquationAttributes;
 use crate::{
   parser::ast::{
     BxEquationDeclarationAST,

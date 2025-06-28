@@ -23,6 +23,7 @@ use crate::{
   },
   impl_display_debug_for_formattable,
 };
+use crate::core::{MaybeModulePtr, Module};
 use crate::core::rewriting_context::RewritingContext;
 
 pub struct VariableSymbol {
@@ -32,18 +33,19 @@ pub struct VariableSymbol {
 impl VariableSymbol {
   #[inline(always)]
   pub fn new(
-    name       : IString,
-    arity      : Arity,
-    attributes : SymbolAttributes,
-    symbol_type: SymbolType,
+    name         : IString,
+    arity        : Arity,
+    attributes   : SymbolAttributes,
+    symbol_type  : SymbolType,
+    parent_module: MaybeModulePtr,
   ) -> VariableSymbol {
-    let core = SymbolCore::new(name, arity, attributes, symbol_type);
+    let core = SymbolCore::new(name, arity, attributes, symbol_type, parent_module);
     VariableSymbol{ core }
   }
 
   #[inline(always)]
-  pub(crate) fn with_name(name: IString) -> VariableSymbol {
-    let core = SymbolCore::with_name(name);
+  pub(crate) fn with_name(name: IString, parent_module: MaybeModulePtr) -> VariableSymbol {
+    let core = SymbolCore::with_name(name, parent_module);
     VariableSymbol { core }
   }
 

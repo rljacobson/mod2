@@ -69,6 +69,7 @@ macro_rules! make_symbol {
             Arity::ZERO,
             SymbolAttribute::Constructor.into(),
             $symbol_type,
+            None
           );
           let mut symbol_ptr  = SymbolPtr::new(
             heap_construct!(paste!{ [<$sort_name Symbol>] ::new(symbol_core)})

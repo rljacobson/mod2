@@ -61,8 +61,8 @@ impl VariableInfo {
 
   pub(crate) fn variable_to_index(&mut self, variable: TermPtr) -> VariableIndex {
     assert_eq!(
-      self.variables.len(), 
-      self.protected_variable_count as usize, 
+      self.variables.len(),
+      self.protected_variable_count as usize,
       "can't add new real variables at this stage"
     );
 
@@ -142,7 +142,17 @@ impl VariableInfo {
 
   // endregion Accessors
 
-  pub(crate) fn compute_index_remapping(&mut self) -> i32 {
+  /// Optimizes variable slot allocation in substitutions by using graph coloring to
+  /// minimize memory usage while preventing variable index conflicts. It first assigns
+  /// protected variables to indices that must persist across compilation fragments, then
+  /// builds a conflict graph for remaining construction indices and uses graph coloring
+  /// to assign the minimum number of slots needed for non-conflicting variables. The
+  /// returned number represents the minimum number of substitution slots needed to
+  /// accommodate all variables used in equation compilation. Specifically, it's the sum of:
+  ///   - Protected variables (`protected_variable_count`) - variables that must persist across fragments
+  ///   - Graph coloring result (`color_count`) - the minimum number of slots needed for construction indices
+  ///     that can be reused within fragments
+  pub(crate) fn compute_index_remapping(&mut self) -> u32 {
     let construction_indices_count = self.construction_indices.len();
 
     // All construction indices that need to be protected between different fragments
@@ -169,11 +179,11 @@ impl VariableInfo {
     let mut next_conflict_candidates = Vec::new();
     for i in 0..construction_indices_count {
       if self.construction_indices[i].assigned_fragment == self.construction_indices[i].last_use_fragment {
-        // A remaining construction index i conflicts with any earlier
-        // remaining construction index j whose last use is after the
-        // allocation of construction index i. To speed things up
-        // when the number of construction indices is huge, we keep track
-        // of a smaller pool of candidates.
+
+        // A remaining construction index `i` conflicts with any earlier remaining
+        // construction index `j` whose last use is after the allocation of
+        // construction index `i`. To speed things up when the number of construction
+        // indices is huge, we keep track of a smaller pool of candidates.
         next_conflict_candidates.clear();
         for &c in &conflict_candidates {
           let construction_index: ConstructionIndex = self.construction_indices[c];
@@ -197,7 +207,7 @@ impl VariableInfo {
     }
 
     // Finally, we need to return the minimum size of substitution needed.
-    self.protected_variable_count as i32 + color_count
+    self.protected_variable_count + color_count as u32
     /*
     DebugAdvisory("nrProtectedVariables = " << nrProtectedVariables <<
                   "\tnrColors = " << nrColors);

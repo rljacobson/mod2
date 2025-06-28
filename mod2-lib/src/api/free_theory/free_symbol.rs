@@ -9,7 +9,9 @@ use crate::{
     sort::SortPtr,
     format::{FormatStyle, Formattable},
     dag_node_core::DagNodeCore,
-    EquationalTheory
+    EquationalTheory,
+    MaybeModulePtr,
+    rewriting_context::RewritingContext
   },
   api::{
     symbol::{
@@ -26,7 +28,6 @@ use crate::{
   },
   impl_display_debug_for_formattable,
 };
-use crate::core::rewriting_context::RewritingContext;
 
 pub struct FreeSymbol {
   core: SymbolCore
@@ -34,17 +35,18 @@ pub struct FreeSymbol {
 
 impl FreeSymbol {
   pub fn new(
-    name: IString,
-    arity: Arity,
-    attributes : SymbolAttributes,
-    symbol_type: SymbolType,
+    name         : IString,
+    arity        : Arity,
+    attributes   : SymbolAttributes,
+    symbol_type  : SymbolType,
+    parent_module: MaybeModulePtr,
   ) -> FreeSymbol {
-    let core = SymbolCore::new(name, arity, attributes, symbol_type);
+    let core = SymbolCore::new(name, arity, attributes, symbol_type, parent_module);
     FreeSymbol{ core }
   }
 
-  pub fn with_arity(name: IString, arity: Arity) -> FreeSymbol {
-    let core = SymbolCore::with_arity(name, arity);
+  pub fn with_arity(name: IString, arity: Arity, parent_module: MaybeModulePtr) -> FreeSymbol {
+    let core = SymbolCore::with_arity(name, arity, parent_module);
     FreeSymbol { core }
   }
 }
@@ -116,7 +118,7 @@ mod tests {
 
   #[test]
   fn test_symbol_creation(){
-    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(3));
+    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(3), None);
     assert_eq!(f.arity().get(), 3);
     assert_eq!(f.name().deref(), "f");
   }

@@ -3,7 +3,7 @@
 A `Module` owns all items defined within it. A module is a kind of namespace. Reduction/matching/evaluation
 happens within the context of some module.
 
-The `Module` structure is designed for Mod2 but can conceivably be used in other contexts. In any case, it implements 
+The `Module` structure is designed for Mod2 but can conceivably be used in other contexts. In any case, it implements
 algorithms any client application would also require.<br>
 
 ## Module Construction
@@ -24,13 +24,7 @@ subsort relation. This is done by calling the method `Module::compute_kind_closu
 
 use std::fmt::{Debug, Display, Formatter};
 
-use mod2_abs::{
-  HashMap,
-  IString,
-  warning,
-  join_iter,
-  heap_destroy,
-};
+use mod2_abs::{HashMap, IString, warning, join_iter, heap_destroy, UnsafePtr, debug};
 
 use crate::{
   api::{
@@ -61,7 +55,9 @@ pub enum ModuleStatus {
   StackMachineCompiled,
 }
 
-pub type BxModule = Box<Module>;
+pub type BxModule       = Box<Module>;
+pub type ModulePtr      = UnsafePtr<Module>;
+pub type MaybeModulePtr = Option<ModulePtr>;
 
 #[derive(Default)]
 pub struct Module {
@@ -80,6 +76,12 @@ pub struct Module {
   pub membership: Vec<PreEquation>,
   // pub strategies: Vec<PreEquation>, // Unimplemented
 
+  /// When creating `Substitution`s, `minimumSubstitutionSize` determines the initial size .
+  /// The `minimumSubstitutionSize` serves as a **starting offset** rather than a direct index.
+  /// It marks the boundary between equation variables (slots 0 to `minimumSubstitutionSize-1`)
+  /// and narrowing/target variables (starting from `minimumSubstitutionSize`).
+  pub minimum_substitution_size: u32,
+
   // Members for performance profiling
   #[cfg(feature = "profiling")]
   symbol_info: Vec<SymbolProfile>,
@@ -89,11 +91,14 @@ pub struct Module {
   eq_info    : Vec<StatementProfile>, // Equation
   #[cfg(feature = "profiling")]
   rl_info    : Vec<StatementProfile>, // Rule
-  #[cfg(feature = "profiling")]
-  sd_info    : Vec<StatementProfile>, // Strategy Definition
+  // #[cfg(feature = "profiling")]
+  // sd_info    : Vec<StatementProfile>, // Strategy Definition
 }
 
 impl Module {
+
+  /// Creates a new module. The module assigns itself as the parent of all symbols that do not already have a parent.
+  /// The new module should not be moved.
   pub fn new(
     name      : IString,
     submodules: Vec<BxModule>,
@@ -104,6 +109,7 @@ impl Module {
     rules     : Vec<PreEquation>,
     membership: Vec<PreEquation>,
   ) -> BxModule {
+    let mut new_module =
     Box::new(
       Module{
         name,
@@ -116,7 +122,9 @@ impl Module {
         equations,
         membership,
         variables,
-  
+
+        minimum_substitution_size: 1,
+
         // Members for performance profiling
         #[cfg(feature = "profiling")]
         symbol_info: vec![],
@@ -126,12 +134,24 @@ impl Module {
         eq_info    : vec![],
         #[cfg(feature = "profiling")]
         rl_info    : vec![],
-        #[cfg(feature = "profiling")]
-        sd_info    : vec![],
+        // #[cfg(feature = "profiling")]
+        // sd_info    : vec![],
       }
-    )
+    );
+
+    // Make the owned symbols point to this module as their parent.
+    let parent_ptr = new_module.as_ptr();
+
+    for symbol in new_module.symbols.values_mut() {
+      let symbol = symbol.core_mut();
+      if symbol.parent_module.is_none() {
+        symbol.parent_module = Some(parent_ptr);
+      }
+    }
+
+    new_module
   }
-  
+
   /**
   Computes the transitive closure of the subsort relation, constructing the lattice of sorts. This only needs to be
   done once when the module is constructed. It is not idempotent.
@@ -147,7 +167,7 @@ impl Module {
   */
   pub fn compute_kind_closures(&mut self) {
     assert_eq!(self.status, ModuleStatus::Open, "tried to compute kind closure when module status is not open");
-    // Temporarily swap out the sort collection with a dummy. 
+    // Temporarily swap out the sort collection with a dummy.
     let mut sorts = SortCollection::new();
     std::mem::swap(&mut self.sorts, &mut sorts);
 
@@ -242,11 +262,29 @@ impl Module {
 
   }
 
+  #[inline(always)]
+  pub fn as_ptr(&self) -> ModulePtr {
+    ModulePtr::new(self as *const Module as *mut Module)
+  }
+
+  pub fn notify_substitution_size(&mut self, size: u32) {
+    if size > self.minimum_substitution_size {
+      debug!(
+        5,
+        "minimumSubstitutionSize for {:?} increased from {} to {}",
+        self.name,
+        self.minimum_substitution_size,
+        size
+      );
+      self.minimum_substitution_size = size;
+    }
+  }
 }
 
 impl Drop for Module {
-  /// A module owns its symbols and kinds, which are raw pointers to allocated memory. The module must reclaim this 
+  /// A module owns its symbols and kinds, which are raw pointers to allocated memory. The module must reclaim this
   /// owned memory when it is dropped.
+  // ToDo: We should own the symbols as `Box<Symbol>` and then hand out `SymbolPtr` as needed.
   fn drop(&mut self) {
     for (_, symbol_ptr) in self.symbols.iter() {
       heap_destroy!(symbol_ptr.as_mut_ptr());

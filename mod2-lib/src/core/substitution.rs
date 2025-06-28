@@ -16,7 +16,7 @@ use std::cmp::min;
 
 use mod2_abs::NatSet;
 
-use crate::{
+pub(crate) use crate::{
   api::{DagNodePtr, MaybeDagNode},
   core::{
     LocalBindings,

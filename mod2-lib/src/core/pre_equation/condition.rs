@@ -25,12 +25,12 @@ use crate::{
     sort::SortPtr,
     substitution::Substitution,
     StateTransitionGraph,
+    TermBag,
     VariableInfo,
     VariableIndex
   }
 };
 use Condition::*;
-
 
 pub type Conditions  = Vec<BxCondition>;
 pub type BxCondition = Box<Condition>;
@@ -38,19 +38,19 @@ pub type BxCondition = Box<Condition>;
 /// Holds state information used in solving condition fragments.
 pub enum ConditionState {
   Assignment {
-    saved:       Substitution,
+    saved      : Substitution,
     rhs_context: Box<RewritingContext>,
-    subproblem:  Box<dyn Subproblem>,
-    succeeded:   bool,
+    subproblem : Box<dyn Subproblem>,
+    succeeded  : bool,
   },
 
   Rewrite {
     state_graph: StateTransitionGraph,
-    matcher:     Box<dyn LHSAutomaton>,
-    saved:       Substitution,
-    subproblem:  Box<dyn Subproblem>,
-    explore:     i32,
-    edge_count:  u32,
+    matcher    : Box<dyn LHSAutomaton>,
+    saved      : Substitution,
+    subproblem : Box<dyn Subproblem>,
+    explore    : i32,
+    edge_count : u32,
   },
 }
 
@@ -97,7 +97,7 @@ pub enum Condition {
 impl Condition {
   fn lhs_term(&self) -> TermPtr {
     match self {
-      Equality { lhs_term, .. } 
+      Equality { lhs_term, .. }
       | SortMembership { lhs_term, .. }
       | Match { lhs_term, .. }
       | Rewrite { lhs_term, .. } => {
@@ -105,7 +105,165 @@ impl Condition {
       }
     }
   }
-  
+
+  // region Compiler related methods
+
+
+  pub fn preprocess(&mut self) {
+    match self {
+
+      Match { lhs_term, rhs_term, .. } => {
+        lhs_term.fill_in_sort_info();
+        rhs_term.fill_in_sort_info();
+        assert_eq!(lhs_term.kind(), rhs_term.kind(), "component clash");
+        lhs_term.analyse_collapses()
+      }
+
+      Equality { lhs_term, rhs_term, .. } => {
+        lhs_term.fill_in_sort_info();
+        rhs_term.fill_in_sort_info();
+        assert_eq!(lhs_term.kind(), rhs_term.kind(), "component clash");
+      }
+
+      Rewrite { lhs_term, rhs_term, .. } => {
+        lhs_term.fill_in_sort_info();
+        rhs_term.fill_in_sort_info();
+        assert_eq!(lhs_term.kind(), rhs_term.kind(), "component clash");
+        rhs_term.analyse_collapses()
+      }
+
+      SortMembership { lhs_term, sort, .. } => {
+        lhs_term.fill_in_sort_info();
+        assert_eq!(lhs_term.kind(), sort.kind, "component clash");
+      }
+
+    }
+  }
+
+  pub fn compile_build(&mut self, variable_info: &mut VariableInfo, available_terms: &mut TermBag) {
+    match self {
+      Equality {
+        lhs_term,
+        rhs_term,
+        lhs_index,
+        rhs_index,
+        builder,
+        ..
+      } => {
+        *lhs_index = lhs_term.compile_rhs(builder, variable_info, available_terms, true);
+        *rhs_index = rhs_term.compile_rhs(builder, variable_info, available_terms, true);
+        variable_info.use_index(*lhs_index);
+        variable_info.use_index(*rhs_index);
+        variable_info.end_of_fragment();
+      }
+
+      SortMembership {
+        lhs_term,
+        lhs_index,
+        builder,
+        ..
+      } => {
+        *lhs_index = lhs_term.compile_rhs(builder, variable_info, available_terms, true);
+        variable_info.use_index(*lhs_index);
+        variable_info.end_of_fragment();
+      }
+
+      Match {
+        lhs_term,
+        rhs_term,
+        rhs_index,
+        builder,
+        ..
+      } => {
+        *rhs_index = rhs_term.compile_rhs(builder, variable_info, available_terms, true);
+        variable_info.use_index(*rhs_index);
+
+        lhs_term.find_available_terms(available_terms, true, false);
+
+        let lhs_term = lhs_term;
+        lhs_term.determine_context_variables();
+        lhs_term.insert_abstraction_variables(variable_info);
+        variable_info.end_of_fragment();
+      }
+
+      Rewrite {
+        lhs_term,
+        rhs_term,
+        lhs_index,
+        builder,
+        ..
+      } => {
+        // ToDo: Why call `compile_rhs` on the lhs term?
+        *lhs_index = lhs_term.compile_rhs(builder, variable_info, available_terms, true);
+        variable_info.use_index(*lhs_index);
+
+        rhs_term.find_available_terms(available_terms, true, false);
+
+        let mut rhs_term = rhs_term;
+        rhs_term.determine_context_variables();
+        rhs_term.insert_abstraction_variables(variable_info);
+        variable_info.end_of_fragment();
+      }
+    }
+  }
+
+  pub fn compile_match(&mut self, variable_info: &mut VariableInfo, bound_uniquely: &mut NatSet) {
+    match self {
+      Equality {
+        lhs_index,
+        rhs_index,
+        builder,
+        ..
+      } => {
+        builder.remap_indices(variable_info);
+        *lhs_index = variable_info.remap_index(*lhs_index);
+        *rhs_index = variable_info.remap_index(*rhs_index);
+      }
+
+      SortMembership { lhs_index, builder, .. } => {
+        builder.remap_indices(variable_info);
+        *lhs_index = variable_info.remap_index(*lhs_index);
+      }
+
+      Match {
+        lhs_term,
+        rhs_index,
+        lhs_matcher,
+        builder,
+        ..
+      } => {
+        builder.remap_indices(variable_info);
+        *rhs_index = variable_info.remap_index(*rhs_index);
+
+        let (new_matcher, _subproblem_likely): (BxLHSAutomaton, bool) =
+            lhs_term.compile_lhs(false, variable_info, bound_uniquely);
+        *lhs_matcher = Some(new_matcher);
+
+        bound_uniquely.union_in_place(lhs_term.occurs_below())
+      }
+
+      Rewrite {
+        rhs_term,
+        lhs_index,
+        rhs_matcher,
+        builder,
+        ..
+      } => {
+        builder.remap_indices(variable_info);
+        *lhs_index = variable_info.remap_index(*lhs_index);
+
+        let (new_matcher, _subproblem_likely): (BxLHSAutomaton, bool) =
+            rhs_term.compile_lhs(false, variable_info, bound_uniquely);
+        *rhs_matcher = Some(new_matcher);
+
+        bound_uniquely.union_in_place(rhs_term.occurs_below())
+      }
+    }
+  }
+
+
+  // endregion Compiler related methods
+
   pub fn check(&mut self, variable_info: &mut VariableInfo, bound_variables: &mut NatSet) {
     let mut unbound_variables = NatSet::new();
 
@@ -171,9 +329,9 @@ impl Condition {
         }
 
         builder.safe_construct(&mut solution.substitution);
-        let lhs_root = solution.substitution.get(*lhs_index);
+        let lhs_root        = solution.substitution.get(*lhs_index);
         let mut lhs_context = RewritingContext::new(lhs_root);
-        let rhs_root = solution.substitution.get(*rhs_index);
+        let rhs_root        = solution.substitution.get(*rhs_index);
         let mut rhs_context = RewritingContext::new(rhs_root);
 
         lhs_context.reduce();

@@ -115,7 +115,7 @@ use mod2_lib::{
   api::{
     built_in::get_built_in_symbol,
     free_theory::FreeSymbol,
-    Symbol, 
+    Symbol,
     SymbolPtr,
   },
   core::sort::SortPtr
@@ -184,11 +184,11 @@ pub(crate) struct MembershipDeclarationAST {
   pub conditions: Option<Vec<ConditionAST>>
 }
 
-/// This method is intended for implicitly defined symbols, that is, symbols that are used without being declared. 
-/// By default, we make such symbols free symbols. 
+/// This method is intended for implicitly defined symbols, that is, symbols that are used without being declared.
+/// By default, we make such symbols free symbols.
 fn get_or_create_symbol<T:Into<IString>>(name: T, symbols: &mut HashMap<IString, SymbolPtr>) -> SymbolPtr {
   let name = name.into();
-  
+
   // Built-ins like `true` and `false`
   // ToDo: If the user tries to shadow a built-in, usages will still reference the built-in. This may not be the right
   //       semantics once shadowing built-ins is made a warning/error.
@@ -199,7 +199,7 @@ fn get_or_create_symbol<T:Into<IString>>(name: T, symbols: &mut HashMap<IString,
   match symbols.entry(name.clone()) {
     Entry::Occupied(s) => *s.get(),
     Entry::Vacant(v) => {
-      let s = heap_construct!(FreeSymbol::with_arity(name.clone(), 0.into()));
+      let s = heap_construct!(FreeSymbol::with_arity(name.clone(), 0.into(), None));
       let s = SymbolPtr::new(s);
       v.insert(s);
       s

@@ -33,6 +33,7 @@ use crate::{
     rewriting_context::RewritingContext,
     sort::SortIndex,
     strategy::Strategy,
+    MaybeModulePtr
   },
   HashType,
 };
@@ -42,6 +43,9 @@ pub struct SymbolCore {
   pub name       : IString,
   pub attributes : SymbolAttributes,
   pub symbol_type: SymbolType,
+
+  // Symbols are owned by their parent module, so this pointer is valid for the lifetime of the symbol.
+  pub(crate) parent_module  : MaybeModulePtr,
 
   pub sort_table: SortTable,
 
@@ -73,10 +77,11 @@ unsafe impl Sync for SymbolCore {}
 impl SymbolCore {
   /// All symbols must be created with `Symbol::new()`. If attributes, arity, symbol_type unknown, use defaults.
   pub fn new(
-      name       : IString,
-      arity      : Arity,
-      attributes : SymbolAttributes,
-      symbol_type: SymbolType,
+      name         : IString,
+      arity        : Arity,
+      attributes   : SymbolAttributes,
+      symbol_type  : SymbolType,
+      parent_module: MaybeModulePtr,
     ) -> SymbolCore
   {
     // Compute hash
@@ -89,6 +94,7 @@ impl SymbolCore {
       name,
       attributes,
       symbol_type,
+      parent_module,
       sort_table           : SortTable::with_arity(arity),
       sort_constraint_table: SortConstraintTable::new(),
       equations            : vec![],
@@ -101,13 +107,13 @@ impl SymbolCore {
   }
 
   #[inline(always)]
-  pub fn with_arity(name: IString, arity: Arity)  -> SymbolCore {
-    SymbolCore::new(name, arity, SymbolAttributes::default(), SymbolType::default())
+  pub fn with_arity(name: IString, arity: Arity, parent_module: MaybeModulePtr)  -> SymbolCore {
+    SymbolCore::new(name, arity, SymbolAttributes::default(), SymbolType::default(), parent_module)
   }
 
   #[inline(always)]
-  pub fn with_name(name: IString)  -> SymbolCore {
-    SymbolCore::new(name, Arity::ZERO, SymbolAttributes::default(), SymbolType::default())
+  pub fn with_name(name: IString, parent_module: MaybeModulePtr)  -> SymbolCore {
+    SymbolCore::new(name, Arity::ZERO, SymbolAttributes::default(), SymbolType::default(), parent_module)
   }
 
   #[inline(always)]
@@ -145,7 +151,7 @@ impl SymbolCore {
       // ToDo: Get rid of this atrocity:
       let mut eq2 = eq;
       let eq3 = eq;
-      
+
       // Destructure the equation
       if let PreEquationKind::Equation {
         rhs_builder,
@@ -161,7 +167,7 @@ impl SymbolCore {
               if sp.is_some() || context.is_trace_enabled() {
                 self.apply_replace_slow_case(subject, eq3, sp, context, extension_info);
               }
-              
+
               if extension_info.is_none() || extension_info.unwrap().matched_whole() {
                 rhs_builder.replace(subject, &mut context.substitution);
               }
@@ -231,7 +237,7 @@ impl SymbolCore {
         //     return false;
         //   }
         // }
-        
+
         // Destructure the equation
         if let PreEquationKind::Equation { rhs_builder, .. } = &mut eq.pe_kind {
           if extension_info.is_none() || extension_info.unwrap().matched_whole() {

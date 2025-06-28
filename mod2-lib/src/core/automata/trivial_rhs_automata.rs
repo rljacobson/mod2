@@ -11,17 +11,18 @@ use crate::{
   core::{
     substitution::{MaybeDagNode, Substitution},
     VariableInfo,
+    VariableIndex
   },
-  theory::{RHSAutomaton, RcDagNode},
+  api::{DagNodePtr, RHSAutomaton},
 };
 
 #[derive(Copy, Clone, Default)]
 pub(crate) struct TrivialRHSAutomaton {
-  index: i32,
+  index: VariableIndex,
 }
 
 impl TrivialRHSAutomaton {
-  pub fn new(index: i32) -> Self {
+  pub fn new(index: VariableIndex) -> Self {
     Self { index }
   }
 }
@@ -40,14 +41,12 @@ impl RHSAutomaton for TrivialRHSAutomaton {
   }
 
   fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
-    return matcher.value(self.index as usize);
+    matcher.value(self.index)
   }
 
-  fn replace(&mut self, old: RcDagNode, matcher: &mut Substitution) {
-    matcher
-      .value(self.index as usize)
-      .unwrap()
-      .borrow_mut()
-      .overwrite_with_clone(old);
+  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
+    matcher.value(self.index)
+           .unwrap()
+           .overwrite_with_clone(old)
   }
 }

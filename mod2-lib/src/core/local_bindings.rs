@@ -18,9 +18,9 @@ use crate::{
 
 
 pub struct Binding {
-  active:         bool,
-  variable_index: VariableIndex,
   value:          DagNodePtr,
+  variable_index: VariableIndex,
+  active:         bool,
 }
 
 #[derive(Default)]

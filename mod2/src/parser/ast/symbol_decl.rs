@@ -169,7 +169,7 @@ pub fn construct_symbol_term_from_decl(
               // ToDo: Enrich this when more theories are implemented.
               assert!(sorts.len() > 0);
               let arity = Arity::new_unchecked((sorts.len()-1) as u16);
-              let ptr = heap_construct!(FreeSymbol::new(name.clone(), arity, attributes, symbol_type));
+              let ptr = heap_construct!(FreeSymbol::new(name.clone(), arity, attributes, symbol_type, None));
               let mut symbol = SymbolPtr::new(ptr);
 
               if let Some(type_signature) = type_signature {
@@ -184,7 +184,7 @@ pub fn construct_symbol_term_from_decl(
 
             SymbolType::Variable => {
               // Variables have symbols named after their sort, so we use `symbol_name`.
-              let ptr = heap_construct!(VariableSymbol::new(symbol_name, Arity::ZERO, attributes, symbol_type));
+              let ptr = heap_construct!(VariableSymbol::new(symbol_name, Arity::ZERO, attributes, symbol_type, None));
               let mut symbol = SymbolPtr::new(ptr);
 
               if let Some(type_signature) = type_signature {

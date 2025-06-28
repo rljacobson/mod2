@@ -44,7 +44,8 @@ use crate::{
     automata::{
       BindingLHSAutomaton,
       CopyRHSAutomaton,
-      RHSBuilder
+      RHSBuilder,
+      TrivialRHSAutomaton
     },
     format::Formattable,
     sort::{
@@ -107,13 +108,13 @@ pub trait Term: Formattable {
   /// This method is only used for `NATerm<T>`, but it is convenient to have it here.
   /// Overwrites `old_node` in place with a new `NADagNode<T>` with the same value as `self`.
   ///
-  /// This method is on `Term` instead of `DagNode` because it is used in a context in which we only 
-  /// have a term available. 
+  /// This method is on `Term` instead of `DagNode` because it is used in a context in which we only
+  /// have a term available.
   fn overwrite_with_dag_node(&mut self, _old_node: DagNodePtr) -> DagNodePtr {
     panic!("Term::overwrite_with_dag_node() is not implemented for {}", std::any::type_name::<Self>());
   }
-  
-  
+
+
   // region Accessors
 
   fn core(&self)         -> &TermCore;
@@ -393,6 +394,22 @@ pub trait Term: Formattable {
     available_terms: &mut TermBag,
     eager_context  : bool,
   ) -> VariableIndex;
+
+  /// Compiles a term at the root/top level of a right-hand side. Unlike compileRhs(), this method guarantees creation of an automaton and handles term compilation specifically for top-level context.
+  fn compile_top_rhs(
+    &mut self,
+    rhs_builder: &mut RHSBuilder,
+    variable_info: &mut VariableInfo,
+    available_terms: &mut TermBag,
+  ) {
+    let index = self.compile_rhs(rhs_builder, variable_info, available_terms, true);
+    variable_info.use_index(index);
+    // If we don't have any automata we must create one, if only to do the
+    // replacement.
+    if rhs_builder.is_empty() {
+      rhs_builder.add_rhs_automaton(Box::new(TrivialRHSAutomaton::new(index)));
+    }
+  }
 
   // A subterm "honors ground out match" if its matching algorithm guarantees never to return a matching subproblem
   // when all the terms variables are already bound.

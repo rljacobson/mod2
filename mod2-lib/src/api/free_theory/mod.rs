@@ -119,9 +119,9 @@ mod tests {
 
   #[test]
   fn term_normalize_sets_hash(){
-    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(2));
-    let g = FreeSymbol::with_arity("g".into(), Arity::new_unchecked(2));
-    let h = FreeSymbol::with_arity("h".into(), Arity::ZERO);
+    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(2), None);
+    let g = FreeSymbol::with_arity("g".into(), Arity::new_unchecked(2), None);
+    let h = FreeSymbol::with_arity("h".into(), Arity::ZERO, None);
 
     // f(g(h, h), h)
 
@@ -186,9 +186,9 @@ mod tests {
 
   #[test]
   fn test_dagify(){
-    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(2));
-    let g = FreeSymbol::with_arity("g".into(), Arity::new_unchecked(2));
-    let h = FreeSymbol::with_arity("h".into(), Arity::ZERO);
+    let f = FreeSymbol::with_arity("f".into(), Arity::new_unchecked(2), None);
+    let g = FreeSymbol::with_arity("g".into(), Arity::new_unchecked(2), None);
+    let h = FreeSymbol::with_arity("h".into(), Arity::ZERO, None);
 
     // f(g(h, h), h)
     let mut h_term = FreeTerm::new(h.as_ptr(), vec![]);
