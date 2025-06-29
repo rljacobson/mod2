@@ -143,7 +143,7 @@ impl SymbolCore {
 
   // region EquationTable methods
 
-  pub(crate) fn apply_replace(&mut self, subject: DagNodePtr, context: &mut RewritingContext, extension_info: MaybeExtensionInfo) -> bool {
+  pub(crate) fn apply_replace(&mut self, mut subject: DagNodePtr, context: &mut RewritingContext, extension_info: MaybeExtensionInfo) -> bool {
     // We have to use this brain dead pattern, because the `for x in y` syntax holds an immutable borrow
     // of `self`.
     for eq_idx in 0..self.equations.len() {
@@ -172,12 +172,10 @@ impl SymbolCore {
                 rhs_builder.replace(subject, &mut context.substitution);
               }
               else {
-                // ToDo: Implement `partial_replace` on `DagNodePtr`, or else determine what replaces it.
-                todo!("Implement `partial_replace` on `DagNodePtr`");
-                // subject.partial_replace(
-                //   rhs_builder.construct(&mut context.substitution).unwrap(),
-                //   extension_info,
-                // );
+                subject.partial_replace(
+                  rhs_builder.construct(&mut context.substitution).unwrap(),
+                  extension_info,
+                );
               }
               context.equation_count += 1;
               context.finished();

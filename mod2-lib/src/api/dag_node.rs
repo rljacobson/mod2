@@ -62,6 +62,7 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
+use crate::api::ExtensionInfo;
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr          = UnsafePtr<dyn DagNode + 'static>;
@@ -620,6 +621,11 @@ pub trait DagNode {
         symbol.fast_compute_true_sort(self.as_ptr(), context);
       }
     }
+  }
+
+  // Only implemented for associative theories and the `S_` theory.
+  fn partial_replace(&mut self, _replacement: DagNodePtr, _extension_info: MaybeExtensionInfo) {
+    unreachable!("partial_replace not implemented for this node type.")
   }
 
   // endregion Rewriting related methods
