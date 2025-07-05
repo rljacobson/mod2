@@ -34,9 +34,6 @@ mod index;
 // Stubs
 pub struct StateTransitionGraph;
 
-// use shared_vector::SharedVector;
-use crate::api::DagNodePtr;
-pub type NodeList = Vec<DagNodePtr>;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;

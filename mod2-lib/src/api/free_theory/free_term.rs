@@ -23,9 +23,9 @@ use crate::{
     dag_node_cache::DagNodeCache,
     free_theory::{
       free_automata::{FreeLHSAutomaton, FreeRHSAutomaton},
+      remainder::FreeRemainder,
       FreeDagNode,
       FreeOccurrence,
-      FreeOccurrences
     },
     symbol::SymbolPtr,
     term::{
@@ -45,6 +45,7 @@ use crate::{
       FormatStyle,
       Formattable,
     },
+    pre_equation::PreEquationPtr,
     substitution::Substitution,
     symbol::SymbolTranslationMap,
     term_core::TermCore,
@@ -58,11 +59,10 @@ use crate::{
   HashType,
 };
 
-
 pub struct FreeTerm{
-  core                 : TermCore,
-  pub args             : Vec<BxTerm>,
-  pub(crate) slot_index: SlotIndex,
+  core          : TermCore,
+  pub args      : Vec<BxTerm>,
+  pub slot_index: SlotIndex,
 }
 
 impl FreeTerm {
@@ -201,38 +201,24 @@ impl Term for FreeTerm {
   fn partial_compare_arguments(&self, partial_substitution: &mut Substitution, other: DagNodePtr) -> Option<Ordering> {
     assert!(self.symbol().compare(other.symbol().deref()).is_eq(), "symbols differ");
 
-    // ToDo: Maude's implementation does a static cast and doesn't check that they have the same number of arguments.
-    //       Which implementation should we use here?
-
-
-    // for (term_arg, dag_arg) in self.iter_args().zip(other.iter_args()) {
-    //   let r = term_arg.partial_compare(partial_substitution, dag_arg.deref());
-    //   if r?.is_ne() {
-    //     return r;
-    //   }
-    // }
-    // Some(Ordering::Equal)
-
-
-    if let Some(da) = other.as_any().downcast_ref::<FreeDagNode>() {
-      for (term_arg, dag_arg) in self.args.iter().zip(da.iter_args()) {
-        let r = term_arg.partial_compare(partial_substitution, dag_arg);
-        if r != PartialOrdering::Equal {
-          return r;
-        }
-      }
-
-      if self.args.len() < da.len() { return PartialOrdering::Less }
-      else if self.args.len() > da.len() { return PartialOrdering::Greater }
-
-      PartialOrdering::Equal
-    } else {
+    let Some(da) = other.as_any().downcast_ref::<FreeDagNode>() else {
       unreachable!(
         "{}:{}: Could not downcast to FreeDagNode. This is a bug.",
         file!(),
         line!()
       )
+    };
+    for (term_arg, dag_arg) in self.args.iter().zip(da.iter_args()) {
+      let r = term_arg.partial_compare(partial_substitution, dag_arg);
+      if r != PartialOrdering::Equal {
+        return r;
+      }
     }
+
+    if self.args.len() < da.len() { return PartialOrdering::Less }
+    else if self.args.len() > da.len() { return PartialOrdering::Greater }
+
+    PartialOrdering::Equal
   }
 
   // endregion
@@ -259,16 +245,16 @@ impl Term for FreeTerm {
   ) -> (BxLHSAutomaton, bool) {
     // We bin the arg terms according to the following categories.
     // First gather all symbols lying in or directly under free skeleton.
-    let mut free_symbols  = FreeOccurrences::new();
-    let mut other_symbols = FreeOccurrences::new();
+    let mut free_symbols  = Vec::<FreeOccurrence>::new();
+    let mut other_symbols = Vec::<FreeOccurrence>::new();
     // See if we can fail on the free skeleton.
     self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, SlotIndex::None, ArgIndex::None);
 
     // Now classify occurrences of non Free-Theory symbols into 4 types
-    let mut bound_variables     = FreeOccurrences::new(); // guaranteed bound when matched against
-    let mut uncertain_variables = FreeOccurrences::new(); // status when matched against uncertain
-    let mut ground_aliens       = FreeOccurrences::new(); // ground alien subterms
-    let mut non_ground_aliens   = FreeOccurrences::new(); // non-ground alien subterms
+    let mut bound_variables     = Vec::<FreeOccurrence>::new(); // guaranteed bound when matched against
+    let mut uncertain_variables = Vec::<FreeOccurrence>::new(); // status when matched against uncertain
+    let mut ground_aliens       = Vec::<FreeOccurrence>::new(); // ground alien subterms
+    let mut non_ground_aliens   = Vec::<FreeOccurrence>::new(); // non-ground alien subterms
 
 
     for mut occurrence in other_symbols {
@@ -713,7 +699,7 @@ impl FreeTerm {
             arg_is_eager,
           );
           sources[idx] = source;
-          term.core_mut().save_index = Some(source as VariableIndex);
+          term.core_mut().save_index = source;
           available_terms.insert_built_term(term, arg_is_eager);
 
           continue;
@@ -736,71 +722,72 @@ impl FreeTerm {
 
       index
     }
-/*
-    pub fn compile_remainder(&self, equation: RcPreEquation, slot_translation: &Vec<i32>) -> RcFreeRemainder {
+
+    pub fn compile_remainder(&mut self, equation: PreEquationPtr, slot_translation: &Vec<SlotIndex>) -> FreeRemainder {
       // Gather all symbols lying in or directly under free skeleton
-      let mut free_symbols: Vec<FreeOccurrence> = Vec::new();
+      let mut free_symbols : Vec<FreeOccurrence> = Vec::new();
       let mut other_symbols: Vec<FreeOccurrence> = Vec::new();
-      self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, NONE, NONE);
+      self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, SlotIndex::None, ArgIndex::None);
 
       // Now classify occurrences of non Free-Theory symbols into 4 types
-      let mut bound_variables: Vec<FreeOccurrence> = Vec::new(); // guaranteed bound when matched against
-      let mut free_variables: Vec<FreeOccurrence> = Vec::new(); // guaranteed unbound when matched against
-      let mut ground_aliens: Vec<FreeOccurrence> = Vec::new(); // ground alien subterms
+      let mut bound_variables  : Vec<FreeOccurrence> = Vec::new(); // guaranteed bound when matched against
+      let mut free_variables   : Vec<FreeOccurrence> = Vec::new(); // guaranteed unbound when matched against
+      let mut ground_aliens    : Vec<FreeOccurrence> = Vec::new(); // ground alien subterms
       let mut non_ground_aliens: Vec<FreeOccurrence> = Vec::new(); // non-ground alien subterms
 
       let mut bound_uniquely = NatSet::new();
 
-      for occ in &other_symbols {
-        let t = occ.term();
-        if let Some(v) = t.as_any().downcast_ref::<VariableTerm>() {
-          let index = v.index as usize;
+      for occurence in &other_symbols {
+        let t = occurence.term();
+        if let Some(variable) = t.as_any().downcast_ref::<VariableTerm>() {
+          let index = variable.index.idx();
           if bound_uniquely.contains(index) {
-            bound_variables.push(occ.clone());
+            bound_variables.push(occurence.clone());
           } else {
             bound_uniquely.insert(index);
-            free_variables.push(occ.clone());
+            free_variables.push(occurence.clone());
           }
         } else {
           if t.ground() {
-            ground_aliens.push(occ.clone());
+            ground_aliens.push(occurence.clone());
           } else {
-            non_ground_aliens.push(occ.clone());
+            non_ground_aliens.push(occurence.clone());
           }
         }
       }
 
       let mut best_sequence = ConstraintPropagationSequence::default();
-      let mut sub_automata: Vec<RcLHSAutomaton> = Vec::new();
-      let nr_aliens = non_ground_aliens.len();
+      let alien_count       = non_ground_aliens.len();
+      // This vector is consumed out of order, so we need slot placeholders for the consumed elements.
+      let mut sub_automata: Vec<Option<BxLHSAutomaton>> = Vec::with_capacity(alien_count);
 
-      if nr_aliens > 0 {
+      if alien_count > 0 {
         // Now we have to find a best sequence in which to match the
         // non-ground alien subterms and generate subautomata for them
-        Self::find_constraint_propagation_sequence(&non_ground_aliens, &mut bound_uniquely, &mut best_sequence);
+        Self::find_constraint_propagation_sequence(&mut non_ground_aliens, &mut bound_uniquely, &mut best_sequence);
 
-        for i in 0..nr_aliens {
-          let (lhs_automata, _subproblem_likely) = non_ground_aliens[best_sequence.sequence[i] as usize]
-              .term()
-              .compile_lhs(false, &equation.borrow().variable_info, &mut bound_uniquely);
-          sub_automata[i] = lhs_automata;
+        for i in 0..alien_count {
+          let (lhs_automata, _subproblem_likely)
+              = non_ground_aliens[best_sequence.sequence[i].idx()]
+                  .term_mut()
+                  .compile_lhs(false, &equation.variable_info, &mut bound_uniquely);
+          sub_automata.push(Some(lhs_automata));
         }
         assert!(bound_uniquely == best_sequence.bound, "bound clash");
       }
-      Rc::new(FreeRemainder::new(
-        equation.clone(),
-        &free_symbols,
-        &free_variables,
-        &bound_variables,
-        &ground_aliens,
-        &non_ground_aliens,
-        &best_sequence.sequence,
-        &sub_automata,
+
+      FreeRemainder::new(
+        equation,
+        free_symbols,
+        free_variables,
+        bound_variables,
+        ground_aliens,
+        non_ground_aliens,
+        best_sequence.sequence,
+        sub_automata,
         slot_translation,
-      ))
+      )
     }
 
-
-    */
 }
 

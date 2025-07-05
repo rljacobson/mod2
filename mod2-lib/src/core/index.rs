@@ -82,6 +82,7 @@ pub type RawSortIndex     = u16;
 pub type RawSlotIndex     = u16;
 pub type RawArgIndex      = u16;
 pub type RawVariableIndex = u32; // Can probably be `u16`, but Maude uses `i32`.
+pub type RawSymbolIndex   = u32; // Can probably be `u16`, but Maude uses `i32`.
 
 /// The index of a sort within its kind
 pub type SortIndex     = SpecialIndex<RawSortIndex    , SentinelIndex, 2>;
@@ -91,7 +92,8 @@ pub type SlotIndex     = SpecialIndex<RawSlotIndex    , SentinelIndex, 2>;
 pub type ArgIndex      = SpecialIndex<RawSlotIndex    , SentinelIndex, 2>;
 /// The index of a variable within its parent module
 pub type VariableIndex = SpecialIndex<RawVariableIndex, SentinelIndex, 2>;
-
+/// The index of a symbol within its parent module
+pub type SymbolIndex   = SpecialIndex<RawSymbolIndex  , SentinelIndex, 2>;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]

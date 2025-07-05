@@ -9,9 +9,6 @@ use std::{
   cmp::Ordering,
   fmt::Display,
   hash::Hash
-
-
-  ,
 };
 use mod2_abs::{hash::hash2, NatSet};
 use crate::{
@@ -204,7 +201,7 @@ impl<T: NADataType> Term for NATerm<T> {
   
   /// Overwrites `old_node` in place with the value of `self`. Returns a new fat pointer, which might be
   /// necessary if the vtable has changed. 
-  fn overwrite_with_dag_node(&mut self, mut old_node: DagNodePtr) -> DagNodePtr {
+  fn overwrite_with_dag_node(&self, mut old_node: DagNodePtr) -> DagNodePtr {
     // ToDo: overwrite without allocating a new node.
     let new_node = self.dagify_aux(&mut DagNodeCache::default());
     

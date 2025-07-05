@@ -44,7 +44,7 @@ impl RHSAutomaton for TrivialRHSAutomaton {
     matcher.value(self.index)
   }
 
-  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
+  fn replace(&self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
     matcher.value(self.index)
            .unwrap()
            .overwrite_with_clone(old)

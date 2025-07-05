@@ -34,6 +34,7 @@ use crate::{
     strategy::Strategy,
     MaybeModulePtr,
     SortIndex,
+    SymbolIndex
   },
   HashType,
 };
@@ -45,7 +46,8 @@ pub struct SymbolCore {
   pub symbol_type: SymbolType,
 
   // Symbols are owned by their parent module, so this pointer is valid for the lifetime of the symbol.
-  pub(crate) parent_module  : MaybeModulePtr,
+  pub parent_module             : MaybeModulePtr,
+  pub index_within_parent_module: SymbolIndex,
 
   pub sort_table: SortTable,
 
@@ -53,7 +55,7 @@ pub struct SymbolCore {
   /// this symbol. The "equation table" is much simpler, so we fold it into `SymbolCore`. In both cases, the
   /// `accept_*` and compiler methods are virtual, so they live in the `Symbol` trait.
   pub sort_constraint_table: SortConstraintTable,
-  pub equations: Vec<EquationPtr>,
+  pub equations            : Vec<EquationPtr>,
 
   /// > 0 for symbols that only produce an unique sort; -1 for fast case; 0 for slow case
   /// implemented as `SortIndex::FAST_CASE_UNIQUE_SORT`, `SortIndex::SLOW_CASE_UNIQUE_SORT`, and a normal value.
@@ -95,6 +97,7 @@ impl SymbolCore {
       attributes,
       symbol_type,
       parent_module,
+      index_within_parent_module: SymbolIndex::Unknown,
       sort_table           : SortTable::with_arity(arity),
       sort_constraint_table: SortConstraintTable::new(),
       equations            : vec![],

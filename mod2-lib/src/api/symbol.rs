@@ -32,7 +32,8 @@ use crate::{
     sort::KindPtr,
     strategy::Strategy,
     EquationalTheory,
-    SortIndex
+    SortIndex,
+    SymbolIndex
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -102,6 +103,11 @@ pub trait Symbol {
   #[inline(always)]
   fn range_kind(&self) -> KindPtr {
     self.sort_table().range_kind()
+  }
+  
+  #[inline(always)]
+  fn index_within_parent_module(&self) -> SymbolIndex {
+    self.core().index_within_parent_module
   }
 
   #[inline(always)]

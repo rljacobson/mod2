@@ -43,6 +43,7 @@ use crate::{
 };
 #[cfg(feature = "profiling")]
 use crate::core::profile::{StatementProfile, SymbolProfile};
+use crate::core::SymbolIndex;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub enum ModuleStatus {
@@ -142,10 +143,13 @@ impl Module {
     // Make the owned symbols point to this module as their parent.
     let parent_ptr = new_module.as_ptr();
 
-    for symbol in new_module.symbols.values_mut() {
+    for (idx, symbol) in new_module.symbols.values_mut().enumerate() {
       let symbol = symbol.core_mut();
       if symbol.parent_module.is_none() {
         symbol.parent_module = Some(parent_ptr);
+      }
+      if !symbol.index_within_parent_module.is_index() {
+        symbol.index_within_parent_module = SymbolIndex::from_usize(idx);
       }
     }
 

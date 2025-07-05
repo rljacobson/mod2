@@ -20,11 +20,12 @@ multithreaded = []
 profiling     = []
 
 [dependencies]
-mod2-abs.workspace = true
-smallvec.workspace = true
+mod2-abs.workspace      = true
+smallvec.workspace      = true
 ordered-float.workspace = true
 paste.workspace         = true
 enumflags2.workspace    = true
 once_cell.workspace     = true
 rand.workspace          = true
-nu-ansi-term.workspace  = true
+#nu-ansi-term.workspace  = true
+#shared_vector.workspace = true

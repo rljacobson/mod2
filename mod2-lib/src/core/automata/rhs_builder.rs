@@ -87,11 +87,11 @@ impl RHSBuilder {
     }
   }
 
-  pub fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) {
+  pub fn replace(&self, old: DagNodePtr, matcher: &mut Substitution) {
     for automaton in self.automata.iter() {
       automaton.construct(matcher);
     }
-    if let Some(last_automaton) = self.last_automaton.as_mut() {
+    if let Some(last_automaton) = self.last_automaton.as_ref() {
       last_automaton.replace(old, matcher);
     }
   }

@@ -1,6 +1,11 @@
-///! The `DagNodeCore::args` field can either hold a single `DagNode` inline, or point to a `DagNodeVector`, or be null.
-///! It is convenient to have an "expanded" representation that can be passed around independently of the containing 
-///! `DagNode`.
+/*!
+
+The `DagNodeCore::args` field can either hold a single `DagNode` inline, or point to a `DagNodeVector`, or be null.
+It is convenient to have an "expanded" representation that can be passed around independently of the containing
+`DagNode`. This structure can be iterated or indexed into just like an array.
+
+*/
+use std::ops::{Index, IndexMut};
 use std::ptr::null_mut;
 use crate::{
   api::{
@@ -46,7 +51,7 @@ impl DagNodeArguments {
       DagNodeArguments::Inline(node)
     }
   }
-  
+
   pub fn from_args(args: *mut u8, arity: Arity) -> Self {
     if arity.get() == 0 || args.is_null() {
       DagNodeArguments::None
@@ -54,23 +59,23 @@ impl DagNodeArguments {
       DagNodeArguments::Inline(arg_to_dag_node(args))
     } else if arity.get() > 1 && !args.is_null() {
       DagNodeArguments::Vec(arg_to_node_vec(args))
-    } else { 
+    } else {
       panic!("arity is incompatible with args pointer");
     }
   }
-  
+
   pub fn is_empty(&self) -> bool {
     if *self == DagNodeArguments::None { true } else { false }
   }
-  
+
   pub fn is_inline(&self) -> bool {
     if let DagNodeArguments::Inline(_) = self { true } else { false }
   }
-  
+
   pub fn is_vec(&self) -> bool {
     if let DagNodeArguments::Vec(_) = self { true } else { false }
   }
-  
+
   pub fn len(&self) -> usize {
     match self {
       DagNodeArguments::None => { 0 }
@@ -78,7 +83,7 @@ impl DagNodeArguments {
       DagNodeArguments::Vec(node_vec) => { node_vec.len() }
     }
   }
-  
+
   pub fn iter(&self) -> ArgumentsIterator {
     self.clone().into_iter()
   }
@@ -87,17 +92,17 @@ impl DagNodeArguments {
 impl PartialEq for DagNodeArguments {
   fn eq(&self, other: &DagNodeArguments) -> bool {
     match (self, other) {
-      
+
       (DagNodeArguments::None, DagNodeArguments::None) => true,
-      
-      (DagNodeArguments::Inline(self_ptr), DagNodeArguments::Inline(other_ptr)) => { 
+
+      (DagNodeArguments::Inline(self_ptr), DagNodeArguments::Inline(other_ptr)) => {
         self_ptr == other_ptr
       },
 
-      (DagNodeArguments::Vec(_), DagNodeArguments::Vec(_)) => { 
+      (DagNodeArguments::Vec(_), DagNodeArguments::Vec(_)) => {
         self.as_args() == other.as_args()
       },
-      
+
       _ => false,
     }
   }
@@ -109,6 +114,36 @@ impl Clone for DagNodeArguments {
   fn clone(&self) -> Self {
     let arity = Arity::new_unchecked(self.len() as u16);
     Self::from_args(self.as_args(), arity)
+  }
+}
+
+impl Index<usize> for DagNodeArguments {
+  type Output = DagNodePtr;
+
+  fn index(&self, index: usize) -> &Self::Output {
+    match (self, index) {
+      (DagNodeArguments::Inline(node_ptr), 0) => {
+        node_ptr
+      }
+      (DagNodeArguments::Vec(vec), index) => {
+        &vec[index]
+      }
+      _ => panic!("index out of bounds"),
+    }
+  }
+}
+
+impl IndexMut<usize> for DagNodeArguments {
+  fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+    match (self, index) {
+      (DagNodeArguments::Inline(node_ptr), 0) => {
+        node_ptr
+      }
+      (DagNodeArguments::Vec(vec), index) => {
+        &mut vec[index]
+      }
+      _ => panic!("index out of bounds"),
+    }
   }
 }
 
@@ -135,19 +170,19 @@ impl Iterator for ArgumentsIterator {
 
   fn next(&mut self) -> Option<Self::Item> {
     match (&self.args, self.idx) {
-      
+
       (DagNodeArguments::Inline(node), 0) => {
         self.idx += 1;
         Some(*node)
       }
-      
+
       (DagNodeArguments::Vec(node_vector), idx) if idx < node_vector.len() => {
         self.idx += 1;
         Some(node_vector[idx - 1])
       }
-      
+
       _ => None,
-      
+
     }
   }
 }

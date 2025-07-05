@@ -415,6 +415,15 @@ pub trait DagNode {
     assert_ne!(self.sort_index(), SortIndex::Unknown, "unknown sort");
     self.sort().unwrap().leq(sort)
   }
+  
+  /// Only works for sorts on which `fast_geq_sufficient()` is true. Only used in
+  /// `FreeRemainder::fast_match_and_replace()` and `FreeRemainder::*_check_and_bind()`.
+  #[inline(always)]
+  fn fast_leq_sort(&self, sort: SortPtr) -> bool {
+    debug_assert!(sort.fast_geq_sufficient(), "invalid call to `DagNode::fast_leq_sort()`");
+    sort.fast_geq(self.sort_index())
+  }
+
 
   // endregion Comparison
 

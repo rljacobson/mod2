@@ -159,7 +159,7 @@ impl RHSAutomaton for FreeRHSAutomaton {
     new_dag_node
   }
 
-  fn replace(&mut self, mut old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
+  fn replace(&self, mut old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
     let instruction_count = self.instructions.len();
 
     for instruction in &self.instructions[..instruction_count - 1] {

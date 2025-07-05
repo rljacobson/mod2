@@ -29,28 +29,29 @@ use crate::{
     variable_theory::VariableTerm,
   },
   core::{
-    substitution::Substitution,
-    NodeList,
-    SortIndex,
     ArgIndex,
-    VariableIndex
+    DagNodeArguments,
+    SlotIndex,
+    SortIndex,
+    VariableIndex,
+    substitution::Substitution,
   }
 };
-use crate::core::SlotIndex;
+
 
 #[derive(Clone)]
 pub struct FreeSubterm {
   position  : SlotIndex,
   arg_index : ArgIndex,
   symbol    : SymbolPtr,
-  save_index: Option<VariableIndex>,
+  save_index: VariableIndex,
 }
 
 
 pub struct FreeLHSAutomaton {
   top_symbol: SymbolPtr,
 
-  stack              : Vec<NodeList>,
+  stack              : Vec<DagNodeArguments>,
   free_subterms      : Vec<FreeSubterm>,
   uncertain_variables: Vec<FreeVariable>,
   bound_variables    : Vec<BoundVariable>,
@@ -71,7 +72,7 @@ impl FreeLHSAutomaton {
     let free_symbol_count = free_symbols.len();
     let top_term          = free_symbols[0].downcast_term_mut::<FreeTerm>();
     let top_symbol        = top_term.symbol();
-    let mut slot_nr       = SlotIndex::new(1);
+    let mut slot_count = SlotIndex::new(1);
 
     top_term.slot_index = SlotIndex::Zero;
 
@@ -96,28 +97,28 @@ impl FreeLHSAutomaton {
         };
 
         if symbol.arity().get() > 0 {
-          term.slot_index = slot_nr;
-          slot_nr += 1;
+          term.slot_index = slot_count;
+          slot_count += 1;
         }
 
         free_subterm
       })
       .collect::<Vec<_>>();
 
-    let stack = vec![NodeList::new(); slot_nr.idx()];
+    let stack = Vec::with_capacity(slot_count.idx());
 
     // Variables that may be bound //
 
     let uncertain_variables = uncertain_vars
       .iter()
-      .map(|oc| {
-        let parent = free_symbols[oc.position.idx()].downcast_term::<FreeTerm>();
-        let v = oc.downcast_term::<VariableTerm>();
+      .map(|occurrence| {
+        let parent = free_symbols[occurrence.position.idx()].downcast_term::<FreeTerm>();
+        let variable = occurrence.downcast_term::<VariableTerm>();
         FreeVariable {
           position:  parent.slot_index,
-          arg_index: oc.arg_index,
-          var_index: v.index,
-          sort:      v.sort(),
+          arg_index: occurrence.arg_index,
+          var_index: variable.index,
+          sort:      variable.sort(),
         }
       })
       .collect::<Vec<_>>();
@@ -126,13 +127,13 @@ impl FreeLHSAutomaton {
 
     let bound_variables = bound_vars
       .iter()
-      .map(|oc| {
-        let parent = free_symbols[oc.position.idx()].downcast_term::<FreeTerm>();
-        let v = oc.downcast_term::<VariableTerm>();
+      .map(|occurrence| {
+        let parent = free_symbols[occurrence.position.idx()].downcast_term::<FreeTerm>();
+        let variable = occurrence.downcast_term::<VariableTerm>();
         BoundVariable {
           position:  parent.slot_index,
-          arg_index: oc.arg_index,
-          var_index: v.index,
+          arg_index: occurrence.arg_index,
+          var_index: variable.index,
         }
       })
       .collect::<Vec<_>>();
@@ -198,7 +199,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
 
     // Maude casts to a FreeDagNode?! Presumably because they want `match` to be a virtual function on the base class.
     if let Some(s) = subject.as_any_mut().downcast_mut::<FreeDagNode>() {
-      self.stack[0] = s.iter_args().collect::<Vec<_>>();
+      self.stack[0] = s.get_arguments();
 
       let mut stack_idx: usize = 0;
       // Match free symbol skeleton.
@@ -210,13 +211,13 @@ impl LHSAutomaton for FreeLHSAutomaton {
           return (false, None);
         }
 
-        if let Some(save_index) = i.save_index {
-          solution.bind(save_index, Some(d.clone()));
+        if i.save_index.is_index() {
+          solution.bind(i.save_index, Some(d));
         }
 
         if !i.symbol.arity().is_zero() {
           stack_idx += 1;
-          self.stack[stack_idx] = d.iter_args().collect::<Vec<_>>();
+          self.stack[stack_idx] = d.get_arguments();
         }
       }
 
@@ -277,7 +278,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
             return (false, None);
           }
         }
-        return (true, Some(subproblems.extract_subproblem()));
+        return (true, subproblems.extract_subproblem());
       }
       (true, None)
     } else {

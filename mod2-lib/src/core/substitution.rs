@@ -11,7 +11,6 @@ by placing a reference to the DagNode at the index of the number. Names are numb
 
 */
 
-use std::cmp::min;
 use mod2_abs::NatSet;
 
 pub(crate) use crate::{
@@ -63,8 +62,9 @@ impl Substitution {
   #[inline(always)]
   pub fn clear_first_n(&mut self, size: usize) {
     self.copy_size = size;
+    debug_assert!(size <= self.bindings.len(), "size > length");
 
-    for i in 0..min(size, self.bindings.len()) {
+    for i in 0..size {
       self.bindings[i] = None;
     }
 

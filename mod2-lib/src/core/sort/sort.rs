@@ -140,8 +140,34 @@ impl Sort {
       }
     }
   }
-  
-  /// Determines if self <= other. 
+
+  pub fn error_free_maximal(&self) -> bool {
+    let component = self.kind.unwrap();
+    self.index_within_kind == 1 && component.maximal_sort_count == 1 && component.error_free
+  }
+
+  /// The idea is that it's faster to avoid calling `self.leq_sorts.contains()`,
+  /// but only returns the correct result if `(fastTest - 1) <= NatSet::smallIntBound`.
+  // Todo: This probably does not give a speed advantage. Benchmark.
+  #[inline(always)]
+  pub fn fast_geq(&self, index: SortIndex) -> bool {
+    assert!(index.is_index(), "unknown sort");
+    if index >= self.fast_compare_index {
+      true
+    } else {
+      self.leq_sorts.contains(index.idx())
+    }
+  }
+
+  /// See `fast_geq(..)`.
+  #[inline(always)]
+  pub fn fast_geq_sufficient(&self) -> bool {
+    // We assume a usize, which is 64 bits on most systems.
+    // Todo: This is another reason to get rid of this optimization. Creates platform dependence.
+    self.fast_compare_index.idx() <= 8 * size_of::<usize>() //NatSet::smallIntBound
+  }
+
+  /// Determines if self <= other.
   #[inline(always)]
   pub fn leq(&self, other: SortPtr) -> bool {
     other.leq_sorts.contains(self.index_within_kind.idx())
@@ -153,7 +179,7 @@ impl Formattable for Sort {
   fn repr(&self, out: &mut dyn Write, _style: FormatStyle) -> std::fmt::Result {
     if self.index_within_kind == SortIndex::Zero {
       write!(out, "[{}]", self.name)
-    } else { 
+    } else {
       write!(out, "{}", self.name)
     }
   }
@@ -168,7 +194,7 @@ pub fn index_leq_sort(index: SortIndex, sort: &Sort) -> bool {
   assert_ne!(index, SortIndex::Unknown, "unknown sort");
   if index >= sort.fast_compare_index {
     true
-  } else { 
+  } else {
     sort.leq_sorts.contains(index.idx())
   }
 }

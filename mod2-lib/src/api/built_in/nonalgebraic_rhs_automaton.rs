@@ -45,7 +45,7 @@ impl RHSAutomaton for NonalgebraicRHSAutomaton {
     Some(dag_node)
   }
 
-  fn replace(&mut self, old: DagNodePtr, _matcher: &mut Substitution) -> DagNodePtr {
+  fn replace(&self, old: DagNodePtr, _matcher: &mut Substitution) -> DagNodePtr {
     self.term.overwrite_with_dag_node(old)
   }
 }

@@ -78,7 +78,7 @@ pub struct TermCore {
   pub(crate) attributes      : TermAttributes,
   pub(crate) sort_index      : SortIndex,
   pub(crate) term_type       : TermType,
-  pub(crate) save_index      : Option<VariableIndex>,
+  pub(crate) save_index      : VariableIndex,
   /// Stores the structural hash computed in `Term::normalize()`
   pub(crate) hash_value      : HashType,
 
@@ -97,7 +97,7 @@ impl TermCore {
       attributes      : TermAttributes::default(),
       sort_index      : SortIndex::default(),
       term_type       : TermType::Free,
-      save_index      : None,
+      save_index      : VariableIndex::None,
       hash_value      : 0,                    // Set in `Term::normalize()`
       cached_size     : Cell::new(None),
     }

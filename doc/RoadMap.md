@@ -1,6 +1,5 @@
 # In Progress
 
-- `SortIndex`, `SlotIndex`, `VariableIndex`
 - `FreeSymbol::discrimination_net.apply_replace(subject, context)`
 - `FreeSymbol::complex_strategy`
 

@@ -5,21 +5,21 @@ Right hand side automata that make copies of bindings in the substitution.
 
 */
 
-
 use std::any::Any;
 use mod2_abs::debug;
 use crate::{
   api::{
     RHSAutomaton,
-    DagNodePtr, 
+    DagNodePtr,
     MaybeDagNode
   },
   core::{
     substitution::Substitution,
-    VariableInfo
+    VariableInfo,
+    VariableIndex
   }
 };
-use crate::core::VariableIndex;
+
 
 pub struct CopyRHSAutomaton {
   original_index: VariableIndex,
@@ -78,7 +78,7 @@ impl RHSAutomaton for CopyRHSAutomaton {
     }
   }
 
-  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
+  fn replace(&self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {
     let orig = matcher.value(self.original_index);
 
     if let Some(mut orig_dag_node) = orig {

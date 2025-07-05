@@ -7,7 +7,7 @@ This module defines the following implementors:
 
 - `VariableAbstractionSubproblem`
 - `SubproblemSequence`
-- 
+-
 
 # Eker96
 
@@ -70,7 +70,7 @@ impl VariableAbstractionSubproblem {
     abstracted_pattern  : Box<dyn LHSAutomaton>,
     abstraction_variable: VariableIndex,
     variable_count      : u32
-  ) -> Self 
+  ) -> Self
   {
     VariableAbstractionSubproblem {
       abstracted_pattern,
@@ -115,7 +115,7 @@ impl Subproblem for VariableAbstractionSubproblem {
         if subproblem.solve(false, context) {
           return true;
         }
-      } 
+      }
     }
 
     if let Some(difference) = self.difference.as_mut() {
@@ -142,11 +142,13 @@ impl SubproblemSequence {
     self.sequence.push(subproblem);
   }
 
-  pub fn extract_subproblem(mut self) -> Box<dyn Subproblem> {
-    if self.sequence.len() == 1 {
-      self.sequence.pop().unwrap()
+  pub fn extract_subproblem(mut self) -> Option<Box<dyn Subproblem>> {
+    if self.sequence.is_empty() {
+      None
+    } else if self.sequence.len() == 1 {
+      Some(self.sequence.pop().unwrap())
     } else {
-      Box::new(self)
+      Some(Box::new(self))
     }
   }
 
@@ -204,11 +206,11 @@ impl Subproblem for SortCheckSubproblem {
     if !find_first {
       return false; // Maude: Only ever one way to solve; otherwise infinite loop.
     }
-    
+
     if self.result == Outcome::Undecided {
       self.result = self.subject.check_sort_in_context(self.sort, solution);
     }
-    
+
     self.result == Outcome::Success
   }
 }

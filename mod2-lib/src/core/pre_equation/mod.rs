@@ -233,6 +233,10 @@ impl PreEquation {
 
   // endregion Constructors
 
+  pub fn as_ptr(&self) -> PreEquationPtr {
+    PreEquationPtr::new(self as *const PreEquation as *mut PreEquation)
+  }
+
   // Common implementation
   // fn trace_begin_trial(&self, subject: DagNodePtr, context: RcRewritingContext) -> Option<i32> {
   //   context.borrow_mut().trace_begin_trial(subject, self)
@@ -288,7 +292,7 @@ impl PreEquation {
     self.attributes.contains(PreEquationAttribute::Narrowing)
   }
 
-  // endregion
+  // endregion Attributes
 
   // region Compiler related methods
 

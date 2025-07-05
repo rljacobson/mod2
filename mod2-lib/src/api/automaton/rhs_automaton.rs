@@ -45,7 +45,7 @@ pub trait RHSAutomaton {
 
   fn remap_indices(&mut self, variable_info: &mut VariableInfo);
   fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode;
-  fn replace(&mut self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr;
+  fn replace(&self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr;
 
   // TODO: `StackMachineRhsCompiler` is not yet implemented.
   /*

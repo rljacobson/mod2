@@ -45,10 +45,10 @@ pub trait LHSAutomaton {
     if extension_info.is_some() {
       return dag_node.match_variable_with_extension(index, sort, solution, extension_info);
     }
-    
+
     let maybe_dag_node = solution.get(index);
     match maybe_dag_node {
-      
+
       None => {
         if let (Outcome::Success, maybe_subproblem) = dag_node.check_sort(sort) {
           let dag_node_ref = if copy_to_avoid_overwriting {
@@ -62,7 +62,7 @@ pub trait LHSAutomaton {
           (false, None)
         }
       }
-      
+
       Some(existing_d) => {
         if dag_node.compare(existing_d).is_eq() {
           (true, None)
@@ -70,7 +70,7 @@ pub trait LHSAutomaton {
           (false, None)
         }
       }
-      
+
     }
   }
 }

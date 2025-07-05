@@ -110,7 +110,7 @@ pub trait Term: Formattable {
   ///
   /// This method is on `Term` instead of `DagNode` because it is used in a context in which we only
   /// have a term available.
-  fn overwrite_with_dag_node(&mut self, _old_node: DagNodePtr) -> DagNodePtr {
+  fn overwrite_with_dag_node(&self, _old_node: DagNodePtr) -> DagNodePtr {
     panic!("Term::overwrite_with_dag_node() is not implemented for {}", std::any::type_name::<Self>());
   }
 
@@ -329,8 +329,8 @@ pub trait Term: Formattable {
     // The theory-specific compilation occurs in `compile_aux()`.
     let (mut automaton, subproblem_likely) = self.compile_lhs_aux(match_at_top, variable_info, bound_uniquely);
 
-    if let Some(save_index) = self.core_mut().save_index {
-      automaton = BindingLHSAutomaton::new(save_index, automaton);
+    if self.core_mut().save_index.is_index() {
+      automaton = BindingLHSAutomaton::new(self.core_mut().save_index, automaton);
     }
 
     (automaton, subproblem_likely)
@@ -354,15 +354,15 @@ pub trait Term: Formattable {
     if let Some((mut found_term, _)) = available_terms.find(self.as_ptr(), eager_context) {
       let found_term = found_term.deref_mut();
 
-      if found_term.core_mut().save_index.is_none() {
+      if found_term.core_mut().save_index == VariableIndex::None {
         if let Some(variable_term) = found_term.as_any().downcast_ref::<VariableTerm>() {
           return variable_term.index;
         }
 
-        found_term.core_mut().save_index = Some(variable_info.make_protected_variable());
+        found_term.core_mut().save_index = variable_info.make_protected_variable();
       }
 
-      return found_term.core_mut().save_index.unwrap();
+      return found_term.core_mut().save_index;
     }
 
     if let Some(variable_term) = self.as_any_mut().downcast_mut::<VariableTerm>() {
@@ -371,7 +371,7 @@ pub trait Term: Formattable {
       if variable_term.is_eager_context() {
         let index = variable_info.make_construction_index();
         rhs_builder.add_rhs_automaton(Box::new(CopyRHSAutomaton::new(var_index, index)));
-        variable_term.core_mut().save_index = Some(index);
+        variable_term.core_mut().save_index = index;
         available_terms.insert_built_term(self.as_ptr(), true);
         return index;
       }
@@ -379,7 +379,7 @@ pub trait Term: Formattable {
     }
 
     let index = self.compile_rhs_aux(rhs_builder, variable_info, available_terms, eager_context);
-    self.core_mut().save_index = Some(index);
+    self.core_mut().save_index = index;
     available_terms.insert_built_term(self.as_ptr(), eager_context);
 
     index
