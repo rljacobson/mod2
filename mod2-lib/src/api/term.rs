@@ -50,7 +50,6 @@ use crate::{
     format::Formattable,
     sort::{
       KindPtr,
-      SortIndex,
       SortPtr
     },
     substitution::Substitution,
@@ -58,6 +57,7 @@ use crate::{
       TermAttribute,
       TermCore
     },
+    SortIndex,
     TermBag,
     VariableInfo,
     VariableIndex
@@ -302,7 +302,7 @@ pub trait Term: Formattable {
     let mut dag_node = self.dagify_aux(node_cache);
 
     if node_cache.set_sort_info {
-      assert!(self.core().sort_index.is_none(), "missing sort info");
+      assert_ne!(self.core().sort_index, SortIndex::None, "missing sort info");
       dag_node.set_sort_index(self.core().sort_index);
       dag_node.set_reduced();
     }
@@ -356,7 +356,7 @@ pub trait Term: Formattable {
 
       if found_term.core_mut().save_index.is_none() {
         if let Some(variable_term) = found_term.as_any().downcast_ref::<VariableTerm>() {
-          return variable_term.index.unwrap();
+          return variable_term.index;
         }
 
         found_term.core_mut().save_index = Some(variable_info.make_protected_variable());
@@ -366,7 +366,7 @@ pub trait Term: Formattable {
     }
 
     if let Some(variable_term) = self.as_any_mut().downcast_mut::<VariableTerm>() {
-      let var_index = variable_term.index.unwrap();
+      let var_index = variable_term.index;
 
       if variable_term.is_eager_context() {
         let index = variable_info.make_construction_index();
@@ -472,11 +472,11 @@ pub trait Term: Formattable {
     let kind       = sort_table.range_kind(); // should be const
 
     if symbol.arity().is_zero() {
-      self.set_sort_info(kind, sort_table.traverse(0, SortIndex::ZERO)); // HACK
+      self.set_sort_info(kind, sort_table.traverse(0, SortIndex::Zero)); // HACK
       return;
     }
 
-    let mut step = SortIndex::ZERO;
+    let mut step = SortIndex::Zero;
     let mut seen_args_count = 0;
 
     for mut term in self.iter_args() {
@@ -488,7 +488,7 @@ pub trait Term: Formattable {
         seen_args_count,
         self.symbol()
       );
-      step = sort_table.traverse(step.idx_unchecked(), term.core().sort_index);
+      step = sort_table.traverse(step.idx(), term.core().sort_index);
       seen_args_count += 1;
     }
 
@@ -526,8 +526,8 @@ pub trait Term: Formattable {
       let variable_term = self.as_any_mut().downcast_mut::<VariableTerm>().unwrap();
 
       // This call needs a mutable VariableTerm
-      variable_term.index = Some(index);
-      variable_term.occurs_below_mut().insert(index as usize);
+      variable_term.index = index;
+      variable_term.occurs_below_mut().insert(index.idx());
     } else {
       // Accumulate in a local variable, because the iterator holds a mutable borrow.
       let mut occurs_below = NatSet::new();

@@ -30,8 +30,8 @@ use crate::{
   core::{
     sort::{
       KindPtr,
-      SortIndex
     },
+    SortIndex,
     VariableIndex
   },
   HashType,

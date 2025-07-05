@@ -115,11 +115,9 @@ mod kind;
 mod sort;
 mod collection;
 mod kind_error;
-mod sort_index;
 
 // Flatten module hierarchy 
 pub use sort::*;
-pub use sort_index::SortIndex;
 pub use kind_error::*;
 pub use kind::*;
 pub use collection::*;

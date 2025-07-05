@@ -311,7 +311,7 @@ impl PreEquation {
           // If the equation has the variant attribute, we disallow left->right sharing so
           // that the rhs can still be instantiated, even if the substitution was made by
           // unification.
-          let Equation { rhs_term, rhs_builder, fast_variable_count, .. } = &mut self.pe_kind else { unreachable!() };
+          let Equation { rhs_term, rhs_builder, .. } = &mut self.pe_kind else { unreachable!() };
           let mut dummy = TermBag::new();
           rhs_term.compile_top_rhs(rhs_builder, &mut self.variable_info, &mut dummy);
           // For an equation with the variant attribute we always compile the lhs, even if the parent symbol
@@ -320,7 +320,7 @@ impl PreEquation {
           compile_lhs = true;
         } else {
           // normal case
-          let Equation { rhs_term, rhs_builder, fast_variable_count, .. } = &mut self.pe_kind else { unreachable!() };
+          let Equation { rhs_term, rhs_builder, .. } = &mut self.pe_kind else { unreachable!() };
           rhs_term.compile_top_rhs(rhs_builder, &mut self.variable_info, &mut available_terms);
         }
 
@@ -450,7 +450,7 @@ impl PreEquation {
         self.variable_info.add_unbound_variables(&unbound_variables);
 
         if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
-          let mindex       = self.variable_info.unbound_variables.min_value().unwrap() as VariableIndex;
+          let mindex       = VariableIndex::from_usize(self.variable_info.unbound_variables.min_value().unwrap());
           let min_variable = self.variable_info.index_to_variable(mindex).unwrap();
 
           let mut self_string_simple:  String = "".to_string();
@@ -476,7 +476,7 @@ impl PreEquation {
       Membership { .. } => {
         // Doesn't use bound_variables.
         if !self.is_nonexec() && !self.variable_info.unbound_variables.is_empty() {
-          let mindex       = self.variable_info.unbound_variables.min_value().unwrap() as VariableIndex;
+          let mindex       = VariableIndex::from_usize(self.variable_info.unbound_variables.min_value().unwrap());
           let min_variable = self.variable_info.index_to_variable(mindex).unwrap();
 
           let mut self_string_simple  = String::new();

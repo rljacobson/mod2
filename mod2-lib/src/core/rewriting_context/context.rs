@@ -5,9 +5,9 @@ use crate::{
     redex_position::RedexPosition,
     rewriting_context::{ContextAttribute, ContextAttributes},
     substitution::Substitution,
-    IndexMarker,
-    VariableIndex
-  },
+    VariableIndex,
+    SentinelIndex
+  }
 };
 
 pub type BxRewritingContext = Box<RewritingContext>;
@@ -27,10 +27,10 @@ pub struct RewritingContext {
   // ToDo: These need to be marked!
   redex_stack  : Vec<RedexPosition>,
   redex_stack_roots: BxRootVec, // Solution to marking redex_stack
-  stale_marker : IndexMarker,   // NONE = -1, ROOT_OK = -2, an index when >= 0
-  lazy_marker  : IndexMarker,   // NONE = -1, an index when >= 0
+  stale_marker : VariableIndex, // NONE = -1, ROOT_OK = -2, an index when >= 0
+  lazy_marker  : VariableIndex, // NONE = -1, an index when >= 0
   current_index: VariableIndex,
-  
+
   pub substitution: Substitution,
   attributes      : ContextAttributes,
 
@@ -48,14 +48,16 @@ impl RewritingContext {
         variant_narrowing_count: 0,
         redex_stack            : vec![],
         redex_stack_roots      : RootVec::new(),
-        stale_marker           : IndexMarker::RootOk,
-        lazy_marker            : IndexMarker::None,
-        current_index          : 0,
+        stale_marker           : SentinelIndex::RootOk.into(),
+        lazy_marker            : SentinelIndex::None.into(),
+        current_index          : VariableIndex::Zero,
         substitution           : Substitution::default(),
         attributes             : ContextAttributes::default(),
       }
     )
   }
+
+  //region Getters
 
   /// A limited RewritingContext:
   ///  1. Does not have a rootNode.
@@ -86,6 +88,8 @@ impl RewritingContext {
   pub fn is_trace_enabled(&self) -> bool {
     self.attributes.contains(ContextAttribute::Trace)
   }
+
+  // endregion Getters
 
   // region Statistics
   #[inline(always)]
@@ -124,34 +128,34 @@ impl RewritingContext {
 
     // Locate deepest stack node with a stale parent.
     current_idx = self.current_index; // All staleness guaranteed to be above current_index
-    while self.redex_stack[current_idx as usize].parent_index != self.stale_marker {
-      current_idx = self.redex_stack[current_idx as usize].parent_index.idx();
+    while self.redex_stack[current_idx.idx()].parent_index != self.stale_marker {
+      current_idx = self.redex_stack[current_idx.idx()].parent_index;
     }
 
     // We assume that we only have to rebuild the spine from staleMarker to root.
-    let mut i = self.stale_marker;
+    let mut i: VariableIndex = self.stale_marker;
 
-    while i != IndexMarker::None {
+    while i != VariableIndex::None {
       self.remake_stale_dag_node(i, current_idx);
-      current_idx = i.idx();
-      i = self.redex_stack[i.idx() as usize].parent_index;
+      current_idx = i;
+      i = self.redex_stack[i.idx()].parent_index;
     }
 
     self.root = Some(RootVec::with_node(self.redex_stack[0].dag_node));
-    self.stale_marker = IndexMarker::RootOk;
+    self.stale_marker = SentinelIndex::RootOk.into();
 
     // println!("root is {:?}", self.root_node);
   }
 
-  fn remake_stale_dag_node(&mut self, stale_index: IndexMarker, child_index: VariableIndex) {
+  fn remake_stale_dag_node(&mut self, stale_index: VariableIndex, child_index: VariableIndex) {
     // Find first stacked argument of stale dag node.
-    let mut first_idx = child_index as usize;
+    let mut first_idx = child_index.idx();
     while self.redex_stack[first_idx - 1].parent_index == stale_index {
       first_idx -= 1;
     }
 
     // Find last stacked argument of stale dag node.
-    let mut last_idx = child_index as usize;
+    let mut last_idx = child_index.idx();
     let stack_length = self.redex_stack.len();
     while last_idx + 1 < stack_length && self.redex_stack[last_idx + 1].parent_index == stale_index {
       last_idx += 1;
@@ -166,7 +170,7 @@ impl RewritingContext {
   }
 
   // endregion
-  
+
   #[inline(always)]
   pub fn reduce(&mut self) {
     if let Some(root) = &self.root {

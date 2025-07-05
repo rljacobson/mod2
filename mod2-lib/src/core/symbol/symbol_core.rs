@@ -31,9 +31,9 @@ use crate::{
     },
     gc::ok_to_collect_garbage,
     rewriting_context::RewritingContext,
-    sort::SortIndex,
     strategy::Strategy,
-    MaybeModulePtr
+    MaybeModulePtr,
+    SortIndex,
   },
   HashType,
 };
@@ -98,7 +98,7 @@ impl SymbolCore {
       sort_table           : SortTable::with_arity(arity),
       sort_constraint_table: SortConstraintTable::new(),
       equations            : vec![],
-      unique_sort_index    : SortIndex::UNKNOWN,
+      unique_sort_index    : SortIndex::Unknown,
       hash_value,
       strategy             : Default::default(),
     };

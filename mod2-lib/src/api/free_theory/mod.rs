@@ -2,19 +2,28 @@ mod free_term;
 mod free_dag_node;
 mod free_symbol;
 mod free_automata;
+// mod free_net;
+// mod remainder;
 
 use std::ops::{Deref, DerefMut};
 use crate::{
-  core::sort::SortPtr,
-  api::term::{Term, TermPtr}
+  api::{
+    term::{Term, TermPtr},
+    automaton::BxLHSAutomaton
+  },
+  core::{
+    sort::SortPtr,
+    ArgIndex,
+    SlotIndex,
+    VariableIndex
+  },
 };
 
+// Flatten module hierarchy
 pub use free_term::FreeTerm;
 pub use free_dag_node::FreeDagNode;
 pub use free_symbol::FreeSymbol;
-use crate::api::ArgIndex;
-use crate::api::automaton::BxLHSAutomaton;
-use crate::core::VariableIndex;
+
 // Small auxiliary types for the free theory
 
 pub(crate) type FreeOccurrences = Vec<FreeOccurrence>;
@@ -22,13 +31,13 @@ pub(crate) type FreeOccurrences = Vec<FreeOccurrence>;
 /// A type erased term that exists under a free term that knows its position and arg index.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) struct FreeOccurrence {
-  position:  ArgIndex,
+  position:  SlotIndex,
   arg_index: ArgIndex,
   term:      TermPtr,
 }
 
 impl FreeOccurrence {
-  pub fn new(position: ArgIndex, arg_index: ArgIndex, term: TermPtr) -> Self {
+  pub fn new(position: SlotIndex, arg_index: ArgIndex, term: TermPtr) -> Self {
     FreeOccurrence {
       position,
       arg_index,
@@ -79,15 +88,15 @@ impl FreeOccurrence {
 // These two structs are specific to the free theory. The ACU theory has its own version.
 #[derive(Clone, Eq, PartialEq)]
 pub(crate) struct FreeVariable {
-  position:  ArgIndex,
+  position:  SlotIndex,
   arg_index: ArgIndex,
-  var_index: Option<VariableIndex>,
+  var_index: VariableIndex,
   sort:      Option<SortPtr>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub(crate) struct BoundVariable {
-  position:  ArgIndex,
+  position:  SlotIndex,
   arg_index: ArgIndex,
   var_index: VariableIndex,
 }
@@ -99,7 +108,7 @@ pub(crate) type GroundAlien = FreeOccurrence;
 
 // #[derive(Clone, PartialEq)]
 pub(crate) struct NonGroundAlien {
-  position:  ArgIndex,
+  position:  SlotIndex,
   arg_index: ArgIndex,
   automaton: BxLHSAutomaton,
 }

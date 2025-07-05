@@ -47,7 +47,7 @@ use crate::{
   core::{
     gc::allocate_dag_node,
     theory::EquationalTheory,
-    sort::SortIndex
+    SortIndex
   }
 };
 

@@ -51,10 +51,10 @@ use crate::{
       ThinDagNodePtr
     },
     gc::allocate_dag_node,
-    sort::SortIndex,
     EquationalTheory,
     HashConsSet,
-    VariableIndex
+    SortIndex,
+    VariableIndex,
   },
   HashType
 };

@@ -49,7 +49,7 @@ pub mod hash;
 // Generic memory utilities
 pub use memory::as_bytes;
 
-// Aliases and utility 
+// Aliases and utility
 pub use partial_ordering::*;
 
 // Arbitrary precision arithmetic
@@ -58,6 +58,7 @@ pub mod numeric;
 // Nonnegative integer types which allow the same optimizations as `NonZero<T>` but which allow
 // zero values.
 pub mod optimizable_int;
+pub mod special_index;
 
 // region Hashing data structures
 use std::collections::HashSet as StdHashSet;

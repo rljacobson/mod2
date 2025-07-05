@@ -18,7 +18,7 @@ use crate::{
     },
     EquationalTheory,
     HashConsSet,
-    sort::SortIndex
+    SortIndex
   },
   api::{
     Arity,
@@ -188,23 +188,23 @@ impl DagNode for FreeDagNode {
     let symbol = self.symbol();
     // assert_eq!(self as *const _, subject.symbol() as *const _, "bad symbol");
     if symbol.arity().is_zero() {
-      let idx = symbol.sort_table().traverse(0, SortIndex::ZERO);
+      let idx = symbol.sort_table().traverse(0, SortIndex::Zero);
       self.set_sort_index(idx); // Maude: HACK
       return;
     }
 
-    let mut state = SortIndex::ZERO;
+    let mut state = SortIndex::Zero;
     // enumerate is only used for assertion
     for (idx, arg) in self.iter_args().enumerate() {
       let term_idx = arg.sort_index();
       assert_ne!(
         term_idx,
-        SortIndex::UNKNOWN,
+        SortIndex::Unknown,
         "unknown sort encounter for arg {} subject = {}",
         idx,
         self as &dyn DagNode
       );
-      state = symbol.sort_table().traverse(state.idx_unchecked(), term_idx);
+      state = symbol.sort_table().traverse(state.idx(), term_idx);
     }
     self.set_sort_index(state);
   }

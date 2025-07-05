@@ -29,6 +29,7 @@ mod memo_map;
 pub(crate) mod rewriting_context;
 pub(crate) mod automata;
 mod dag_node_args;
+mod index;
 
 // Stubs
 pub struct StateTransitionGraph;
@@ -54,29 +55,9 @@ pub use theory::*;
 // ToDo: Should this be `()`?
 pub type Byte = u8;
 
-/// The type used to store variable indices.
-pub type VariableIndex = u32;
-
 // NONE = -1, ROOT_OK = -2, an index when >= 0
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum IndexMarker {
-  None,
-  RootOk,
-  Index(VariableIndex)
-}
+pub use index::*;
 
-impl IndexMarker {
-  #[allow(non_upper_case_globals)]
-  pub const Undefined: IndexMarker = IndexMarker::None;
-
-  pub fn idx(&self) -> VariableIndex {
-    if let IndexMarker::Index(i) = self {
-      *i
-    } else {
-      panic!("`IndexMarker` is not numeric");
-    }
-  }
-}
 
 #[cfg(test)]
 mod tests {

@@ -18,7 +18,7 @@ use crate::{
     Arity,
     BxTerm,
     DagNode,
-    DagNodePtr, 
+    DagNodePtr,
     TermPtr,
   },
   core::{
@@ -29,9 +29,10 @@ use crate::{
       OpDeclaration
     },
     rewriting_context::RewritingContext,
-    sort::{KindPtr, SortIndex},
+    sort::KindPtr,
     strategy::Strategy,
     EquationalTheory,
+    SortIndex
   },
   impl_display_debug_for_formattable,
   HashType,
@@ -49,7 +50,7 @@ pub trait Symbol {
 
   /// A type-erased way of asking a symbol to make a term of compatible type.
   fn make_term(&self, args: Vec<BxTerm>) -> BxTerm;
-  
+
   /// A type-erased way of asking a symbol to make a DAG node of compatible type.
   fn make_dag_node(&self, args: *mut u8) -> DagNodePtr;
 
@@ -57,7 +58,7 @@ pub trait Symbol {
   /// Trait level access to members for shared implementation
   fn core(&self) -> &SymbolCore;
   fn core_mut(&mut self) -> &mut SymbolCore;
-  
+
   fn theory(&self) -> EquationalTheory;
 
   #[inline(always)]
@@ -107,7 +108,7 @@ pub trait Symbol {
   fn strategy(&self) -> Option<&Strategy> {
     self.core().strategy.as_deref()
   }
-  
+
   #[inline(always)]
   fn standard_strategy(&self) -> bool {
     // Uses the standard strategy if `self.strategy` is `None`.
@@ -118,7 +119,7 @@ pub trait Symbol {
   fn eager_argument(&self, arg_count: usize) -> bool {
     if let Some(strategy) = self.core().strategy.as_deref() {
       strategy.eager.contains(arg_count)
-    } else { 
+    } else {
       false
     }
   }
@@ -131,7 +132,7 @@ pub trait Symbol {
       false
     }
   }
-  
+
   #[inline(always)]
   fn sort_constraint_free(&self) -> bool {
     self.core().sort_constraint_table.sort_constraint_free()
@@ -143,7 +144,7 @@ pub trait Symbol {
   fn compare(&self, other: &dyn Symbol) -> Ordering {
     self.hash().cmp(&other.hash())
   }
-  
+
   // Compiler related methods
 
   #[inline(always)]
@@ -157,11 +158,11 @@ pub trait Symbol {
     let symbol_ptr = self.as_ptr();
     self.core_mut().sort_table.compile_op_declaration(symbol_ptr)
   }
-  
+
   // Rewriting related methods
 
-  /// Performs symbol-specific equational rewriting on the given DAG node.  
-  /// This virtual method is called by the reduction machinery to apply equations  
+  /// Performs symbol-specific equational rewriting on the given DAG node.
+  /// This virtual method is called by the reduction machinery to apply equations
   /// and built-in operations specific to this symbol type. Returns `true` if
   /// the subject was modified.
   fn rewrite(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool;
@@ -170,16 +171,16 @@ pub trait Symbol {
   fn fast_compute_true_sort(&mut self, mut subject: DagNodePtr, context: &mut RewritingContext) {
     // let root = self.root.unwrap();
     match self.core().unique_sort_index {
-      SortIndex::SLOW_CASE_UNIQUE_SORT => {
+      SortIndex::SlowCaseUniqueSort => {
         // most general case
         self.slow_compute_true_sort(subject, context);
       }
 
-      SortIndex::FAST_CASE_UNIQUE_SORT => {
+      SortIndex::FastCaseUniqueSort => {
         // usual case
         subject.compute_base_sort();
       }
-      
+
       other => {
         // unique sort case
         subject.set_sort_index(other);

@@ -32,7 +32,7 @@ use crate::{
     EquationalTheory
   }
 };
-
+use crate::core::VariableIndex;
 
 // ToDo: Figure out why multithreading breaks the tests.
 // Force GC tests to run serially for consistent behavior.
@@ -254,7 +254,7 @@ fn create_destroy_variable_dag_node() {
   {
     let symbol = VariableSymbol::with_name(name.clone(), None);
     {
-      let node = VariableDagNode::new(symbol.as_ptr(), name.clone(), 0);
+      let node = VariableDagNode::new(symbol.as_ptr(), name.clone(), VariableIndex::default());
       println!("{}", node);
       // Node goes out of scope.
     }

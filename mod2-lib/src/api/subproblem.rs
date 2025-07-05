@@ -39,9 +39,10 @@ use crate::{
   api::DagNodePtr,
   core::{
     LocalBindings,
+    SortIndex,
     VariableIndex,
     rewriting_context::RewritingContext,
-    sort::{SortIndex, SortPtr},
+    sort::SortPtr,
     substitution::Substitution,
   }
 };
@@ -66,9 +67,9 @@ pub struct VariableAbstractionSubproblem {
 
 impl VariableAbstractionSubproblem {
   pub fn new(
-    abstracted_pattern: Box<dyn LHSAutomaton>, 
-    abstraction_variable: VariableIndex, 
-    variable_count: u32
+    abstracted_pattern  : Box<dyn LHSAutomaton>,
+    abstraction_variable: VariableIndex,
+    variable_count      : u32
   ) -> Self 
   {
     VariableAbstractionSubproblem {
@@ -184,8 +185,8 @@ impl Subproblem for SubproblemSequence {
 
 pub struct SortCheckSubproblem {
   pub subject: DagNodePtr,
-  pub sort: SortPtr,
-  pub result: Outcome
+  pub sort   : SortPtr,
+  pub result : Outcome
 }
 
 impl SortCheckSubproblem {

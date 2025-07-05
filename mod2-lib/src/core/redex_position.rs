@@ -6,11 +6,8 @@ A `RedexPosition` holds position information of a potential redex.
 
 use enumflags2::{bitflags, BitFlags};
 use crate::{
-  api::{
-    DagNodePtr,
-    ArgIndex
-  },
-  core::IndexMarker
+  api::DagNodePtr,
+  core::{ArgIndex, VariableIndex}
 };
 
 #[bitflags]
@@ -20,14 +17,14 @@ pub enum RedexPositionFlag {
   Stale,
   Eager,
 }
-pub type RedexPositionFlags = BitFlags<RedexPositionFlag>;
 // Local convenience
 use RedexPositionFlag::{Eager, Stale};
+pub type RedexPositionFlags = BitFlags<RedexPositionFlag>;
 
 pub struct RedexPosition {
   // ToDo: These need to be marked!
   pub dag_node    : DagNodePtr,
-  pub parent_index: IndexMarker, // These indices can be UNDEFINED/NONE
+  pub parent_index: VariableIndex, // These indices can be UNDEFINED/NONE
   pub arg_index   : ArgIndex,
   pub flags       : RedexPositionFlags,
 }

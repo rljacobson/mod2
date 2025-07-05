@@ -62,9 +62,9 @@ use crate::{
     sort::{
       SortPtr,
       KindError,
-      Sort, 
-      SortIndex
-    }
+      Sort,
+    },
+    SortIndex
   }
 };
 
@@ -184,7 +184,7 @@ impl Kind {
       if supersort_count == 0 {
         sort.index_within_kind = self.append_sort(sort);
       } else {
-        sort.index_within_kind = supersort_count.try_into().unwrap();
+        sort.index_within_kind = SortIndex::from_usize(supersort_count);
         for &s in sort.supersorts.iter() {
           if s.kind.is_none() {
             self.register_connected_sorts(s, visited_sort_count);
@@ -202,7 +202,7 @@ impl Kind {
       // time to add the subsort to its kind. This ensures all supersorts
       // of that subsort have been "resolved" before the subsort is added.
       subsort.index_within_kind -= 1;
-      if subsort.index_within_kind == SortIndex::ZERO {
+      if subsort.index_within_kind == SortIndex::Zero {
         // All supersorts resolved, so add to kind. There is a symmetric statement
         // for subsorts in `Kind::register_connected_sorts`
         subsort.index_within_kind = self.append_sort(*subsort);
@@ -213,7 +213,7 @@ impl Kind {
   /// Pushes the sort onto `self.sorts`, returning the index of the sort in `self.sorts`.
   pub fn append_sort(&mut self, sort: SortPtr) -> SortIndex {
     self.sorts.push(sort);
-    (self.sorts.len() - 1).try_into().unwrap()
+    SortIndex::from_usize(self.sorts.len() - 1)
   }
 
   // region Accessors
@@ -223,7 +223,7 @@ impl Kind {
   }
 
   pub fn sort(&self, idx: SortIndex) -> SortPtr {
-    self.sorts[idx.idx_unchecked()]
+    self.sorts[idx.idx()]
   }
 
   // endregion Accessors

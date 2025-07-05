@@ -1,7 +1,12 @@
 use enumflags2::{bitflags, BitFlags};
+
+use mod2_abs::UnsafePtr;
 use crate::{
-  api::{ArgIndex, DagNodePtr, Multiplicity},
-  core::gc::root_container::RootVec
+  core::{
+    ArgIndex,
+    gc::root_container::RootVec
+  },
+  api::{DagNodePtr, Multiplicity},
 };
 
 pub type MaybeExtensionInfo = Option<ExtensionInfoPtr>;
@@ -105,7 +110,6 @@ pub enum ExtensionAttribute {
 }
 
 use ExtensionAttribute::*;
-use mod2_abs::UnsafePtr;
 
 pub type ExtensionAttributes = BitFlags<ExtensionAttribute, u8>;
 

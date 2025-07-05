@@ -9,11 +9,9 @@ by placing a reference to the DagNode at the index of the number. Names are numb
  > recursion in both simplify and build_hierarchy can be tracked by a
  > single global array indexed by small integers representing variables.
 
- */
-
+*/
 
 use std::cmp::min;
-
 use mod2_abs::NatSet;
 
 pub(crate) use crate::{
@@ -25,6 +23,7 @@ pub(crate) use crate::{
     VariableIndex
   }
 };
+
 
 #[derive(Clone, Default)]
 pub struct Substitution {
@@ -84,16 +83,16 @@ impl Substitution {
   // ToDo: Should this take an VariableIndex?
   #[inline(always)]
   pub fn get(&self, index: VariableIndex) -> MaybeDagNode {
-    // assert!(index >= 0, "-ve index {}", index);
+    assert!(index.is_index(), "Non index {}", index);
     assert!(
-      (index as usize) < self.bindings.len(),
+      index.idx() < self.bindings.len(),
       "index too big {} vs {}",
       index,
       self.bindings.len()
     );
 
     // The asserts guarantee safety here.
-    unsafe { self.bindings.get_unchecked(index as usize).clone() }
+    unsafe { self.bindings.get_unchecked(index.idx()).clone() }
   }
 
   #[inline(always)]
@@ -112,7 +111,7 @@ impl Substitution {
       assert!(j.is_none() || i == j, "substitution inconsistency at index {}", idx);
       if let (Some(a), Some(b)) = (i, j) {
         if !a.addr_eq(*b) {
-          local_bindings.add_binding(idx as VariableIndex, *a);
+          local_bindings.add_binding(VariableIndex::from_usize(idx), *a);
         }
       }
     }
@@ -139,15 +138,15 @@ impl Substitution {
 
   #[inline(always)]
   pub fn bind(&mut self, index: VariableIndex, maybe_value: Option<DagNodePtr>) {
-    // assert!(index >= 0, "Negative index {}", index);
+    assert!(index.is_index(), "Non index {}", index);
     assert!(
-      (index as usize) < self.bindings.len(),
+      (index.idx()) < self.bindings.len(),
       "Index too big {} vs {}",
       index,
       self.bindings.len()
     );
 
-    self.bindings[index as usize] = maybe_value;
+    self.bindings[index.idx()] = maybe_value;
   }
 
   #[inline(always)]
@@ -182,7 +181,7 @@ pub fn print_substitution_narrowing(substitution: &Substitution, variable_info: 
 
   for i in 0..variable_count {
     let var = variable_info.index_to_variable(i).unwrap();
-    let binding = substitution.value(i as VariableIndex);
+    let binding = substitution.value(VariableIndex::from_usize(i));
     assert!(binding.is_some(), "A variable is bound to None. This is a bug.");
     let binding = binding.unwrap();
     println!("{} --> {}", var, binding);
@@ -200,12 +199,12 @@ pub fn print_substitution_with_ignored(substitution: &Substitution, var_info: &V
     if ignored_indices.contains(i) {
       continue;
     }
-    let var = var_info.index_to_variable(i as VariableIndex);
+    let var = var_info.index_to_variable(VariableIndex::from_usize(i));
     debug_assert!(var.is_some(), "null variable");
     let var = var.unwrap();
     print!("{} --> ", var);
 
-    match substitution.value(i as VariableIndex) {
+    match substitution.value(VariableIndex::from_usize(i)) {
       None => {
         println!("(unbound)");
       }

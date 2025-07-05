@@ -36,11 +36,9 @@ use mod2_abs::{
 use crate::{
   api::{built_in::get_built_in_sort},
   core::{
-    sort::{
-      kind::KindPtr,
-      sort_index::SortIndex
-    },
     format::{FormatStyle, Formattable},
+    sort::kind::KindPtr,
+    SortIndex,
   },
   impl_display_debug_for_formattable,
 };
@@ -126,7 +124,7 @@ impl Sort {
   /// guaranteed by how `sort.register_connected_sorts` is called. Used during subsort relation closure, during `Kind`
   /// construction.
   pub fn compute_leq_sorts(&mut self) {
-    self.leq_sorts.insert(self.index_within_kind.idx_unchecked());
+    self.leq_sorts.insert(self.index_within_kind.idx());
     for subsort in self.subsorts.iter() {
       let subsort_leq_sorts: &NatSet = &subsort.leq_sorts;
       self.leq_sorts.union_in_place(subsort_leq_sorts);
@@ -135,9 +133,9 @@ impl Sort {
     // Now determine `fast_compare_index`, the index for which all sorts with `index >= fast_compare_index` are subsorts.
     self.fast_compare_index = self.index_within_kind;
     let total_sort_count    = unsafe {self.kind.unwrap_unchecked().sorts.len()};
-    for i in (self.index_within_kind.idx_unchecked()..total_sort_count).rev() {
+    for i in (self.index_within_kind.idx()..total_sort_count).rev() {
       if !self.leq_sorts.contains(i) {
-        self.fast_compare_index = SortIndex::try_from(i + 1).unwrap();
+        self.fast_compare_index = SortIndex::from_usize(i + 1);
         break;
       }
     }
@@ -146,14 +144,14 @@ impl Sort {
   /// Determines if self <= other. 
   #[inline(always)]
   pub fn leq(&self, other: SortPtr) -> bool {
-    other.leq_sorts.contains(self.index_within_kind.idx_unchecked())
+    other.leq_sorts.contains(self.index_within_kind.idx())
   }
 }
 
 
 impl Formattable for Sort {
   fn repr(&self, out: &mut dyn Write, _style: FormatStyle) -> std::fmt::Result {
-    if self.index_within_kind == SortIndex::ZERO {
+    if self.index_within_kind == SortIndex::Zero {
       write!(out, "[{}]", self.name)
     } else { 
       write!(out, "{}", self.name)
@@ -167,11 +165,11 @@ impl_display_debug_for_formattable!(Sort);
 
 #[inline(always)]
 pub fn index_leq_sort(index: SortIndex, sort: &Sort) -> bool {
-  assert_ne!(index, SortIndex::UNKNOWN, "unknown sort");
+  assert_ne!(index, SortIndex::Unknown, "unknown sort");
   if index >= sort.fast_compare_index {
     true
   } else { 
-    sort.leq_sorts.contains(index.idx_unchecked())
+    sort.leq_sorts.contains(index.idx())
   }
 }
 

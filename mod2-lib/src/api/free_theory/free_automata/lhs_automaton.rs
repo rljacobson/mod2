@@ -17,7 +17,6 @@ use super::super::{
 };
 use crate::{
   api::{
-    ArgIndex,
     BxLHSAutomaton,
     DagNode,
     DagNodePtr,
@@ -30,16 +29,18 @@ use crate::{
     variable_theory::VariableTerm,
   },
   core::{
-    sort::SortIndex,
     substitution::Substitution,
     NodeList,
+    SortIndex,
+    ArgIndex,
     VariableIndex
   }
 };
+use crate::core::SlotIndex;
 
 #[derive(Clone)]
 pub struct FreeSubterm {
-  position  : ArgIndex,
+  position  : SlotIndex,
   arg_index : ArgIndex,
   symbol    : SymbolPtr,
   save_index: Option<VariableIndex>,
@@ -70,15 +71,15 @@ impl FreeLHSAutomaton {
     let free_symbol_count = free_symbols.len();
     let top_term          = free_symbols[0].downcast_term_mut::<FreeTerm>();
     let top_symbol        = top_term.symbol();
-    let mut slot_nr       = 1;
+    let mut slot_nr       = SlotIndex::new(1);
 
-    top_term.slot_index = 0;
+    top_term.slot_index = SlotIndex::Zero;
 
     // Free symbol skeleton //
     // Start with 1, because 0th term is `top_term`, which we set above.
     let free_subterms = (1..free_symbol_count)
       .map(|i| {
-        let oc_position       = free_symbols[i].position as usize;
+        let oc_position       = free_symbols[i].position.idx();
         let oc_arg_index      =  free_symbols[i].arg_index;
         let parent_slot_index = {
           let parent: &FreeTerm = free_symbols[oc_position].downcast_term::<FreeTerm>();
@@ -103,14 +104,14 @@ impl FreeLHSAutomaton {
       })
       .collect::<Vec<_>>();
 
-    let stack = vec![NodeList::new(); slot_nr as usize];
+    let stack = vec![NodeList::new(); slot_nr.idx()];
 
     // Variables that may be bound //
 
     let uncertain_variables = uncertain_vars
       .iter()
       .map(|oc| {
-        let parent = free_symbols[oc.position as usize].downcast_term::<FreeTerm>();
+        let parent = free_symbols[oc.position.idx()].downcast_term::<FreeTerm>();
         let v = oc.downcast_term::<VariableTerm>();
         FreeVariable {
           position:  parent.slot_index,
@@ -126,12 +127,12 @@ impl FreeLHSAutomaton {
     let bound_variables = bound_vars
       .iter()
       .map(|oc| {
-        let parent = free_symbols[oc.position as usize].downcast_term::<FreeTerm>();
+        let parent = free_symbols[oc.position.idx()].downcast_term::<FreeTerm>();
         let v = oc.downcast_term::<VariableTerm>();
         BoundVariable {
           position:  parent.slot_index,
           arg_index: oc.arg_index,
-          var_index: v.index.unwrap(),
+          var_index: v.index,
         }
       })
       .collect::<Vec<_>>();
@@ -141,7 +142,7 @@ impl FreeLHSAutomaton {
     let ground_aliens = gnd_aliens
       .iter()
       .map(|oc| {
-        let parent = free_symbols[oc.position as usize].downcast_term::<FreeTerm>();
+        let parent = free_symbols[oc.position.idx()].downcast_term::<FreeTerm>();
         GroundAlien {
           position : parent.slot_index,
           arg_index: oc.arg_index,
@@ -155,12 +156,12 @@ impl FreeLHSAutomaton {
     let non_ground_aliens = best_sequence
       .iter()
       .map(|&i| {
-        let occurrence: &FreeOccurrence = &non_gnd_aliens[i as usize];
-        let parent = free_symbols[occurrence.position as usize].downcast_term::<FreeTerm>();
+        let occurrence: &FreeOccurrence = &non_gnd_aliens[i.idx()];
+        let parent = free_symbols[occurrence.position.idx()].downcast_term::<FreeTerm>();
         NonGroundAlien {
           position:  parent.slot_index,
           arg_index: occurrence.arg_index,
-          automaton: sub_automata[i as usize].take().unwrap(),
+          automaton: sub_automata[i.idx()].take().unwrap(),
         }
       })
       .collect::<Vec<_>>();
@@ -184,7 +185,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
     mut subject    : DagNodePtr,
     solution       : &mut Substitution,
     _extension_info: MaybeExtensionInfo
-  ) -> (bool, MaybeSubproblem) 
+  ) -> (bool, MaybeSubproblem)
   {
     // ToDo: What variant of comparison should this be?
     if subject.symbol() != self.top_symbol {
@@ -204,7 +205,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
       for i in &self.free_subterms {
         // It is important that this is _immutable_ access to the args list, because
         // a `SharedVec` is copy on write if the ref count is greater than 1.
-        let d: DagNodePtr = self.stack[i.position as usize][i.arg_index as usize];
+        let d: DagNodePtr = self.stack[i.position.idx()][i.arg_index.idx()];
         if d.symbol() != i.symbol {
           return (false, None);
         }
@@ -220,13 +221,13 @@ impl LHSAutomaton for FreeLHSAutomaton {
       }
 
       for i in &self.uncertain_variables {
-        let d = self.stack[i.position as usize][i.arg_index as usize];
-        let v = i.var_index.unwrap();
+        let d = self.stack[i.position.idx()][i.arg_index.idx()];
+        let v = i.var_index;
         let b = solution.get(v);
         if b.is_none() {
           assert_ne!(
             d.sort_index(),
-            SortIndex::UNKNOWN,
+            SortIndex::Unknown,
             "missing sort information (2) for {:?}",
             d.symbol().name()
           );
@@ -244,14 +245,14 @@ impl LHSAutomaton for FreeLHSAutomaton {
       }
 
       for i in &self.bound_variables {
-        if !self.stack[i.position as usize][i.arg_index as usize].eq(solution.get(i.var_index).as_ref().unwrap()) {
+        if !self.stack[i.position.idx()][i.arg_index.idx()].eq(solution.get(i.var_index).as_ref().unwrap()) {
           return (false, None);
         }
       }
 
       for i in &self.ground_aliens {
         if i.term
-          .compare_dag_node(self.stack[i.position as usize][i.arg_index as usize])
+          .compare_dag_node(self.stack[i.position.idx()][i.arg_index.idx()])
           .is_ne()
         {
           return (false, None);
@@ -264,7 +265,7 @@ impl LHSAutomaton for FreeLHSAutomaton {
 
         for i in &mut self.non_ground_aliens {
           if let (true, subproblem) = i.automaton.match_(
-            self.stack[i.position as usize][i.arg_index as usize].clone(),
+            self.stack[i.position.idx()][i.arg_index.idx()].clone(),
             solution,
             None
           ) {

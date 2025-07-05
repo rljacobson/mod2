@@ -26,5 +26,4 @@ pub use automaton::*;
 pub use subproblem::*;
 pub use extension_info::*;
 
-pub(crate) type ArgIndex = u16;
 pub type Arity = OptU16;

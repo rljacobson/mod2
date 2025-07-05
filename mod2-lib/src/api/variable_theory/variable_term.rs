@@ -34,13 +34,13 @@ use crate::{
     substitution::Substitution,
     term_core::TermCore,
     TermBag,
-    VariableInfo
+    VariableInfo,
+    VariableIndex
   },
   impl_display_debug_for_formattable
   ,
   HashType,
 };
-use crate::core::VariableIndex;
 
 #[derive(Clone)]
 pub struct VariableTerm {
@@ -49,7 +49,7 @@ pub struct VariableTerm {
   pub variable_type: VariableType,
   /// Variables are tracked in a `VariableInfo` structure that maintains the environment.
   /// The value of `index` is set in `Term::index_variables()` as part of compilation.
-  pub index        : Option<VariableIndex>,
+  pub index        : VariableIndex,
 }
 
 impl VariableTerm {
@@ -58,7 +58,7 @@ impl VariableTerm {
       core         : TermCore::new(symbol),
       name,
       variable_type: VariableType::Blank,
-      index        : None, // Set in `Term::index_variables()`
+      index        : VariableIndex::None, // Set in `Term::index_variables()`
     }
   }
 }
@@ -130,7 +130,7 @@ impl Term for VariableTerm {
   }
 
   fn partial_compare_unstable(&self, partial_substitution: &mut Substitution, other: DagNodePtr) -> Option<Ordering> {
-    match partial_substitution.get(self.index.unwrap()) {
+    match partial_substitution.get(self.index) {
       None => {
         PartialOrdering::Unknown
       }
@@ -142,7 +142,7 @@ impl Term for VariableTerm {
   #[allow(private_interfaces)]
   fn dagify_aux(&self, _node_cache: &mut DagNodeCache) -> DagNodePtr {
     // ToDo: Why do we not consult `node_cache`?
-    VariableDagNode::new(self.symbol(), self.name.clone(), self.index.unwrap())
+    VariableDagNode::new(self.symbol(), self.name.clone(), self.index)
   }
 
   // region Compiler related methods
@@ -153,9 +153,10 @@ impl Term for VariableTerm {
     _variable_info: &VariableInfo,
     bound_uniquely: &mut NatSet,
   ) -> (BxLHSAutomaton, bool) {
-    let index = self.index.expect("index negative");
+    assert_ne!(self.index, VariableIndex::None, "index negative");
+    let index = self.index;
     assert!(index > 100, "index too big");
-    bound_uniquely.insert(index as usize);
+    bound_uniquely.insert(index.idx());
 
     let automaton: BxLHSAutomaton =
         Box::new(VariableLHSAutomaton::new(index, self.sort().unwrap(), match_at_top));
@@ -175,7 +176,7 @@ impl Term for VariableTerm {
   }
 
   fn analyse_constraint_propagation(&mut self, bound_uniquely: &mut NatSet) {
-    bound_uniquely.insert(self.index.unwrap() as usize);
+    bound_uniquely.insert(self.index.idx());
   }
 
   fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {

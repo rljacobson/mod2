@@ -24,12 +24,9 @@ use mod2_abs::{
 
 use crate::{
   core::{
-    sort::{
-      SortIndex,
-      SortPtr,
-      KindPtr,
-    },
-    symbol::op_declaration::{ConstructorStatus, OpDeclaration}
+    sort::{SortPtr, KindPtr},
+    symbol::op_declaration::{ConstructorStatus, OpDeclaration},
+    SortIndex,
   },
   api::{
     SymbolPtr,
@@ -100,7 +97,7 @@ impl SortTable {
     if self.maximal_op_decl_set_table.is_empty() {
       self.compute_maximal_op_decl_set_table();
     }
-    &self.maximal_op_decl_set_table[target.index_within_kind.idx_unchecked()]
+    &self.maximal_op_decl_set_table[target.index_within_kind.idx()]
   }
 
   #[inline(always)]
@@ -174,12 +171,12 @@ impl SortTable {
 
   #[inline(always)]
   pub fn traverse(&self, position: usize, sort_index: SortIndex) -> SortIndex {
-    self.sort_diagram[position + sort_index.idx_unchecked()]
+    self.sort_diagram[position + sort_index.idx()]
   }
 
   #[inline(always)]
   pub fn constructor_traverse(&self, position: usize, sort_index: SortIndex) -> SortIndex {
-    self.constructor_diagram[position + sort_index.idx_unchecked()]
+    self.constructor_diagram[position + sort_index.idx()]
   }
 
   pub fn domain_subsumes(&self, subsumer: usize, victim: usize) -> bool {
@@ -203,7 +200,7 @@ impl SortTable {
         .resize(sort_count, NatSet::new());
 
     for i in 0..sort_count {
-      let target = range.sort( SortIndex::try_from(i).unwrap() );
+      let target = range.sort( SortIndex::from_usize(i) );
 
       for j in 0..declaration_count {
         if (&self.op_declarations[j])[self.arity.get() as usize].leq(target) {
@@ -274,7 +271,7 @@ impl SortTable {
       return;
     }
 
-    let mut single_non_error_sort_index = SortIndex::UNINITIALIZED;
+    let mut single_non_error_sort_index = SortIndex::Uninitialized; // 0
     let mut next_states                 = Vec::new();
     let mut current_base                = 0;
     let mut bad_terminals               = HashSet::new();
@@ -285,7 +282,7 @@ impl SortTable {
       let nr_current_states = current_states.len();
 
       let next_base = current_base + nr_sorts * nr_current_states;
-      self.sort_diagram.resize(next_base, SortIndex::ZERO);
+      self.sort_diagram.resize(next_base, SortIndex::Zero);
 
       let nr_next_sorts = if i == (self.arity.get() - 1) as  usize {
         0
@@ -294,7 +291,7 @@ impl SortTable {
       };
 
       for j in 0..nr_sorts {
-        let s = component.sort(j.try_into().unwrap());
+        let s = component.sort(SortIndex::from_usize(j));
         let mut viable = NatSet::new();
 
         for (k, decl) in self.op_declarations.iter().enumerate() {
@@ -311,20 +308,20 @@ impl SortTable {
             let (sort_index, unique) = self.find_min_sort_index(&next_state);
             self.sort_diagram[index] = sort_index;
             if !unique {
-              bad_terminals.insert(index.try_into().unwrap());
+              bad_terminals.insert(SortIndex::from_usize(index));
             }
             if sort_index.is_positive() {
-              if single_non_error_sort_index == SortIndex::UNINITIALIZED {
+              if single_non_error_sort_index == SortIndex::Uninitialized {
                 single_non_error_sort_index = sort_index;
               } else if single_non_error_sort_index != sort_index {
-                single_non_error_sort_index = SortIndex::IMPOSSIBLE;
+                single_non_error_sort_index = SortIndex::Impossible;
               }
             }
           } else {
             self.minimize(&mut next_state, i + 1);
             let state_num            = SortTable::find_state_number(&mut next_states, next_state);
             let new_state            = next_base + nr_next_sorts * state_num;
-            self.sort_diagram[index] = new_state.try_into().unwrap();
+            self.sort_diagram[index] = SortIndex::from_usize(new_state);
           }
         }
       }
@@ -356,7 +353,7 @@ impl SortTable {
     let arg_count = self.arity.get() as usize;
 
     // Start with the error sort
-    let mut min_sort   = self.arg_kinds[arg_count].sort(SortIndex::ERROR);
+    let mut min_sort   = self.arg_kinds[arg_count].sort(SortIndex::Error);
     let mut inf_so_far = min_sort.leq_sorts.clone();
 
     for i in state.iter() {
@@ -465,39 +462,39 @@ impl SortTable {
     let mut spanning_tree: HashMap<usize, Node> = HashMap::new();
     spanning_tree.insert(0, Node {
       path_count: BigInt::one(),
-      parent    : SortIndex::UNKNOWN,
-      sort_index: SortIndex::UNKNOWN,
+      parent    : SortIndex::Unknown,
+      sort_index: SortIndex::Unknown,
     });
 
     let mut product       = BigInt::one();
     let mut bad_count     = BigInt::zero();
-    let mut first_bad     = vec![SortIndex::ZERO; nr_args];
+    let mut first_bad     = vec![SortIndex::Zero; nr_args];
     let mut current_nodes = HashSet::new();
 
-    current_nodes.insert(SortIndex::ZERO);
+    current_nodes.insert(SortIndex::Zero);
 
     for i in 0..nr_args {
       let component       = self.arg_kinds[i];
       let nr_sorts        = component.sort_count();
       let mut next_nodes  = HashSet::new();
-      product            *= nr_sorts;
+      product            *= nr_sorts as u64;
 
       for &parent in &current_nodes {
-        let path_count = spanning_tree[&parent.idx_unchecked()].path_count.clone();
+        let path_count = spanning_tree[&parent.idx()].path_count.clone();
 
         for k in 0..nr_sorts {
-          let index = parent + k;
+          let index = parent + SortIndex::from_usize(k);
 
           if i == nr_args - 1 {
             // Terminal node
             if bad_terminals.contains(&index) {
               if bad_count.is_zero() {
                 bad_count = path_count.clone();
-                first_bad[nr_args - 1] = k.try_into().unwrap();
+                first_bad[nr_args - 1] = SortIndex::from_usize(k);
 
                 let mut n = parent;
                 for l in (0..nr_args - 1).rev() {
-                  if let Some(node) = spanning_tree.get(&n.idx_unchecked()) {
+                  if let Some(node) = spanning_tree.get(&n.idx()) {
                     first_bad[l] = node.sort_index;
                     n = node.parent;
                   } else {
@@ -510,13 +507,13 @@ impl SortTable {
             }
           } else {
             // Non-terminal node
-            let target = diagram[index.idx_unchecked()];
-            let entry  = spanning_tree.entry(target.idx_unchecked()).or_insert_with(Node::default);
+            let target = diagram[index.idx()];
+            let entry  = spanning_tree.entry(target.idx()).or_insert_with(Node::default);
 
             if entry.path_count.is_zero() {
               entry.path_count = path_count.clone();
               entry.parent     = parent;
-              entry.sort_index = k.try_into().unwrap();
+              entry.sort_index = SortIndex::from_usize(k);
               next_nodes.insert(target);
             } else {
               entry.path_count += path_count.clone();
@@ -560,7 +557,7 @@ impl SortTable {
     writeln!(f, "{}Begin{{SortDiagram}}", " ".repeat(indent_level))?;
     let indent_level = indent_level + 2;
     let mut nodes: HashSet<SortIndex> = HashSet::new();
-    nodes.insert(SortIndex::ZERO);
+    nodes.insert(SortIndex::Zero);
 
     let range = self.arg_kinds[self.arity.get() as usize]; // Result component
 
@@ -591,15 +588,15 @@ impl SortTable {
         )?;
 
         for k in 0..nr_sorts {
-          let index = node + k;
-          let target = self.sort_diagram[index.idx_unchecked()];
+          let index = node + SortIndex::from_usize(k);
+          let target = self.sort_diagram[index.idx()];
 
           write!(
             f,
             "{}sort {} ({}) -> ",
             " ".repeat(indent_level),
             k,
-            component.sort(k.try_into().unwrap())
+            component.sort(SortIndex::from_usize(k))
           )?;
 
           if i == self.arity.get() as usize - 1 {

@@ -22,8 +22,8 @@ use crate::{
     },
     dag_node_cache::DagNodeCache,
     free_theory::{
-      free_automata::FreeLHSAutomaton,
-      free_dag_node::FreeDagNode,
+      free_automata::{FreeLHSAutomaton, FreeRHSAutomaton},
+      FreeDagNode,
       FreeOccurrence,
       FreeOccurrences
     },
@@ -34,7 +34,6 @@ use crate::{
       TermPtr
     },
     variable_theory::VariableTerm,
-    ArgIndex,
   },
   core::{
     automata::RHSBuilder,
@@ -49,19 +48,21 @@ use crate::{
     substitution::Substitution,
     symbol::SymbolTranslationMap,
     term_core::TermCore,
+    ArgIndex,
+    SlotIndex,
     TermBag,
-    VariableInfo
+    VariableIndex,
+    VariableInfo,
   },
   impl_display_debug_for_formattable,
   HashType,
 };
-use crate::api::free_theory::free_automata::FreeRHSAutomaton;
-use crate::core::VariableIndex;
+
 
 pub struct FreeTerm{
   core                 : TermCore,
   pub args             : Vec<BxTerm>,
-  pub(crate) slot_index: ArgIndex,
+  pub(crate) slot_index: SlotIndex,
 }
 
 impl FreeTerm {
@@ -69,7 +70,7 @@ impl FreeTerm {
     Self {
       core      : TermCore::new(symbol),
       args,
-      slot_index: 0,
+      slot_index: SlotIndex::None,
     }
   }
 }
@@ -261,7 +262,7 @@ impl Term for FreeTerm {
     let mut free_symbols  = FreeOccurrences::new();
     let mut other_symbols = FreeOccurrences::new();
     // See if we can fail on the free skeleton.
-    self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
+    self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, SlotIndex::None, ArgIndex::None);
 
     // Now classify occurrences of non Free-Theory symbols into 4 types
     let mut bound_variables     = FreeOccurrences::new(); // guaranteed bound when matched against
@@ -272,14 +273,14 @@ impl Term for FreeTerm {
 
     for mut occurrence in other_symbols {
       if let Some(v) = occurrence.try_downcast_term_mut::<VariableTerm>() {
-        assert!(v.index.is_some(), "index is none");
-        let index: VariableIndex = v.index.unwrap();
+        assert_ne!(v.index, VariableIndex::None, "index is none");
+        let index: VariableIndex = v.index;
         assert!(index > 100, "index too big");
 
-        if bound_uniquely.contains(index as usize) {
+        if bound_uniquely.contains(index.idx()) {
           bound_variables.push(occurrence);
         } else {
-          bound_uniquely.insert(index as usize);
+          bound_uniquely.insert(index.idx());
           uncertain_variables.push(occurrence);
         }
       } else {
@@ -305,7 +306,7 @@ impl Term for FreeTerm {
 
       for &sequence_index in &best_sequence.sequence {
         let (automata, spl): (BxLHSAutomaton, bool) =
-            non_ground_aliens[sequence_index as usize]
+            non_ground_aliens[sequence_index.idx()]
                 .term_mut()
                 .compile_lhs(false, variable_info, bound_uniquely);
         sub_automata.push(Some(automata));
@@ -368,7 +369,7 @@ impl Term for FreeTerm {
     // First gather all symbols lying in or directly under free skeleton.
     let mut free_symbols  = Vec::new();
     let mut other_symbols = Vec::new();
-    self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, 0, 0);
+    self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, SlotIndex::None, ArgIndex::None);
 
     // Now extract the non-ground aliens and update BoundUniquely with variables
     // that lie directly under the free skeleton and thus will receive an unique binding.
@@ -376,7 +377,7 @@ impl Term for FreeTerm {
     for occurrence in &mut other_symbols {
       let t = occurrence.term_mut();
       if let Some(variable_term) = t.as_any_mut().downcast_mut::<VariableTerm>() {
-        bound_uniquely.insert(variable_term.index.unwrap() as usize);
+        bound_uniquely.insert(variable_term.index.idx());
       } else if !t.ground() {
         non_ground_aliens.push(occurrence.clone());
       }
@@ -489,18 +490,18 @@ impl FreeTerm {
     &mut self,
     free_symbols : &mut Vec<FreeOccurrence>,
     other_symbols: &mut Vec<FreeOccurrence>,
-    parent       : ArgIndex,
+    parent       : SlotIndex,
     arg_index    : ArgIndex,
   ) {
-    let our_position = free_symbols.len() as ArgIndex;
+    let our_position = SlotIndex::from_usize(free_symbols.len());
     let occurrence   = FreeOccurrence::new(parent, arg_index, self.as_ptr());
     free_symbols.push(occurrence);
 
     for (i, t) in self.args.iter_mut().enumerate() {
       if let Some(f) = t.as_any_mut().downcast_mut::<FreeTerm>() {
-        f.scan_free_skeleton(free_symbols, other_symbols, our_position, i as ArgIndex);
+        f.scan_free_skeleton(free_symbols, other_symbols, our_position, ArgIndex::from_usize(i));
       } else {
-        let occurrence = FreeOccurrence::new(our_position, i as ArgIndex, t.as_ptr());
+        let occurrence = FreeOccurrence::new(our_position, ArgIndex::from_usize(i), t.as_ptr());
         other_symbols.push(occurrence);
       }
     }
@@ -512,7 +513,7 @@ impl FreeTerm {
     bound_uniquely: &mut NatSet,
     best_sequence : &mut ConstraintPropagationSequence,
   ) {
-    let mut current_sequence: Vec<ArgIndex> = (0..aliens.len() as ArgIndex).collect();
+    let mut current_sequence: Vec<ArgIndex> = (0..aliens.len()).map(|i| ArgIndex::from_usize(i)).collect();
     best_sequence.cardinality = -1;
 
     Self::find_constraint_propagation_sequence_helper(
@@ -536,7 +537,7 @@ impl FreeTerm {
       return false;
     }
     for i in step..aliens.len() {
-      if i != us && !interesting_variables.is_disjoint(aliens[current_sequence[i] as usize].term().occurs_below()) {
+      if i != us && !interesting_variables.is_disjoint(aliens[current_sequence[i].idx()].term().occurs_below()) {
         return true;
       }
     }
@@ -556,7 +557,7 @@ impl FreeTerm {
     // By matching these early we maximize the chance of early match failure,
     // and avoid wasted work at match time.
     for i in step..alien_count {
-      if aliens[current_sequence[i] as usize]
+      if aliens[current_sequence[i].idx()]
           .term()
           .will_ground_out_match(bound_uniquely)
       {
@@ -575,7 +576,7 @@ impl FreeTerm {
 
       for i in step..alien_count {
         new_bounds[i] = bound_uniquely.clone();
-        let t = aliens[current_sequence[i] as usize].term_mut();
+        let t = aliens[current_sequence[i].idx()].term_mut();
         t.analyse_constraint_propagation(&mut new_bounds[i]);
 
         // We now check if t has the potential to benefit from delayed matching.
@@ -692,7 +693,7 @@ impl FreeTerm {
 
       // Consider each argument in largest first order.
       let symbol = self.symbol();
-      let mut sources: Vec<VariableIndex> = vec![0; arg_count];
+      let mut sources: Vec<VariableIndex> = vec![VariableIndex::Zero; arg_count];
 
       for (_, idx) in &order {
         let idx = *idx;

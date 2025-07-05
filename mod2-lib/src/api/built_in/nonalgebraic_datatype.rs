@@ -30,14 +30,13 @@ use crate::{
       NaturalNumber,
       StringBuiltIn,
       NADagNode,
+      NASymbol
     },
     dag_node::{DagNode, DagNodePtr}
   },
-  core::EquationalTheory,
+  core::{EquationalTheory, SortIndex},
   HashType,
 };
-use crate::api::built_in::NASymbol;
-use crate::core::sort::SortIndex;
 
 /// A uniform interface to types that are used to implement built-in primitive datatypes.
 pub trait NADataType: Any + Clone + Display + Sized {
@@ -59,7 +58,7 @@ pub trait NADataType: Any + Clone + Display + Sized {
   fn make_dag_node(value: Self) -> DagNodePtr;
 
   fn compute_base_sort(dag_node: &mut NADagNode<Self>) {
-    let idx = dag_node.symbol().sort_table().traverse(0, SortIndex::ZERO);
+    let idx = dag_node.symbol().sort_table().traverse(0, SortIndex::Zero);
     dag_node.set_sort_index(idx); // Maude: HACK
   }
 }
@@ -87,7 +86,7 @@ impl NADataType for Float {
   fn make_dag_node(value: Self) -> DagNodePtr{ NADagNode::<Self>::new(value) }
   fn compute_base_sort(dag_node: &mut NADagNode<Self>) {
     if dag_node.value().is_finite() {
-      let idx = dag_node.symbol().sort_table().traverse(0, SortIndex::ZERO);
+      let idx = dag_node.symbol().sort_table().traverse(0, SortIndex::Zero);
       dag_node.set_sort_index(idx); // Maude: HACK
     } else {
       // ToDo: Implement sorts for infinite floats.

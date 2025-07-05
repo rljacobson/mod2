@@ -199,7 +199,6 @@ impl Condition {
 
         rhs_term.find_available_terms(available_terms, true, false);
 
-        let mut rhs_term = rhs_term;
         rhs_term.determine_context_variables();
         rhs_term.insert_abstraction_variables(variable_info);
         variable_info.end_of_fragment();

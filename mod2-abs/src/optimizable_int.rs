@@ -56,7 +56,7 @@ impl<T> From<T> for OptInt<T>
 }
 
 impl<T> Display for OptInt<T>
-    where T: Display + OptimizableInteger<T> 
+    where T: Display + OptimizableInteger<T>
 {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.get())

@@ -25,12 +25,13 @@ use std::{
 use mod2_abs::{Outcome, UnsafePtr};
 use crate::{
   api::{
-    SymbolPtr,
     Arity,
-    Term,
-    MaybeSubproblem,
+    ExtensionInfo,
     MaybeExtensionInfo,
+    MaybeSubproblem,
     SortCheckSubproblem,
+    SymbolPtr,
+    Term,
   },
   core::{
     dag_node_core::{
@@ -54,15 +55,16 @@ use crate::{
     EquationalTheory,
     HashConsSet,
     RedexPosition,
+    SortIndex,
     VariableIndex,
     rewriting_context::RewritingContext,
-    sort::{SortPtr, SortIndex},
+    sort::SortPtr,
     substitution::Substitution,
   },
   impl_display_debug_for_formattable,
   HashType,
 };
-use crate::api::ExtensionInfo;
+
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr          = UnsafePtr<dyn DagNode + 'static>;
@@ -206,7 +208,7 @@ pub trait DagNode {
   fn sort(&self) -> Option<SortPtr> {
     let sort_index = self.sort_index();
     match sort_index {
-      SortIndex::UNKNOWN => None,
+      SortIndex::Unknown => None,
 
       // Anything else
       sort_index => {
@@ -237,13 +239,13 @@ pub trait DagNode {
     //    valid-sort, SORT_UNKNOWN -> valid-sort
     //    valid-sort,  valid-sort -> valid-sort
     match (self.sort_index(), other.sort_index()) {
-      (SortIndex::UNKNOWN, SortIndex::UNKNOWN) => {
-        self.set_sort_index(SortIndex::UNKNOWN);
+      (SortIndex::Unknown, SortIndex::Unknown) => {
+        self.set_sort_index(SortIndex::Unknown);
       }
-      (SortIndex::UNKNOWN, sort_index) => {
+      (SortIndex::Unknown, sort_index) => {
         self.set_sort_index(sort_index);
       }
-      (sort_index, SortIndex::UNKNOWN) => {
+      (sort_index, SortIndex::Unknown) => {
         self.set_sort_index(sort_index);
       }
       (sort_index, _sort_index_other) => {
@@ -410,7 +412,7 @@ pub trait DagNode {
 
   /// Tests whether `self`'s sort is less than or equal to other's sort
   fn leq_sort(&self, sort: SortPtr) -> bool {
-    assert_ne!(self.sort_index(), SortIndex::UNKNOWN, "unknown sort");
+    assert_ne!(self.sort_index(), SortIndex::Unknown, "unknown sort");
     self.sort().unwrap().leq(sort)
   }
 
@@ -474,7 +476,7 @@ pub trait DagNode {
 
       DagNodeArguments::Vec(node_vec) => {
         for idx in first_idx..=last_idx.min((self.arity().get()-1) as usize) {
-          node_vec[redex_stack[idx].arg_index as usize] = redex_stack[redex_stack[idx].arg_index as usize].dag_node;
+          node_vec[redex_stack[idx].arg_index.idx()] = redex_stack[redex_stack[idx].arg_index.idx()].dag_node;
         }
       }
 
@@ -567,13 +569,13 @@ pub trait DagNode {
 
     if self.leq_sort(bound_sort) {
       if !self.symbol().sort_constraint_free() {
-        self.set_sort_index(SortIndex::UNKNOWN);
+        self.set_sort_index(SortIndex::Unknown);
       }
     } else {
       if self.symbol().sort_constraint_free() {
         return (Outcome::Failure, None);
       }
-      self.set_sort_index(SortIndex::UNKNOWN);
+      self.set_sort_index(SortIndex::Unknown);
       let returned_subproblem = Box::new(SortCheckSubproblem::new(self.as_ptr(), bound_sort));
       return (Outcome::Success, Some(returned_subproblem))
     }
@@ -583,12 +585,12 @@ pub trait DagNode {
 
   /// This version is designed for rewriting contexts where sort constraints must be resolved immediately.
   fn check_sort_in_context(&mut self, bound_sort: SortPtr, context: &mut RewritingContext) -> Outcome{
-    if self.sort_index().is_unknown() {
+    if self.sort_index() == SortIndex::Unknown {
       self.compute_base_sort();
 
       if self.leq_sort(bound_sort) {
         if !self.symbol().sort_constraint_free() {
-          self.set_sort_index(SortIndex::UNKNOWN);
+          self.set_sort_index(SortIndex::Unknown);
         }
         return Outcome::Success;
       }
@@ -623,7 +625,7 @@ pub trait DagNode {
     }
   }
 
-  // Only implemented for associative theories and the `S_` theory.
+  /// Only implemented for associative theories and the `S_` theory.
   fn partial_replace(&mut self, _replacement: DagNodePtr, _extension_info: MaybeExtensionInfo) {
     unreachable!("partial_replace not implemented for this node type.")
   }

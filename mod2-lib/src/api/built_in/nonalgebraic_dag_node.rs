@@ -37,9 +37,10 @@ use crate::{
       DagNodeFlag,
       ThinDagNodePtr
     },
-    EquationalTheory,
     gc::allocate_dag_node,
-    HashConsSet
+    EquationalTheory,
+    HashConsSet,
+    SortIndex,
   },
   api::{
     built_in::{
@@ -51,7 +52,6 @@ use crate::{
       StringBuiltIn,
       get_built_in_symbol
     },
-    Arity,
     dag_node::{
       DagNodeVectorRefMut,
       DagNodeVector,
@@ -60,11 +60,12 @@ use crate::{
       arg_to_dag_node,
       arg_to_node_vec
     },
-    symbol::SymbolPtr
+    symbol::SymbolPtr,
+    Arity,
   },
   HashType,
 };
-use crate::core::sort::SortIndex;
+
 
 pub type BoolDagNode    = NADagNode<Bool>;
 pub type FloatDagNode   = NADagNode<Float>;

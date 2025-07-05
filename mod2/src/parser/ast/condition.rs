@@ -44,7 +44,7 @@ use mod2_lib::{
     Term, 
   },
 };
-
+use mod2_lib::core::VariableIndex;
 use crate::parser::ast::{
   BxFunctorSortAST,
   BxTermAST,
@@ -81,8 +81,8 @@ impl ConditionAST {
           lhs_term: lhs.construct(symbols, sorts, variables),
           rhs_term: rhs.construct(symbols, sorts, variables),
           builder: Default::default(),
-          lhs_index: 0,
-          rhs_index: 0,
+          lhs_index: VariableIndex::None,
+          rhs_index: VariableIndex::None,
         }
       }
 
@@ -92,7 +92,7 @@ impl ConditionAST {
           lhs_term: lhs.construct(symbols, sorts, variables),
           sort,
           builder: Default::default(),
-          lhs_index: 0,
+          lhs_index: VariableIndex::None,
         }
       }
 
@@ -102,7 +102,7 @@ impl ConditionAST {
           rhs_term: rhs.construct(symbols, sorts, variables),
           builder: Default::default(),
           lhs_matcher: None,
-          rhs_index: 0,
+          rhs_index: VariableIndex::None,
         }
       }
 
@@ -112,7 +112,7 @@ impl ConditionAST {
           rhs_term: rhs.construct(symbols, sorts, variables),
           builder: Default::default(),
           rhs_matcher: None,
-          lhs_index: 0,
+          lhs_index: VariableIndex::None,
         }
       }
 
@@ -122,8 +122,8 @@ impl ConditionAST {
           lhs_term: lhs.construct(symbols, sorts, variables),
           rhs_term: Box::new(BoolTerm::new(true)),
           builder: Default::default(),
-          lhs_index: 0,
-          rhs_index: 0,
+          lhs_index: VariableIndex::None,
+          rhs_index: VariableIndex::None,
         }
       }
 
