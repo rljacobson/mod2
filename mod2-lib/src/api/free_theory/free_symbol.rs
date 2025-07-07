@@ -14,23 +14,27 @@ use crate::{
     rewriting_context::RewritingContext
   },
   api::{
+    dag_node::DagNodePtr,
+    free_theory::{
+      FreeTerm,
+      free_net::FreeNet
+    },
     symbol::{
       SymbolPtr,
       Symbol
     },
-    Arity,
-    free_theory::FreeTerm,
     term::{
       BxTerm,
       TermPtr
     },
-    dag_node::DagNodePtr
+    Arity,
   },
   impl_display_debug_for_formattable,
 };
 
 pub struct FreeSymbol {
-  core: SymbolCore
+  core              : SymbolCore,
+  discrimination_net: FreeNet
 }
 
 impl FreeSymbol {
@@ -40,14 +44,15 @@ impl FreeSymbol {
     attributes   : SymbolAttributes,
     symbol_type  : SymbolType,
     parent_module: MaybeModulePtr,
-  ) -> FreeSymbol {
+  ) -> FreeSymbol
+  {
     let core = SymbolCore::new(name, arity, attributes, symbol_type, parent_module);
-    FreeSymbol{ core }
+    FreeSymbol{ core, discrimination_net: FreeNet::new() }
   }
 
   pub fn with_arity(name: IString, arity: Arity, parent_module: MaybeModulePtr) -> FreeSymbol {
     let core = SymbolCore::with_arity(name, arity, parent_module);
-    FreeSymbol { core }
+    FreeSymbol { core, discrimination_net: FreeNet::new() }
   }
 }
 
@@ -85,9 +90,7 @@ impl Symbol for FreeSymbol {
       for mut arg in subject.iter_args() {
         arg.reduce(context);
       }
-      // ToDo: Implement discrimination net
-      todo!("free symbol rewriting");
-      // self.discrimination_net.apply_replace(subject, context)
+      self.discrimination_net.apply_replace(subject, context)
     } else {
       // ToDo: Implement nonstandard strategy rewriting
       unimplemented!("nonstandard strategy rewriting not implemented");

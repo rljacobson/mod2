@@ -1,11 +1,8 @@
 # In Progress
 
-- `FreeSymbol::discrimination_net.apply_replace(subject, context)`
-- `FreeSymbol::complex_strategy`
+- `PreEquation::check_condition_find_first`
 
 # Next Steps
-
-- `PreEquation::check_condition_find_first`
 
 - compiler
    - `Term::compile_lhs`, `Term::compile_rhs`
@@ -34,6 +31,7 @@
 - `AUExtensionInfo`, `AUCExtensionInfo`, `SExtensionInfo`
 - `core::rewriting_context::trace`
 - `core::rewriting_context::debugger`
+- `FreeSymbol::complex_strategy` - execution strategies are not implemented.
 
 # Issues
 
