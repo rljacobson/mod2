@@ -292,6 +292,11 @@ impl PreEquation {
     self.attributes.contains(PreEquationAttribute::Narrowing)
   }
 
+  #[inline(always)]
+  pub fn is_owise(&self) -> bool {
+    self.attributes.contains(PreEquationAttribute::Otherwise)
+  }
+
   // endregion Attributes
 
   // region Compiler related methods

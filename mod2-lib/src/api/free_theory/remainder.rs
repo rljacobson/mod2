@@ -63,15 +63,15 @@ pub struct FreeRemainder {
   //	To qualify for "super-fast", additionally each variable must have a sort that
   //	is the unique maximal user sort in its component which must be error-free.
   /// > 0 super-fast; < 0 fast; = 0 slow
-  pub(crate) fast  : Speed,
+  pub(crate) fast    : Speed,
   /// remainder consists of a foreign equation that might collapse into free theory
-  foreign          : bool,
-  free_variables   : Vec<FreeVariable>,
+  foreign            : bool,
+  free_variables     : Vec<FreeVariable>,
   /// equation we are a remainder of
-  equation         : PreEquationPtr,
-  bound_variables  : Vec<BoundVariable>,
-  ground_aliens    : Vec<GroundAlien>,
-  non_ground_aliens: Vec<NonGroundAlien>,
+  pub(crate) equation: PreEquationPtr,
+  bound_variables    : Vec<BoundVariable>,
+  ground_aliens      : Vec<GroundAlien>,
+  non_ground_aliens  : Vec<NonGroundAlien>,
 }
 
 impl FreeRemainder {
@@ -270,13 +270,13 @@ impl FreeRemainder {
     stack  : &mut Vec<DagNodeArguments>,
   ) -> bool {
     context.substitution.clear_first_n(self.equation.variable_info.protected_variable_count());
-    let r = self.slow_match_replace2(subject, context, stack);
+    let r = self.slow_match_replace_aux(subject, context, stack);
     context.finished();
     ok_to_collect_garbage();
     r
   }
 
-  pub fn slow_match_replace2(
+  pub fn slow_match_replace_aux(
     &mut self,
     subject: DagNodePtr,
     context: &mut RewritingContext,

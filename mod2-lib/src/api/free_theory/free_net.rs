@@ -137,7 +137,7 @@ impl FreeNet {
     neq_target    : i32,
   ) {
     let symbol_count = symbols.len();
-    let mut triples = Vec::with_capacity(symbol_count);
+    let mut triples  = Vec::with_capacity(symbol_count);
 
     for i in 0..symbol_count {
       triples.push(Triple {
@@ -216,7 +216,7 @@ impl FreeNet {
     self.fast_applicable.resize_with(applicable_count, | | Vec::new());
 
     for i in 0..applicable_count {
-      let live_set = &self.applicable[i];
+      let live_set   = &self.applicable[i];
       let remainders = &mut self.fast_applicable[i];
       remainders.reserve(live_set.len());
       // remainders.resize_with(live_set.len() + 1, | | None);
@@ -230,17 +230,17 @@ impl FreeNet {
 
   fn build_ternary_tree(
     &mut self,
-    node_index: &mut i32,
-    triples: &mut Vec<Triple>,
-    first: usize,
-    last: usize,
+    node_index     : &mut i32,
+    triples        : &mut Vec<Triple>,
+    first          : usize,
+    last           : usize,
     default_subtree: i32,
-    position: SlotIndex,
-    arg_index: ArgIndex,
+    position       : SlotIndex,
+    arg_index      : ArgIndex,
   ) {
     // Pick a middle element as the test symbol. If the sum of the first and last eligible indices
     // is odd we have a choice of middle elements and we try to break the tie in a smart way.
-    let sum = first + last;
+    let sum             = first + last;
     let mut test_symbol = sum / 2;
     if sum & 1 != 0 && self.more_important(&triples[test_symbol + 1].symbol, &triples[test_symbol].symbol) {
       test_symbol += 1;
@@ -249,11 +249,11 @@ impl FreeNet {
     // Fill out a new node.
     let i = *node_index as usize;
     *node_index += 1;
-    self.net[i].position = position;
-    self.net[i].arg_index = arg_index;
+    self.net[i].position     = position;
+    self.net[i].arg_index    = arg_index;
     self.net[i].symbol_index = triples[test_symbol].symbol.index_within_parent_module();
-    self.net[i].slot = triples[test_symbol].slot;
-    self.net[i].equal = triples[test_symbol].subtree;
+    self.net[i].slot         = triples[test_symbol].slot;
+    self.net[i].equal        = triples[test_symbol].subtree;
 
     // If there are any symbols remaining to the left of the test symbol, build a subtree for them.
     if first < test_symbol {
@@ -301,12 +301,16 @@ impl FreeNet {
     }
   }
 
+  /// Traverses the discrimination net for the given subject term and attempts to apply a matching rewrite rule.
+  /// Returns true if a matching rule was successfully applied; otherwise, returns false.
+  ///
+  /// This general-purpose version handles symbols of any arity, including constants, and sets up the stack accordingly.
   pub fn apply_replace_aux(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
     let mut next_index: i32;
 
     if !self.net.is_empty() {
       // At least one pattern has free symbols
-      let top_arg_array: DagNodeArguments = subject.get_arguments();
+      let top_arg_array    = subject.get_arguments();
       let mut net_idx      = 0;
       let mut dag_node     = top_arg_array[self.net[net_idx].arg_index.idx()];
       let mut symbol_index = dag_node.symbol().index_within_parent_module();
@@ -314,7 +318,8 @@ impl FreeNet {
 
       loop {
         let position: SlotIndex;
-        let diff    : isize = symbol_index.idx() as isize - self.net[net_idx].symbol_index.idx() as isize;
+        let diff    : isize = symbol_index.idx() as isize
+            - self.net[net_idx].symbol_index.idx() as isize;
 
         if diff != 0 {
           next_index = if diff < 0 {
@@ -331,10 +336,11 @@ impl FreeNet {
             break;
           }
 
-          // n     = &net_base[i as usize];
+          // n     = net_base + i as usize;
           net_idx  = next_index as usize;
           // p     = n.position;
           position = self.net[net_idx].position;
+
           if !position.is_index() {
             continue;
           }
@@ -343,12 +349,14 @@ impl FreeNet {
           if slot.is_index() {
             self.stack[slot.idx()] = dag_node.get_arguments();
           }
+
           next_index = self.net[net_idx].equal;
           if next_index <= 0 {
             break;
           }
-          self.net[net_idx] = self.net[next_index as usize];
-          position          = self.net[net_idx].position;
+
+          net_idx  = next_index as usize;
+          position = self.net[net_idx].position;
         }
 
         dag_node     = self.stack[position.idx()][self.net[net_idx].arg_index.idx()];
@@ -368,6 +376,186 @@ impl FreeNet {
     // Now go through the sequence of remainders, trying to finish the match
     let fast_applicable_list = &mut self.fast_applicable[next_index as usize];
     for remainder in fast_applicable_list.iter_mut() {
+      if remainder.fast_match_replace(subject, context, &mut self.stack) {
+        return true;
+      }
+    }
+
+    false
+  }
+
+  /// This is the inlined guard for `apply_replace_fast` that provides a fast path in the case that
+  /// the term cannot be applied.
+  #[inline(always)]
+  pub fn apply_replace_fast(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
+    if self.applicable.is_empty() {
+      false
+    } else {
+      self.apply_replace_fast_aux(subject, context)
+    }
+  }
+
+  /// "Optimized" version of the the above that only works for unary, binary and ternary top symbols. The only
+  /// difference is that this version assigns the subject's args to the stack unconditionally.
+  // ToDo: It's hard to imagine that this is actually faster.
+  pub fn apply_replace_fast_aux(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
+    let mut next_index: i32;
+
+    let top_arg_array = subject.get_arguments();
+    self.stack[0]     = top_arg_array.clone();
+
+    if !self.net.is_empty() {
+      let mut net_idx      = 0;
+      let mut dag_node     = top_arg_array[self.net[net_idx].arg_index.idx()];
+      let mut symbol_index = dag_node.symbol().index_within_parent_module();
+
+      loop {
+        let position: SlotIndex;
+        let diff = symbol_index.idx() as isize - self.net[net_idx].symbol_index.idx() as isize;
+
+        if diff != 0 {
+          next_index = if diff < 0 {
+            self.net[net_idx].not_equal.greater
+          } else {
+            self.net[net_idx].not_equal.less
+          };
+
+          if next_index <= 0 {
+            if next_index == 0 {
+              // zero represents failure
+              return false;
+            }
+            break;
+          }
+
+          // n     = net_base + i as usize;
+          net_idx  = next_index as usize;
+          // p     = n.position;
+          position = self.net[net_idx].position;
+
+          if !position.is_index() {
+            continue;
+          }
+        } else {
+          let slot = self.net[net_idx].slot;
+          if slot.is_index() {
+            self.stack[slot.idx()] = dag_node.get_arguments();
+          }
+
+          next_index = self.net[net_idx].equal;
+          if next_index <= 0 {
+            break;
+          }
+
+          net_idx  = next_index as usize;
+          position = self.net[net_idx].position;
+        }
+
+        dag_node     = self.stack[position.idx()][self.net[net_idx].arg_index.idx()];
+        symbol_index = dag_node.symbol().index_within_parent_module();
+      }
+
+      next_index = !next_index;
+    } else {
+      next_index = 0;
+    }
+
+    // Attempt fast-match replace on each applicable remainder
+    let fast_applicable_list = &mut self.fast_applicable[next_index as usize];
+    for remainder in fast_applicable_list.iter_mut() {
+      if remainder.fast_match_replace(subject, context, &mut self.stack) {
+        return true;
+      }
+    }
+
+    false
+  }
+
+  /// This is the inlined guard for `apply_replace_no_owise` that provides a fast path in the case that
+  /// the term cannot be applied.
+  #[inline(always)]
+  pub fn apply_replace_no_owise(&mut self, subject: DagNodePtr, context: &mut RewritingContext) -> bool {
+    if self.applicable.is_empty() {
+      false
+    } else {
+      self.apply_replace_no_owise_aux(subject, context)
+    }
+  }
+
+  pub fn apply_replace_no_owise_aux(
+    &mut self,
+    subject: DagNodePtr,
+    context: &mut RewritingContext,
+  ) -> bool {
+    let mut next_index: i32;
+
+    if !self.net.is_empty() {
+      // At least one pattern has free symbols
+      let top_arg_array    = subject.get_arguments();
+      let mut net_idx      = 0;
+      let mut dag_node     = top_arg_array[self.net[net_idx].arg_index.idx()];
+      let mut symbol_index = dag_node.symbol().index_within_parent_module();
+      self.stack[0]        = top_arg_array;
+
+      loop {
+        let position: SlotIndex;
+        let diff    : isize = symbol_index.idx() as isize
+            - self.net[net_idx].symbol_index.idx() as isize;
+
+        if diff != 0 {
+          next_index = if diff < 0 {
+            self.net[net_idx].not_equal.greater
+          } else {
+            self.net[net_idx].not_equal.less
+          };
+
+          if next_index <= 0 {
+            if next_index == 0 {
+              // zero represents failure
+              return false;
+            }
+            break;
+          }
+
+          net_idx  = next_index as usize;
+          position = self.net[net_idx].position;
+
+          if !position.is_index() {
+            continue;
+          }
+        } else {
+          let slot = self.net[net_idx].slot;
+          if slot.is_index() {
+            self.stack[slot.idx()] = dag_node.get_arguments();
+          }
+
+          next_index = self.net[net_idx].equal;
+          if next_index <= 0 {
+            break;
+          }
+
+          net_idx  = next_index as usize;
+          position = self.net[net_idx].position;
+        }
+
+        dag_node     = self.stack[position.idx()][self.net[net_idx].arg_index.idx()];
+        symbol_index = dag_node.symbol().index_within_parent_module();
+      }
+
+      next_index = !next_index;
+    } else {
+      if !subject.symbol().arity().is_zero() {
+        self.stack[0] = subject.get_arguments();
+      }
+      next_index = 0;
+    }
+
+    // Iterate over applicable remainders, stopping at first `owise`
+    let fast_applicable_list = &mut self.fast_applicable[next_index as usize];
+    for remainder in fast_applicable_list.iter_mut() {
+      if remainder.equation.is_owise() {
+        break;
+      }
       if remainder.fast_match_replace(subject, context, &mut self.stack) {
         return true;
       }
