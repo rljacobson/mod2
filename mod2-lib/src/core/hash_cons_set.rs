@@ -13,14 +13,20 @@ represented by a single canonical instance in memory.
 
 use crate::{
   api::DagNodePtr,
-  core::gc::root_container::RootMap
+  core::gc::root_container::{BxRootMap, RootMap}
 };
 
 pub struct HashConsSet {
-  node_set: RootMap
+  node_set: BxRootMap
 }
 
 impl HashConsSet {
+  pub fn new() -> HashConsSet {
+    HashConsSet{
+      node_set: RootMap::new()
+    }
+  }
+  
   /// Inserts the node if a canonical version of it is not in the set. Returns the canonical node.
   pub fn insert(&mut self, node: DagNodePtr) -> DagNodePtr {
     if let Some(&canon) = self.node_set.get(&node.structural_hash()) {

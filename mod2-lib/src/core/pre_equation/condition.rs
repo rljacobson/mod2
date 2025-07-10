@@ -1,8 +1,17 @@
 /*!
 
-Equations, rules, membership axioms, and strategies can have optional
-conditions that must be satisfied in order for the pre-equation to
-apply. Conditions are like a "lite" version of `PreEquation`.
+Equations, rules, membership axioms, and strategies can have optional conditions that
+must be satisfied in order for the pre-equation to apply. Conditions are like a
+"lite" version of `PreEquation`.
+
+In Maude, conditions are called condition fragments; the conjunction of all condition
+fragments is called the condition. Maude also uses distinct subclasses of the base
+class `ConditionFragment`. We use an enum.
+
+We call a single condition "fragment" just a `Condition`, and we call the
+conjunction of `Condition`s just `Conditions` (plural). Instead of subclasses,
+`Condition` is an enum with variants for `Equality`, `SortMembership`
+("sort test" in Maude), `Match` ("assignment" in Maude), and `Rewrite`.
 
 */
 
@@ -14,44 +23,212 @@ use mod2_abs::NatSet;
 use crate::{
   api::{
     BxLHSAutomaton,
-    LHSAutomaton,
-    Subproblem,
     BxTerm,
-    TermPtr
+    LHSAutomaton,
+    MaybeDagNode,
+    MaybeSubproblem,
+    Subproblem,
+    TermPtr,
   },
   core::{
+    StateGraphIndex,
+    TermBag,
+    VariableIndex,
+    VariableInfo,
     automata::RHSBuilder,
+    pre_equation::state_transition_graph::StateTransitionGraph,
     rewriting_context::RewritingContext,
     sort::SortPtr,
     substitution::Substitution,
-    StateTransitionGraph,
-    TermBag,
-    VariableInfo,
-    VariableIndex
-  }
+  },
 };
 use Condition::*;
 
 pub type Conditions  = Vec<BxCondition>;
 pub type BxCondition = Box<Condition>;
 
+// Also called Assignment
+pub struct MatchConditionState {
+  saved      : Substitution,
+  rhs_context: Box<RewritingContext>,
+  subproblem : Option<Box<dyn Subproblem>>,
+  succeeded  : bool,
+}
+
+/// Creates a new `ConditionState::Match`.
+///
+/// Note that this does not retain a reference to the provided matcher.
+impl MatchConditionState {
+  pub fn new(
+    original    : &mut RewritingContext,
+    matcher     : &mut dyn LHSAutomaton,
+    rhs_instance: MaybeDagNode
+  ) -> Self {
+    let mut saved = Substitution::with_capacity(original.substitution.fragile_binding_count());
+    saved.copy_from_substitution(&original.substitution);
+
+    let mut rhs_context = RewritingContext::new(rhs_instance);
+    rhs_context.reduce();
+    original.add_counts_from(rhs_context.as_ref());
+
+    let (succeeded, subproblem) = matcher.match_(rhs_context.root.as_ref().unwrap().node(), &mut original.substitution, None);
+
+    MatchConditionState {
+      saved,
+      rhs_context,
+      subproblem,
+      succeeded,
+    }
+  }
+
+  pub fn solve(&mut self, find_first: bool, solution: &mut RewritingContext) -> bool {
+    if self.succeeded {
+      if let Some(subproblem) = self.subproblem.as_mut() {
+        if subproblem.solve(find_first, solution) {
+          return true;
+        }
+      } else {
+        if find_first {
+          return true;
+        }
+      }
+    }
+    solution.substitution.copy_from_substitution(&self.saved);
+
+    false
+  }
+}
+
+pub struct RewriteConditionState {
+  state_graph: StateTransitionGraph,
+  // matcher    : Option<BxLHSAutomaton>,
+  saved      : Substitution,
+  subproblem : MaybeSubproblem,
+  explore    : StateGraphIndex,
+  edge_count : StateGraphIndex,
+}
+
+impl RewriteConditionState {
+  /// Creates a new `ConditionState::Rewrite`
+  pub fn new(
+    original    : &mut RewritingContext,
+    lhs_instance: MaybeDagNode,
+    // matcher     : Option<BxLHSAutomaton>,
+  ) -> Self
+  {
+    let state_graph = StateTransitionGraph::new(RewritingContext::new(lhs_instance));
+
+    let mut saved = Substitution::with_capacity(original.substitution.fragile_binding_count());
+    saved.copy_from_substitution(&original.substitution);
+
+    RewriteConditionState {
+      state_graph,
+      saved,
+      subproblem: None,
+      explore   : StateGraphIndex::None,
+      edge_count: StateGraphIndex::None,
+    }
+  }
+
+  pub fn solve(
+    &mut self,
+    find_first : bool,
+    solution   : &mut RewritingContext,
+    rhs_matcher: &mut dyn LHSAutomaton
+  ) -> bool
+  {
+    if !find_first {
+      if let Some(ref mut sp) = self.subproblem.as_mut() {
+        if sp.solve(false, solution) {
+          return true;
+        }
+        self.subproblem = None;
+      }
+      solution.substitution.copy_from_substitution(&self.saved);
+    }
+
+    loop {
+      let state_nr = self.find_next_state();
+      solution.add_counts_from(&self.state_graph.initial_context);
+
+      if state_nr == StateGraphIndex::None {
+        break;
+      }
+
+      let dag = self.state_graph.get_state_dag(state_nr);
+      let success;
+
+      (success, self.subproblem) = rhs_matcher.match_(dag, &mut solution.substitution, None);
+
+      if success {
+        if self.subproblem
+               .as_mut()
+               .map_or(true, |sp| sp.solve(true, solution))
+        {
+          return true;
+        }
+        self.subproblem = None;
+      }
+
+      solution.substitution.copy_from_substitution(&self.saved);
+    }
+
+    false
+  }
+
+  fn find_next_state(&mut self) -> StateGraphIndex {
+    if self.explore == StateGraphIndex::None {
+      self.explore = StateGraphIndex::Zero;
+      return StateGraphIndex::Zero;
+    }
+
+    let state_count = self.state_graph.state_count();
+
+    while self.explore.idx() < state_count {
+      loop {
+        self.edge_count += 1;
+        let state_nr = self.state_graph.get_next_state(self.explore, self.edge_count);
+
+        if state_nr == StateGraphIndex::None {
+          if self.state_graph.initial_context.trace_abort() {
+            return StateGraphIndex::None;
+          }
+          break; // try next explore state
+        }
+
+        if state_nr.idx() == state_count {
+          return state_nr;
+        }
+      }
+
+      self.edge_count = StateGraphIndex::None;
+      self.explore += 1;
+    }
+
+    StateGraphIndex::None
+  }
+}
+
 /// Holds state information used in solving condition fragments.
 pub enum ConditionState {
-  Assignment {
-    saved      : Substitution,
-    rhs_context: Box<RewritingContext>,
-    subproblem : Box<dyn Subproblem>,
-    succeeded  : bool,
-  },
+  // Also called Assignment
+  Match(MatchConditionState),
+  Rewrite(RewriteConditionState),
+}
 
-  Rewrite {
-    state_graph: StateTransitionGraph,
-    matcher    : Box<dyn LHSAutomaton>,
-    saved      : Substitution,
-    subproblem : Box<dyn Subproblem>,
-    explore    : i32,
-    edge_count : u32,
-  },
+impl ConditionState {
+  pub fn solve(
+    &mut self,
+    find_first : bool,
+    solution   : &mut RewritingContext,
+    mut matcher: Option<&mut dyn LHSAutomaton>
+  ) -> bool
+  {
+    match self {
+      ConditionState::Match(match_state)      => match_state.solve(find_first, solution),
+      ConditionState::Rewrite(rewrite_state) => rewrite_state.solve(find_first, solution, matcher.as_deref_mut().unwrap()),
+    }
+  }
 }
 
 pub enum Condition {
@@ -260,7 +437,6 @@ impl Condition {
     }
   }
 
-
   // endregion Compiler related methods
 
   pub fn check(&mut self, variable_info: &mut VariableInfo, bound_variables: &mut NatSet) {
@@ -313,10 +489,8 @@ impl Condition {
     }
   }
 
-  pub fn solve(&mut self, find_first: bool, solution: &mut RewritingContext, _state: &mut Vec<ConditionState>) -> bool {
+  pub fn solve(&mut self, find_first: bool, solution: &mut RewritingContext, state: &mut Vec<ConditionState>) -> bool {
     match self {
-      Match { .. } => todo!("Implement match condition solve"),
-
       Equality {
         builder,
         lhs_index,
@@ -341,9 +515,88 @@ impl Condition {
         (*lhs_context.root.unwrap().as_ref()).deref() == (*rhs_context.root.unwrap().as_ref()).deref()
       }
 
-      Rewrite { .. } => todo!("Implement rewrite condition solve"),
+      SortMembership {
+        builder,
+        lhs_index,
+        sort,
+        ..
+      } => {
+        if !find_first {
+          return false;
+        }
 
-      SortMembership { .. } => todo!("Implement sort test condition solve"),
+        builder.safe_construct(&mut solution.substitution);
+        let lhs_root        = solution.substitution.get(*lhs_index);
+        let mut lhs_context = RewritingContext::new(lhs_root);
+
+        lhs_context.reduce();
+        solution.add_counts_from(&lhs_context);
+
+        lhs_context
+            .root
+            .as_ref()
+            .unwrap()
+            .node()
+            .leq_sort(*sort)
+      }
+
+      // `Match` is also called `Assignment` in Maude
+      Match {
+        builder,
+        lhs_matcher,
+        rhs_index,
+        ..
+      } => {
+        if find_first {
+          builder.safe_construct(&mut solution.substitution);
+          let rhs_value = solution.substitution.get(*rhs_index);
+          let mut condition_state
+              = MatchConditionState::new(solution, lhs_matcher.as_deref_mut().unwrap(), rhs_value);
+
+          if condition_state.solve(true, solution) {
+            state.push(ConditionState::Match(condition_state));
+            return true;
+          }
+        } else {
+          let Some(mut condition_state) = state.pop() else {
+            panic!("Expected ConditionState::Match on the stack");
+          };
+
+          if condition_state.solve(false, solution, None) {
+            state.push(condition_state);
+            return true;
+          }
+        }
+        false
+      }
+
+      Rewrite {
+        builder,
+        lhs_index,
+        rhs_matcher,
+        ..
+      } => {
+        if find_first {
+          builder.safe_construct(&mut solution.substitution);
+          let lhs_value = solution.substitution.get(*lhs_index);
+          let mut condition_state = RewriteConditionState::new(solution, lhs_value);
+
+          if condition_state.solve(true, solution, rhs_matcher.as_deref_mut().unwrap()) {
+            state.push(ConditionState::Rewrite(condition_state));
+            return true;
+          }
+        } else {
+          let Some(ConditionState::Rewrite(mut rewrite_condition_state)) = state.pop() else {
+            panic!("Expected RewriteConditionState on the stack");
+          };
+
+          if rewrite_condition_state.solve(false, solution, rhs_matcher.as_deref_mut().unwrap()) {
+            state.push(ConditionState::Rewrite(rewrite_condition_state));
+            return true;
+          }
+        }
+        false
+      }
     }
   }
 }

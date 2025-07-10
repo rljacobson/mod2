@@ -24,7 +24,7 @@ mod context;
 use std::fmt::{Display, Formatter};
 use enumflags2::{bitflags, BitFlags};
 
-pub use context::RewritingContext;
+pub use context::{RewritingContext, BxRewritingContext};
 
 #[bitflags]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]

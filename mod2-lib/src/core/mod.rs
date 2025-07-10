@@ -31,9 +31,6 @@ pub(crate) mod automata;
 mod dag_node_args;
 mod index;
 
-// Stubs
-pub struct StateTransitionGraph;
-
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;

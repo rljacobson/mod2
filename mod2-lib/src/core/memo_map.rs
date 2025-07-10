@@ -14,18 +14,17 @@ is provided by `MemoTable`. In our implementation, we combine `MemoTable` with `
 use crate::{
   api::DagNodePtr,
   core::{
-    gc::root_container::{RootMap, RootVec},
+    gc::root_container::{BxRootMap, RootVec},
+    rewriting_context::RewritingContext,
     HashConsSet,
-    rewriting_context::RewritingContext
   }
 };
-
 
 pub struct MemoMap {
   /// The to-dags are always canonical.
   dags: HashConsSet,
   /// Maps from-dags to to-dags
-  dag_map: RootMap
+  dag_map: BxRootMap
 }
 
 impl MemoMap {

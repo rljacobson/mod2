@@ -78,22 +78,29 @@ However, Maude uses sort indices _as indices_ into arrays, for example
 use std::fmt::{Display, Formatter};
 use mod2_abs::special_index::{OuterEnumType, SpecialIndex};
 
-pub type RawSortIndex     = u16;
-pub type RawSlotIndex     = u16;
-pub type RawArgIndex      = u16;
-pub type RawVariableIndex = u32; // Can probably be `u16`, but Maude uses `i32`.
-pub type RawSymbolIndex   = u32; // Can probably be `u16`, but Maude uses `i32`.
+pub type RawSortIndex       = u16;
+pub type RawSlotIndex       = u16;
+pub type RawArgIndex        = u16;
+// Can probably be `u16`, but Maude uses `i32`.
+pub type RawVariableIndex   = u32;
+// Can probably be `u16`, but Maude uses `i32`.
+pub type RawSymbolIndex     = u32;
+// Maude uses `i32`, but that's probably too large, and smaller state tables are more cache friendly.
+pub type RawStateGraphIndex = u16;
 
 /// The index of a sort within its kind
-pub type SortIndex     = SpecialIndex<RawSortIndex    , SentinelIndex, 2>;
+pub type SortIndex       = SpecialIndex<RawSortIndex      , SentinelIndex, 2>;
 /// Represents a position in the match stack
-pub type SlotIndex     = SpecialIndex<RawSlotIndex    , SentinelIndex, 2>;
+pub type SlotIndex       = SpecialIndex<RawSlotIndex      , SentinelIndex, 2>;
 /// Represents a position in the argument list
-pub type ArgIndex      = SpecialIndex<RawSlotIndex    , SentinelIndex, 2>;
+pub type ArgIndex        = SpecialIndex<RawSlotIndex      , SentinelIndex, 2>;
 /// The index of a variable within its parent module
-pub type VariableIndex = SpecialIndex<RawVariableIndex, SentinelIndex, 2>;
+pub type VariableIndex   = SpecialIndex<RawVariableIndex  , SentinelIndex, 2>;
 /// The index of a symbol within its parent module
-pub type SymbolIndex   = SpecialIndex<RawSymbolIndex  , SentinelIndex, 2>;
+pub type SymbolIndex     = SpecialIndex<RawSymbolIndex    , SentinelIndex, 2>;
+/// Internal state representation of a `StateTransitionGraph`
+pub type StateGraphIndex = SpecialIndex<RawStateGraphIndex, SentinelIndex, 2>;
+
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
@@ -161,6 +168,8 @@ implement_from_traits!(RawSortIndex);
 // implement_from_traits!(RawSlotIndex); // Same type as `RawSortIndex`
 // implement_from_traits!(RawArgIndex);  // Same type as `RawSortIndex`
 implement_from_traits!(RawVariableIndex);
+// implement_from_traits!(RawSymbolIndex);     // Same as `RawVariableIndex`
+// implement_from_traits!(RawStateGraphIndex); // Same as `RawVariableIndex`
 
 
 

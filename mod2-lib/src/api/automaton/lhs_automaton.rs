@@ -26,7 +26,6 @@ pub trait LHSAutomaton {
     &mut self,
     subject : DagNodePtr,
     solution: &mut Substitution,
-    // returned_subproblem: Option<&mut dyn Subproblem>,
     extension_info: MaybeExtensionInfo,
   ) -> (bool, MaybeSubproblem);
 

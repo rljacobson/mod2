@@ -1,6 +1,10 @@
 # In Progress
 
-- `PreEquation::check_condition_find_first`
+- Everything in `state_transition_graph.rs`
+  - `StateTransitionGraph`
+  - `PositionState`
+  - `SearchState`
+  - `RewriteSearchState`
 
 # Next Steps
 
@@ -21,10 +25,10 @@
   * FreeUnaryRHSAutomaton
   * FreeNullaryRHSAutomaton
 
+
 # Stubs
 
 - Implement `StateTransitionGraph`
-
 
 # Saved for later
 
@@ -32,6 +36,13 @@
 - `core::rewriting_context::trace`
 - `core::rewriting_context::debugger`
 - `FreeSymbol::complex_strategy` - execution strategies are not implemented.
+
+- Tracing in:
+    - `PreEquation::check_condition_find_first`
+    - `FreeRemainder`
+    - `SortConstraintTable`
+    - `MemoMap`
+    - `SymbolCore`
 
 # Issues
 
