@@ -14,11 +14,13 @@ disadvantage that a full half of the representable values of the unsigned `N` ar
 
 */
 
-use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter};
-use std::marker::PhantomData;
-use std::ops::{Add, AddAssign, Sub, SubAssign};
-use num_traits::{Unsigned, Bounded, ConstZero, ConstOne};
+use std::{
+  marker::PhantomData,
+  fmt::{Debug, Display, Formatter},
+  cmp::Ordering,
+  ops::{Add, AddAssign, Sub, SubAssign}
+};
+use num_traits::{Bounded, ConstOne, ConstZero, Unsigned};
 
 pub trait InnerIndexType: Unsigned + Bounded + PartialOrd + Ord + PartialEq + Eq + From<u8> + Copy + Into<u64> + ConstZero + ConstOne {}
 pub trait OuterEnumType<N: InnerIndexType>: TryFrom<N> + Into<N> + Copy + PartialEq + Eq {}

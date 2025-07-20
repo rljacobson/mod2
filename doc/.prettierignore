@@ -1,0 +1,12 @@
+/**/.vscode
+/**/.idea
+/**/.obsidian
+/**/.VSCodeCounter
+
+/**/*.rs
+/**/*.ts
+/**/*.js
+/**/*.cc
+/**/*.cpp
+/**/*.hh
+/**/*.hpp

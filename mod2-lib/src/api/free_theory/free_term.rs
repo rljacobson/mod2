@@ -73,7 +73,388 @@ impl FreeTerm {
       slot_index: SlotIndex::None,
     }
   }
+
+  /// Traverse the free skeleton, calling compile_rhs() on all non-free subterms.
+  pub fn compile_rhs_aliens(
+    &mut self,
+    rhs_builder        : &mut RHSBuilder,
+    variable_info      : &mut VariableInfo,
+    available_terms    : &mut TermBag,
+    eager_context      : bool,
+    max_arity          : &mut u32,
+    free_variable_count: &mut u32,
+  ) {
+    let arg_count = self.args.len() as u32;
+    if arg_count > *max_arity {
+      *max_arity = arg_count;
+    }
+    let symbol = self.symbol();
+    for i in 0..arg_count as usize {
+      let arg_eager = eager_context && symbol.eager_argument(i);
+      let term = &mut self.args[i];
+      if let Some(free_term) = term.as_any_mut().downcast_mut::<FreeTerm>() {
+        *free_variable_count += 1;
+        if !available_terms.contains(free_term.as_ptr(), arg_eager) {
+          free_term.compile_rhs_aliens(
+            rhs_builder,
+            variable_info,
+            available_terms,
+            arg_eager,
+            max_arity,
+            free_variable_count,
+          );
+        }
+      } else {
+        term.compile_rhs(rhs_builder, variable_info, available_terms, arg_eager);
+      }
+    }
+  }
+
+  /// Traverses the term's argument array, recursively scanning nested `FreeTerm` nodes
+  /// while building a position table and classifying non-free subterms as bound variables,
+  /// free variables, or alien terms (ground or non-ground). Returns a boolean indicating
+  /// whether the compilation can proceed without failure, tracking which variables become
+  /// bound and accumulating subterm information needed for pattern matching optimization.
+  fn scan_free_skeleton(
+    &mut self,
+    free_symbols : &mut Vec<FreeOccurrence>,
+    other_symbols: &mut Vec<FreeOccurrence>,
+    parent       : SlotIndex,
+    arg_index    : ArgIndex,
+  ) {
+    let our_position = SlotIndex::from_usize(free_symbols.len());
+    let occurrence   = FreeOccurrence::new(parent, arg_index, self.as_ptr());
+    free_symbols.push(occurrence);
+
+    for (i, t) in self.args.iter_mut().enumerate() {
+      if let Some(f) = t.as_any_mut().downcast_mut::<FreeTerm>() {
+        f.scan_free_skeleton(free_symbols, other_symbols, our_position, ArgIndex::from_usize(i));
+      } else {
+        let occurrence = FreeOccurrence::new(our_position, ArgIndex::from_usize(i), t.as_ptr());
+        other_symbols.push(occurrence);
+      }
+    }
+  }
+
+  /// Bootstrap the recursive `find_constraint_propagation_sequence_aux` method, which
+  /// contains the actual algorithm.
+  fn find_constraint_propagation_sequence(
+    aliens        : &mut Vec<FreeOccurrence>,
+    bound_uniquely: &mut NatSet,
+    best_sequence : &mut ConstraintPropagationSequence,
+  ) {
+    let mut current_sequence: Vec<ArgIndex> = (0..aliens.len()).map(|i| ArgIndex::from_usize(i)).collect();
+    best_sequence.cardinality = -1;
+
+    Self::find_constraint_propagation_sequence_aux(
+      aliens,
+      &mut current_sequence,
+      bound_uniquely,
+      0,
+      best_sequence
+    );
+    assert!(best_sequence.cardinality >= 0, "didn't find a sequence");
+  }
+
+  /// The recursive part of the `find_constraint_propagation_sequence` algorithm.
+  ///
+  /// A constraint propagation optimization algorithm that determines the best
+  /// order to match pattern terms to minimize exponential blowup during pattern
+  /// compilation. The function analyzes which variables can be bound uniquely by each
+  /// term and finds a sequence that maximizes constraint propagation between terms.
+  fn find_constraint_propagation_sequence_aux(
+    aliens          : &mut Vec<FreeOccurrence>,
+    current_sequence: &mut Vec<ArgIndex>,
+    bound_uniquely  : &NatSet,
+    mut step        : usize,
+    best_sequence   : &mut ConstraintPropagationSequence,
+  ) {
+    let alien_count = aliens.len();
+
+    // Add any alien that will "ground out match" to the current sequence.
+    // By matching these early we maximize the chance of early match failure,
+    // and avoid wasted work at match time.
+    for i in step..alien_count {
+      if aliens[current_sequence[i].idx()]
+          .term()
+          .will_ground_out_match(bound_uniquely)
+      {
+        current_sequence.swap(step, i);
+        step += 1;
+      }
+    }
+    if step < alien_count {
+      // Now we search over possible ordering of remaining NGAs.
+
+      let mut new_bounds: Vec<NatSet> = Vec::with_capacity(alien_count);
+      // debug_advisory(&format!(
+      //   "FreeTerm::findConstraintPropagationSequence(): phase 1 step = {}",
+      //   step
+      // ));
+
+      for i in step..alien_count {
+        new_bounds[i] = bound_uniquely.clone();
+        let t = aliens[current_sequence[i].idx()].term_mut();
+        t.analyse_constraint_propagation(&mut new_bounds[i]);
+
+        // We now check if t has the potential to benefit from delayed matching.
+        let unbound = t.occurs_below().difference(&new_bounds[i]);
+        if !Self::remaining_aliens_contain(&aliens, &current_sequence, step, i, &unbound) {
+          // No, so commit to matching it here.
+
+          // debug_advisory(&format!(
+          //   "FreeTerm::findConstraintPropagationSequence(): step = {} committed to {}",
+          //   step, t
+          // ));
+
+          current_sequence.swap(step, i);
+          Self::find_constraint_propagation_sequence_aux(
+            aliens,
+            current_sequence,
+            &new_bounds[i],
+            step + 1,
+            best_sequence,
+          );
+
+          return;
+        }
+      }
+
+      // We didn't find a NGA that we could commit to matching without possibly missing a better sequence.
+      // Now go over the NGAs again. This time we need to consider expanding multiple branches in the
+      // search tree.
+      // debug_advisory(&format!(
+      //   "FreeTerm::findConstraintPropagationSequence(): phase 2 step = {}",
+      //   step
+      // ));
+      let mut expanded_at_least_one_branch = false;
+
+      for i in step..alien_count {
+        // We expand this branch if it binds something that could help another NGA.
+        let newly_bound_uniquely: NatSet = new_bounds[i].difference(bound_uniquely);
+        if Self::remaining_aliens_contain(&aliens, &current_sequence, step, i, &newly_bound_uniquely) {
+          // Explore this path.
+
+          // debug_advisory(&format!(
+          //   "FreeTerm::findConstraintPropagationSequence(): step = {} exploring {}",
+          //   step, aliens[current_sequence[i]].term()
+          // ));
+          current_sequence.swap(step, i);
+          Self::find_constraint_propagation_sequence_aux(
+            aliens,
+            current_sequence,
+            &new_bounds[i],
+            step + 1,
+            best_sequence,
+          );
+          current_sequence.swap(step, i);
+          expanded_at_least_one_branch = true;
+        }
+      }
+      if expanded_at_least_one_branch {
+        return;
+      }
+
+      //	If we get here, none of the remaining NGAs can bind a variable that could affect
+      //	the ability of other NGAs to bind variables, so there is no point pursuing further
+      //	exploration. But we still need to union any other variable they may bind and score
+      //	the result by making a recursive call to our leaf case.
+
+      // debug_advisory(&format!(
+      //   "FreeTerm::findConstraintPropagationSequence(): phase 3 step = {}",
+      //   step
+      // ));
+      let mut new_bound_union = NatSet::new();
+      for i in step..alien_count {
+        new_bound_union.union_in_place(&new_bounds[i]);
+      }
+
+      Self::find_constraint_propagation_sequence_aux(
+        aliens,
+        current_sequence,
+        &new_bound_union,
+        alien_count,
+        best_sequence,
+      );
+      return;
+    }
+
+    // Leaf of search tree.
+    let n = bound_uniquely.len() as i32;
+    if n > best_sequence.cardinality {
+      best_sequence.sequence    = current_sequence.clone(); // deep copy
+      best_sequence.bound       = bound_uniquely.clone();   // deep copy
+      best_sequence.cardinality = n;
+    }
+  }
+
+  /// A helper for `find_constraint_propagation_sequence`, checks whether any
+  /// remaining alien terms in the constraint propagation sequence contain
+  /// variables from a specified set of interesting variables. Returns `true` if
+  /// any remaining alien's variables overlap with the `interesting_variables` set.
+  fn remaining_aliens_contain(
+    aliens               : &Vec<FreeOccurrence>,
+    current_sequence     : &Vec<ArgIndex>,
+    step                 : usize,
+    us                   : usize,
+    interesting_variables: &NatSet,
+  ) -> bool {
+    if interesting_variables.is_empty() {
+      return false;
+    }
+    for i in step..aliens.len() {
+      if i != us && !interesting_variables.is_disjoint(aliens[current_sequence[i].idx()].term().occurs_below()) {
+        return true;
+      }
+    }
+    false
+  }
+
+  /// Optimizes the compilation of right-hand side free terms by sorting arguments by size in
+  /// descending order to minimize slot conflicts. For each argument, it either recursively
+  /// compiles new free subterms or reuses already compiled terms through availableTerms,
+  /// then constructs a free term automaton instruction using the compiled source indices.
+  /// This approach prevents quadratic complexity on large right-hand side expressions.
+  /// (Maude's compileRhs3)
+  pub fn compile_into_automaton(
+    &self,
+    automaton      : &mut dyn RHSAutomaton,
+    rhs_builder    : &mut RHSBuilder,
+    variable_info  : &mut VariableInfo,
+    available_terms: &mut TermBag,
+    eager_context  : bool,
+  ) -> VariableIndex {
+    let arg_count = self.args.len();
+
+    // We want to minimize conflict between slots to avoid quadratic number of
+    // conflict arcs on giant right hand sides. The heuristic we use is crude:
+    // we sort in order of arguments by number of symbol occurrences, and build
+    // largest first.
+    let mut order: Vec<(i32, usize)> = (0..arg_count)
+        .map(|i| (-(self.args[i].compute_size() as i32), i))
+        .collect();
+
+    order.sort_unstable();
+
+    // Consider each argument in largest first order.
+    let symbol = self.symbol();
+    let mut sources: Vec<VariableIndex> = vec![VariableIndex::Zero; arg_count];
+
+    for (_, idx) in &order {
+      let idx = *idx;
+      let arg_is_eager = eager_context && symbol.eager_argument(idx);
+      let mut term = self.args[idx].as_ptr();
+
+      // Argument is free - see if we need to compile it into current automaton.
+      if !available_terms.contains(term, arg_is_eager) {
+        let free_term = term.as_any_mut()
+                            .downcast_mut::<FreeTerm>()
+                            .expect("term should be a FreeTerm");
+        let source = free_term.compile_into_automaton(
+          automaton,
+          rhs_builder,
+          variable_info,
+          available_terms,
+          arg_is_eager,
+        );
+        sources[idx] = source;
+        term.core_mut().save_index = source;
+        available_terms.insert_built_term(term, arg_is_eager);
+
+        continue;
+      }
+
+      // Alien, variable or available term so use standard mechanism.
+      sources[idx] = term.compile_rhs(rhs_builder, variable_info, available_terms, arg_is_eager);
+    }
+
+    // Need to flag last use of each source.
+    for i in &sources {
+      variable_info.use_index(*i);
+    }
+
+    // Add to free step to automaton.
+    let index = variable_info.make_construction_index();
+    if let Some(automaton) = automaton.as_any_mut().downcast_mut::<FreeRHSAutomaton>() {
+      automaton.add_free(symbol.clone(), index, &sources);
+    }
+
+    index
+  }
+
+  /// FreeTerm::compileRemainder analyzes the term's structure by categorizing symbols into
+  /// free symbols and four types of "other" symbols: bound variables, free variables, ground
+  /// aliens, and non-ground aliens. For non-ground aliens, it determines an optimal matching
+  /// sequence that maximizes constraint propagation and variable binding opportunities.
+  /// Finally, it compiles subautomata for each non-ground alien in the determined sequence and
+  /// returns a new `FreeRemainder` object containing all this information for efficient matching.
+  pub fn compile_remainder(&mut self, equation: PreEquationPtr, slot_translation: &Vec<SlotIndex>) -> FreeRemainder {
+    // Gather all symbols lying in or directly under free skeleton
+    let mut free_symbols : Vec<FreeOccurrence> = Vec::new();
+    let mut other_symbols: Vec<FreeOccurrence> = Vec::new();
+    self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, SlotIndex::None, ArgIndex::None);
+
+    // Now classify occurrences of non Free-Theory symbols into 4 types
+    let mut bound_variables  : Vec<FreeOccurrence> = Vec::new(); // guaranteed bound when matched against
+    let mut free_variables   : Vec<FreeOccurrence> = Vec::new(); // guaranteed unbound when matched against
+    let mut ground_aliens    : Vec<FreeOccurrence> = Vec::new(); // ground alien subterms
+    let mut non_ground_aliens: Vec<FreeOccurrence> = Vec::new(); // non-ground alien subterms
+
+    let mut bound_uniquely = NatSet::new();
+
+    for occurence in &other_symbols {
+      let t = occurence.term();
+      if let Some(variable) = t.as_any().downcast_ref::<VariableTerm>() {
+        let index = variable.index.idx();
+        if bound_uniquely.contains(index) {
+          bound_variables.push(occurence.clone());
+        } else {
+          bound_uniquely.insert(index);
+          free_variables.push(occurence.clone());
+        }
+      } else {
+        if t.ground() {
+          ground_aliens.push(occurence.clone());
+        } else {
+          non_ground_aliens.push(occurence.clone());
+        }
+      }
+    }
+
+    let mut best_sequence = ConstraintPropagationSequence::default();
+    let alien_count       = non_ground_aliens.len();
+    // This vector is consumed out of order, so we need slot placeholders for the consumed elements.
+    let mut sub_automata: Vec<Option<BxLHSAutomaton>> = Vec::with_capacity(alien_count);
+
+    if alien_count > 0 {
+      // Now we have to find a best sequence in which to match the
+      // non-ground alien subterms and generate subautomata for them
+      Self::find_constraint_propagation_sequence(&mut non_ground_aliens, &mut bound_uniquely, &mut best_sequence);
+
+      for i in 0..alien_count {
+        let (lhs_automata, _subproblem_likely)
+            = non_ground_aliens[best_sequence.sequence[i].idx()]
+                .term_mut()
+                .compile_lhs(false, &equation.variable_info, &mut bound_uniquely);
+        sub_automata.push(Some(lhs_automata));
+      }
+      assert!(bound_uniquely == best_sequence.bound, "bound clash");
+    }
+
+    FreeRemainder::new(
+      equation,
+      free_symbols,
+      free_variables,
+      bound_variables,
+      ground_aliens,
+      non_ground_aliens,
+      best_sequence.sequence,
+      sub_automata,
+      slot_translation,
+    )
+  }
 }
+
 
 impl Formattable for FreeTerm {
   fn repr(&self, f: &mut dyn std::fmt::Write, style: FormatStyle) -> std::fmt::Result {
@@ -380,7 +761,7 @@ impl Term for FreeTerm {
       // unique values for variables allow those values to be propagated.
       let mut best_sequence = ConstraintPropagationSequence::default();
 
-      Self::find_constraint_propagation_sequence_helper(
+      Self::find_constraint_propagation_sequence_aux(
         &mut non_ground_aliens,
         &mut vec![],
         &bound_uniquely,
@@ -392,35 +773,35 @@ impl Term for FreeTerm {
     }
   }
 
-    #[inline(always)]
-    fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
-      if self.ground() {
-        return;
+  #[inline(always)]
+  fn find_available_terms_aux(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
+    if self.ground() {
+      return;
+    }
+
+    let arg_count = self.args.len();
+    let symbol    = self.symbol();
+
+    if at_top {
+      for i in 0..arg_count {
+        self.args[i].find_available_terms_aux(
+          available_terms,
+          eager_context && symbol.eager_argument(i),
+          false,
+        );
       }
-
-      let arg_count = self.args.len();
-      let symbol    = self.symbol();
-
-      if at_top {
-        for i in 0..arg_count {
-          self.args[i].find_available_terms_aux(
-            available_terms,
-            eager_context && symbol.eager_argument(i),
-            false,
-          );
-        }
-      } else {
-        available_terms.insert_matched_term(self.as_ptr(), eager_context);
-        for i in 0..arg_count {
-          self.args[i].find_available_terms_aux(
-            available_terms,
-            eager_context && symbol.evaluated_argument(i),
-            false,
-          );
-        }
+    } else {
+      available_terms.insert_matched_term(self.as_ptr(), eager_context);
+      for i in 0..arg_count {
+        self.args[i].find_available_terms_aux(
+          available_terms,
+          eager_context && symbol.evaluated_argument(i),
+          false,
+        );
       }
     }
-    // endregion
+  }
+  // endregion
 }
 
 
@@ -431,363 +812,3 @@ struct ConstraintPropagationSequence {
   bound      : NatSet,
   cardinality: i32,
 }
-
-
-impl FreeTerm {
-
-
-  /// Traverse the free skeleton, calling compile_rhs() on all non-free subterms.
-  pub fn compile_rhs_aliens(
-    &mut self,
-    rhs_builder        : &mut RHSBuilder,
-    variable_info      : &mut VariableInfo,
-    available_terms    : &mut TermBag,
-    eager_context      : bool,
-    max_arity          : &mut u32,
-    free_variable_count: &mut u32,
-  ) {
-    let arg_count = self.args.len() as u32;
-    if arg_count > *max_arity {
-      *max_arity = arg_count;
-    }
-    let symbol = self.symbol();
-    for i in 0..arg_count as usize {
-      let arg_eager = eager_context && symbol.eager_argument(i);
-      let term = &mut self.args[i];
-      if let Some(free_term) = term.as_any_mut().downcast_mut::<FreeTerm>() {
-        *free_variable_count += 1;
-        if !available_terms.contains(free_term.as_ptr(), arg_eager) {
-          free_term.compile_rhs_aliens(
-            rhs_builder,
-            variable_info,
-            available_terms,
-            arg_eager,
-            max_arity,
-            free_variable_count,
-          );
-        }
-      } else {
-        term.compile_rhs(rhs_builder, variable_info, available_terms, arg_eager);
-      }
-    }
-  }
-
-  fn scan_free_skeleton(
-    &mut self,
-    free_symbols : &mut Vec<FreeOccurrence>,
-    other_symbols: &mut Vec<FreeOccurrence>,
-    parent       : SlotIndex,
-    arg_index    : ArgIndex,
-  ) {
-    let our_position = SlotIndex::from_usize(free_symbols.len());
-    let occurrence   = FreeOccurrence::new(parent, arg_index, self.as_ptr());
-    free_symbols.push(occurrence);
-
-    for (i, t) in self.args.iter_mut().enumerate() {
-      if let Some(f) = t.as_any_mut().downcast_mut::<FreeTerm>() {
-        f.scan_free_skeleton(free_symbols, other_symbols, our_position, ArgIndex::from_usize(i));
-      } else {
-        let occurrence = FreeOccurrence::new(our_position, ArgIndex::from_usize(i), t.as_ptr());
-        other_symbols.push(occurrence);
-      }
-    }
-  }
-
-
-  fn find_constraint_propagation_sequence(
-    aliens        : &mut Vec<FreeOccurrence>,
-    bound_uniquely: &mut NatSet,
-    best_sequence : &mut ConstraintPropagationSequence,
-  ) {
-    let mut current_sequence: Vec<ArgIndex> = (0..aliens.len()).map(|i| ArgIndex::from_usize(i)).collect();
-    best_sequence.cardinality = -1;
-
-    Self::find_constraint_propagation_sequence_helper(
-      aliens,
-      &mut current_sequence,
-      bound_uniquely,
-      0,
-      best_sequence
-    );
-    assert!(best_sequence.cardinality >= 0, "didn't find a sequence");
-  }
-
-  fn remaining_aliens_contain(
-    aliens               : &Vec<FreeOccurrence>,
-    current_sequence     : &Vec<ArgIndex>,
-    step                 : usize,
-    us                   : usize,
-    interesting_variables: &NatSet,
-  ) -> bool {
-    if interesting_variables.is_empty() {
-      return false;
-    }
-    for i in step..aliens.len() {
-      if i != us && !interesting_variables.is_disjoint(aliens[current_sequence[i].idx()].term().occurs_below()) {
-        return true;
-      }
-    }
-    false
-  }
-
-  fn find_constraint_propagation_sequence_helper(
-    aliens          : &mut Vec<FreeOccurrence>,
-    current_sequence: &mut Vec<ArgIndex>,
-    bound_uniquely  : &NatSet,
-    mut step        : usize,
-    best_sequence   : &mut ConstraintPropagationSequence,
-  ) {
-    let alien_count = aliens.len();
-
-    // Add any alien that will "ground out match" to the current sequence.
-    // By matching these early we maximize the chance of early match failure,
-    // and avoid wasted work at match time.
-    for i in step..alien_count {
-      if aliens[current_sequence[i].idx()]
-          .term()
-          .will_ground_out_match(bound_uniquely)
-      {
-        current_sequence.swap(step, i);
-        step += 1;
-      }
-    }
-    if step < alien_count {
-      // Now we search over possible ordering of remaining NGAs.
-
-      let mut new_bounds: Vec<NatSet> = Vec::with_capacity(alien_count);
-      // debug_advisory(&format!(
-      //   "FreeTerm::findConstraintPropagationSequence(): phase 1 step = {}",
-      //   step
-      // ));
-
-      for i in step..alien_count {
-        new_bounds[i] = bound_uniquely.clone();
-        let t = aliens[current_sequence[i].idx()].term_mut();
-        t.analyse_constraint_propagation(&mut new_bounds[i]);
-
-        // We now check if t has the potential to benefit from delayed matching.
-        let unbound = t.occurs_below().difference(&new_bounds[i]);
-        if !Self::remaining_aliens_contain(&aliens, &current_sequence, step, i, &unbound) {
-          // No, so commit to matching it here.
-
-          // debug_advisory(&format!(
-          //   "FreeTerm::findConstraintPropagationSequence(): step = {} committed to {}",
-          //   step, t
-          // ));
-
-          current_sequence.swap(step, i);
-          Self::find_constraint_propagation_sequence_helper(
-            aliens,
-            current_sequence,
-            &new_bounds[i],
-            step + 1,
-            best_sequence,
-          );
-
-          return;
-        }
-      }
-
-      // We didn't find a NGA that we could commit to matching without possibly missing a better sequence.
-      // Now go over the NGAs again. This time we need to consider expanding multiple branches in the
-      // search tree.
-      // debug_advisory(&format!(
-      //   "FreeTerm::findConstraintPropagationSequence(): phase 2 step = {}",
-      //   step
-      // ));
-      let mut expanded_at_least_one_branch = false;
-
-      for i in step..alien_count {
-        // We expand this branch if it binds something that could help another NGA.
-        let newly_bound_uniquely: NatSet = new_bounds[i].difference(bound_uniquely);
-        if Self::remaining_aliens_contain(&aliens, &current_sequence, step, i, &newly_bound_uniquely) {
-          // Explore this path.
-
-          // debug_advisory(&format!(
-          //   "FreeTerm::findConstraintPropagationSequence(): step = {} exploring {}",
-          //   step, aliens[current_sequence[i]].term()
-          // ));
-          current_sequence.swap(step, i);
-          Self::find_constraint_propagation_sequence_helper(
-            aliens,
-            current_sequence,
-            &new_bounds[i],
-            step + 1,
-            best_sequence,
-          );
-          current_sequence.swap(step, i);
-          expanded_at_least_one_branch = true;
-        }
-      }
-      if expanded_at_least_one_branch {
-        return;
-      }
-
-      //	If we get here, none of the remaining NGAs can bind a variable that could affect
-      //	the ability of other NGAs to bind variables, so there is no point pursuing further
-      //	exploration. But we still need to union any other variable they may bind and score
-      //	the result by making a recursive call to our leaf case.
-
-      // debug_advisory(&format!(
-      //   "FreeTerm::findConstraintPropagationSequence(): phase 3 step = {}",
-      //   step
-      // ));
-      let mut new_bound_union = NatSet::new();
-      for i in step..alien_count {
-        new_bound_union.union_in_place(&new_bounds[i]);
-      }
-
-      Self::find_constraint_propagation_sequence_helper(
-        aliens,
-        current_sequence,
-        &new_bound_union,
-        alien_count,
-        best_sequence,
-      );
-      return;
-    }
-
-    // Leaf of search tree.
-    let n = bound_uniquely.len() as i32;
-    if n > best_sequence.cardinality {
-      best_sequence.sequence    = current_sequence.clone(); // deep copy
-      best_sequence.bound       = bound_uniquely.clone();   // deep copy
-      best_sequence.cardinality = n;
-    }
-  }
-
-    /// Use the given automaton to compile this RHS. Maude's compileRhs3
-    pub fn compile_into_automaton(
-      &self,
-      automaton      : &mut dyn RHSAutomaton,
-      rhs_builder    : &mut RHSBuilder,
-      variable_info  : &mut VariableInfo,
-      available_terms: &mut TermBag,
-      eager_context  : bool,
-    ) -> VariableIndex {
-      let arg_count = self.args.len();
-
-      // We want to minimize conflict between slots to avoid quadratic number of
-      // conflict arcs on giant right hand sides. The heuristic we use is crude:
-      // we sort in order of arguments by number of symbol occurrences, and build
-      // largest first.
-      let mut order: Vec<(i32, usize)> = (0..arg_count)
-          .map(|i| (-(self.args[i].compute_size() as i32), i))
-          .collect();
-
-      order.sort_unstable();
-
-      // Consider each argument in largest first order.
-      let symbol = self.symbol();
-      let mut sources: Vec<VariableIndex> = vec![VariableIndex::Zero; arg_count];
-
-      for (_, idx) in &order {
-        let idx = *idx;
-        let arg_is_eager = eager_context && symbol.eager_argument(idx);
-        let mut term = self.args[idx].as_ptr();
-
-        // Argument is free - see if we need to compile it into current automaton.
-        if !available_terms.contains(term, arg_is_eager) {
-          let free_term = term.as_any_mut()
-                              .downcast_mut::<FreeTerm>()
-                              .expect("term should be a FreeTerm");
-          let source = free_term.compile_into_automaton(
-            automaton,
-            rhs_builder,
-            variable_info,
-            available_terms,
-            arg_is_eager,
-          );
-          sources[idx] = source;
-          term.core_mut().save_index = source;
-          available_terms.insert_built_term(term, arg_is_eager);
-
-          continue;
-        }
-
-        // Alien, variable or available term so use standard mechanism.
-        sources[idx] = term.compile_rhs(rhs_builder, variable_info, available_terms, arg_is_eager);
-      }
-
-      // Need to flag last use of each source.
-      for i in &sources {
-        variable_info.use_index(*i);
-      }
-
-      // Add to free step to automaton.
-      let index = variable_info.make_construction_index();
-      if let Some(automaton) = automaton.as_any_mut().downcast_mut::<FreeRHSAutomaton>() {
-        automaton.add_free(symbol.clone(), index, &sources);
-      }
-
-      index
-    }
-
-    pub fn compile_remainder(&mut self, equation: PreEquationPtr, slot_translation: &Vec<SlotIndex>) -> FreeRemainder {
-      // Gather all symbols lying in or directly under free skeleton
-      let mut free_symbols : Vec<FreeOccurrence> = Vec::new();
-      let mut other_symbols: Vec<FreeOccurrence> = Vec::new();
-      self.scan_free_skeleton(&mut free_symbols, &mut other_symbols, SlotIndex::None, ArgIndex::None);
-
-      // Now classify occurrences of non Free-Theory symbols into 4 types
-      let mut bound_variables  : Vec<FreeOccurrence> = Vec::new(); // guaranteed bound when matched against
-      let mut free_variables   : Vec<FreeOccurrence> = Vec::new(); // guaranteed unbound when matched against
-      let mut ground_aliens    : Vec<FreeOccurrence> = Vec::new(); // ground alien subterms
-      let mut non_ground_aliens: Vec<FreeOccurrence> = Vec::new(); // non-ground alien subterms
-
-      let mut bound_uniquely = NatSet::new();
-
-      for occurence in &other_symbols {
-        let t = occurence.term();
-        if let Some(variable) = t.as_any().downcast_ref::<VariableTerm>() {
-          let index = variable.index.idx();
-          if bound_uniquely.contains(index) {
-            bound_variables.push(occurence.clone());
-          } else {
-            bound_uniquely.insert(index);
-            free_variables.push(occurence.clone());
-          }
-        } else {
-          if t.ground() {
-            ground_aliens.push(occurence.clone());
-          } else {
-            non_ground_aliens.push(occurence.clone());
-          }
-        }
-      }
-
-      let mut best_sequence = ConstraintPropagationSequence::default();
-      let alien_count       = non_ground_aliens.len();
-      // This vector is consumed out of order, so we need slot placeholders for the consumed elements.
-      let mut sub_automata: Vec<Option<BxLHSAutomaton>> = Vec::with_capacity(alien_count);
-
-      if alien_count > 0 {
-        // Now we have to find a best sequence in which to match the
-        // non-ground alien subterms and generate subautomata for them
-        Self::find_constraint_propagation_sequence(&mut non_ground_aliens, &mut bound_uniquely, &mut best_sequence);
-
-        for i in 0..alien_count {
-          let (lhs_automata, _subproblem_likely)
-              = non_ground_aliens[best_sequence.sequence[i].idx()]
-                  .term_mut()
-                  .compile_lhs(false, &equation.variable_info, &mut bound_uniquely);
-          sub_automata.push(Some(lhs_automata));
-        }
-        assert!(bound_uniquely == best_sequence.bound, "bound clash");
-      }
-
-      FreeRemainder::new(
-        equation,
-        free_symbols,
-        free_variables,
-        bound_variables,
-        ground_aliens,
-        non_ground_aliens,
-        best_sequence.sequence,
-        sub_automata,
-        slot_translation,
-      )
-    }
-
-}
-

@@ -89,7 +89,7 @@ pub(crate) const INLINE_BYTE_COUNT: usize = size_of::<StringBuiltIn>();
 #[repr(u8)]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum DagNodeFlag {
-  /// Marked as in use
+  /// Marked as in use during the sweep phase of garbage collection.
   Marked,
   /// Has args that need destruction
   NeedsDestruction,
@@ -99,11 +99,12 @@ pub enum DagNodeFlag {
   Copied,
   /// Reduced and not rewritable by rules
   Unrewritable,
-  /// Unrewritable and all subterms unstackable or frozen
+  /// Unrewritable and all subterms unstackable or frozen. Such a node should
+  /// not be added to the redexStack for exploration during rewriting.
   Unstackable,
-  /// No variables occur below this node
+  /// No variables occur below this node.
   GroundFlag,
-  /// Node has a valid hash value (storage is theory dependent)
+  /// Node has a valid hash value (storage is theory dependent).
   HashValid,
 }
 
@@ -210,11 +211,11 @@ impl DagNodeCore {
 
     DagNodeCore::upgrade(node)
   }
-  
+
   pub fn with_args(symbol: SymbolPtr, args: *mut u8) -> DagNodePtr {
     let node     = allocate_dag_node();
     let node_mut = unsafe { &mut *node };
-    
+
     // Re-initialize memory
     node_mut.args   = args;
     node_mut.flags  = DagNodeFlags::empty();
@@ -229,7 +230,7 @@ impl DagNodeCore {
 
     DagNodeCore::upgrade(node)
   }
-  
+
 
   // endregion Constructors
 

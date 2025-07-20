@@ -21,6 +21,7 @@ pub enum RedexPositionFlag {
 use RedexPositionFlag::{Eager, Stale};
 pub type RedexPositionFlags = BitFlags<RedexPositionFlag>;
 
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub struct RedexPosition {
   // ToDo: These need to be marked!
   pub dag_node    : DagNodePtr,

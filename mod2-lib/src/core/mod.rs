@@ -29,8 +29,8 @@ mod memo_map;
 pub(crate) mod rewriting_context;
 pub(crate) mod automata;
 mod dag_node_args;
-mod index;
-
+pub(crate) mod index;
+pub(crate) mod state_transition_graph;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;

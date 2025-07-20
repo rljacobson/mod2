@@ -1,0 +1,8 @@
+# Reorder the imports alphabetically
+reorder_imports = true
+
+# Group imports into standard, external, and crate-local
+group_imports = "StdExternalCrate"
+
+# Combine multiple imports from the same module into one
+imports_granularity = "Module"

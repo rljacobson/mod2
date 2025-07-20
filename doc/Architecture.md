@@ -1,8 +1,8 @@
-Portions of this document are quoted from [Clavel et al.], which is published under the 
+Portions of this document are quoted from [Clavel et al.], which is published under the
 [Attribution-NonCommercial-NoDerivs 3.0 Unported (CC BY-NC-ND 3.0)](https://creativecommons.org/licenses/by-nc-nd/3.0/)
 license.
 
-> Clavel, M., Eker, S., Lincoln, P., & Meseguer, J. (1996). Principles of Maude. Electronic Notes in Theoretical 
+> Clavel, M., Eker, S., Lincoln, P., & Meseguer, J. (1996). Principles of Maude. Electronic Notes in Theoretical
 > Computer Science, 4, 65-89. doi: 10.1016/S1571-0661(04)00034-9
 
 # Architecture
@@ -107,38 +107,37 @@ and its built in constants true and false. ...
 
 Performance enhancing techniques implemented in the current prototype include:
 
- * Fixed size dag nodes for in-place replacement.
- * ull indexing for the topmost free function symbol layer of patterns; when the patterns for some free symbol only
-   contain free symbols this is equivalent to matching a subject against all the patterns simultaneously.
- * Use of _greedy matching algorithms_, which attempt to generate a single matching substitution as fast as possible for
-   patterns and subpatterns that are simple enough and whose variables satisfy certain conditions (such as not appearing
-   in a condition). If a greedy matching algorithm fails it may be able to report that no match exists; but it is also
-   allowed to report 'undecided' in which case the full matching algorithm must be used.
- * Use of binary search during AC matching for fast elimination of ground terms and previously bound variables.
- * se of a specially designed sorting algorithm which uses additional information to speed up the renormalization of AC
-   terms.
- * Use of a Boyer-Moore style algorithm for matching under associative function symbols.
- * Compile time analysis of sort information to avoid needless searching during associative and AC matching.
- * ompile time analysis of non-linear variables in patterns in order to propagate constraints on those variables in an
-   'optimal' way and reduce the search space.
- * Compile time allocation of fixed size data structures needed at run time.
- * Caching dynamically sized data structures created at run time for later reuse if they are big enough.
- * Bit vector encoding of sort information for fast sort comparisons.
- * Compilation of sort information into _regularity tables_ for fast incremental computation of sorts at run time.
- * fficient handling of _matching with extension_ through a theory independent mechanism that avoids the need for
-   extension variables or equations.
+- Fixed size dag nodes for in-place replacement.
+- Full indexing for the topmost free function symbol layer of patterns; when the patterns for some free symbol only
+  contain free symbols this is equivalent to matching a subject against all the patterns simultaneously.
+- Use of _greedy matching algorithms_, which attempt to generate a single matching substitution as fast as possible for
+  patterns and subpatterns that are simple enough and whose variables satisfy certain conditions (such as not appearing
+  in a condition). If a greedy matching algorithm fails it may be able to report that no match exists; but it is also
+  allowed to report 'undecided' in which case the full matching algorithm must be used.
+- Use of binary search during AC matching for fast elimination of ground terms and previously bound variables.
+- Use of a specially designed sorting algorithm which uses additional information to speed up the renormalization of AC
+  terms.
+- Use of a Boyer-Moore style algorithm for matching under associative function symbols.
+- Compile time analysis of sort information to avoid needless searching during associative and AC matching.
+- Compile time analysis of non-linear variables in patterns in order to propagate constraints on those variables in an
+  'optimal' way and reduce the search space.
+- Compile time allocation of fixed size data structures needed at run time.
+- Caching dynamically sized data structures created at run time for later reuse if they are big enough.
+- Bit vector encoding of sort information for fast sort comparisons.
+- Compilation of sort information into _regularity tables_ for fast incremental computation of sorts at run time.
+- Efficient handling of _matching with extension_ through a theory independent mechanism that avoids the need for
+  extension variables or equations.
 
 # Implementation Decisions
 
 ## Nullable indexes
 
-The idiomatic way of representing a value that can be present or not present is, of course, with `Option<T>`. This 
-comes up a lot for different index types in Maude, and Maude implements these as `int`s, with nonnegative values as
-an index and `-1` as `None` (and sometimes other special values as negative numbers). Maude's solution has some
-trade-offs:
+The idiomatic way of representing a value that can be present or not present is, of course, with `Option<T>`. This comes
+up a lot for different index types in Maude, and Maude implements these as `int`s, with nonnegative values as an index
+and `-1` as `None` (and sometimes other special values as negative numbers). Maude's solution has some trade-offs:
 
 | Pros                            | Cons                                                     |
-|:--------------------------------|:---------------------------------------------------------|
+| :------------------------------ | :------------------------------------------------------- |
 | Simple                          | Can only represent half the possible unsigned values     |
 | "conversion" to index is a noop | Special values are just convention, no semantics         |
 | Same size as index type         | Type system doesn't enforce... anything                  |
@@ -147,14 +146,14 @@ trade-offs:
 But `Option<u32>` also has trade-offs:
 
 | Pros                                 | Cons                                    |
-|:-------------------------------------|:----------------------------------------|
+| :----------------------------------- | :-------------------------------------- |
 | Idiomatic                            | 8 bytes / 64 bits, twice the size!      |
 | Special value has semantics          | Have to call `unwrap` for known indexes |
 | Mechanism forces `None`/`Some` check | Mechanism forces `None`/`Some` check    |
 |                                      | Conversion to index is not a noop       |
 
 For applications in which indexes are a fundamental type used in bulk and in hot paths / tight loops, `Option<u32>`
-isn't very attractive. An alternative is to do something like: 
+isn't very attractive. An alternative is to do something like:
 
 ```rust
 pub struct OptInt(NonZero<u32>);
@@ -183,17 +182,17 @@ The represented value `v` is stored internally as `v + 1`. Since it wraps `NonZe
 size as `u32` and is "nullable."
 
 | Pros                                      | Cons                                                    |
-|:------------------------------------------|:--------------------------------------------------------|
+| :---------------------------------------- | :------------------------------------------------------ |
 | Same size as `u32`                        | Conversion to `u32` is not a noop                       |
 | Idiomatic                                 | Have to call `unwrap` AND `get` to extract an index     |
 | Mechanism forces `None`/`Some` check      | Mechanism forces `None`/`Some` check                    |
 | Generalizes to `n` special values         | Conversion from `u32` to `Option<OptInt>` needs a check |
 | Only costs one `u32` value representation | Cannot represent `u32::MAX`                             |
 
-The efficient use of space is attractive, but the programmer ergonomics aren't great, and doing arithmetic on every 
+The efficient use of space is attractive, but the programmer ergonomics aren't great, and doing arithmetic on every
 single index operation is not very attractive for such a common operation.
 
-We can combine a few of these to hopefully get the most attractive features in a single type. The idea is, instead of 
+We can combine a few of these to hopefully get the most attractive features in a single type. The idea is, instead of
 using the all zero bit pattern to represent `None`, we use `u32::MAX`. In general, for an enum with `n` variants
 representing "special" values, we use `u32::MAX`, `u32::MAX - 1`, `u32::MAX - n + 1` to represent these special values.
 (Just subtract the discriminant from `u32::MAX`.)
@@ -208,7 +207,7 @@ impl SpecialIndex {
 ```
 
 | Pros                                      | Cons                                                                             |
-|:------------------------------------------|:---------------------------------------------------------------------------------|
+| :---------------------------------------- | :------------------------------------------------------------------------------- |
 | Same size as `u32`                        | Not idiomatic                                                                    |
 | Mechanism forces `None`/`Some` check      | Mechanism forces `None`/`Some` check                                             |
 | Only costs one `u32` value representation | Cannot represent `u32::MAX`                                                      |

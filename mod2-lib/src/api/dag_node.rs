@@ -55,10 +55,12 @@ use crate::{
     EquationalTheory,
     HashConsSet,
     RedexPosition,
+    RedexPositionFlag,
     SortIndex,
     VariableIndex,
     rewriting_context::RewritingContext,
     sort::SortPtr,
+    state_transition_graph::PositionIndex,
     substitution::Substitution,
   },
   impl_display_debug_for_formattable,
@@ -291,6 +293,21 @@ pub trait DagNode {
   }
 
   #[inline(always)]
+  fn is_unrewritable(&self) -> bool {
+    self.core().flags.contains(DagNodeFlag::Unrewritable)
+  }
+
+  #[inline(always)]
+  fn is_unstackable(&self) -> bool {
+    self.core().flags.contains(DagNodeFlag::Unstackable)
+  }
+
+  #[inline(always)]
+  fn set_unstackable(&mut self) {
+    self.core_mut().flags.insert(DagNodeFlag::Unstackable)
+  }
+
+  #[inline(always)]
   fn is_copied(&self) -> bool {
     self.core().flags.contains(DagNodeFlag::Copied)
   }
@@ -415,7 +432,7 @@ pub trait DagNode {
     assert_ne!(self.sort_index(), SortIndex::Unknown, "unknown sort");
     self.sort().unwrap().leq(sort)
   }
-  
+
   /// Only works for sorts on which `fast_geq_sufficient()` is true. Only used in
   /// `FreeRemainder::fast_match_and_replace()` and `FreeRemainder::*_check_and_bind()`.
   #[inline(always)]
@@ -637,6 +654,40 @@ pub trait DagNode {
   /// Only implemented for associative theories and the `S_` theory.
   fn partial_replace(&mut self, _replacement: DagNodePtr, _extension_info: MaybeExtensionInfo) {
     unreachable!("partial_replace not implemented for this node type.")
+  }
+
+  /// This function needs to be defined for theories that only store and
+  /// stack one copy of a repeated argument to avoid redundant rewrite steps.
+  /// (This is a method on Symbol in Maude.)
+  fn stack_physical_arguments(
+    &mut self,
+    stack              : &mut Vec<RedexPosition>,
+    parent_index       : VariableIndex,
+    respect_frozen     : bool,
+    respect_unstackable: bool,
+    is_eager_context   : bool,
+  ) {
+    // Default impl delegates to `self.stack_arguments()`, i.e. assumes
+    // that physical arguments correspond to notional arguments.
+    self.stack_arguments(
+      stack,
+      parent_index,
+      respect_frozen,
+      respect_unstackable,
+      is_eager_context,
+    )
+  }
+
+  /// This function must be defined for symbols that have arity > 0.
+  fn stack_arguments(
+    &mut self,
+    _stack              : &mut Vec<RedexPosition>,
+    _parent_index       : VariableIndex,
+    _respect_frozen     : bool,
+    _respect_unstackable: bool,
+    _is_eager_context   : bool,
+  ) {
+    // Default version does nothing and can be used for symbols that have no arguments.
   }
 
   // endregion Rewriting related methods

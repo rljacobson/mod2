@@ -31,15 +31,15 @@ use crate::{
     TermPtr,
   },
   core::{
+    automata::RHSBuilder,
+    rewriting_context::RewritingContext,
+    sort::SortPtr,
+    state_transition_graph::StateTransitionGraph,
+    substitution::Substitution,
     StateGraphIndex,
     TermBag,
     VariableIndex,
     VariableInfo,
-    automata::RHSBuilder,
-    pre_equation::state_transition_graph::StateTransitionGraph,
-    rewriting_context::RewritingContext,
-    sort::SortPtr,
-    substitution::Substitution,
   },
 };
 use Condition::*;

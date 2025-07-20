@@ -6,6 +6,7 @@ use std::{
   },
   ops::DerefMut
 };
+use enumflags2::BitFlag;
 use mod2_abs::hash::hash2;
 use crate::{
   core::{
@@ -16,9 +17,14 @@ use crate::{
       DagNodeFlag,
       ThinDagNodePtr
     },
+    ArgIndex,
     EquationalTheory,
     HashConsSet,
-    SortIndex
+    RedexPosition,
+    RedexPositionFlag,
+    SortIndex,
+    VariableIndex,
+    state_transition_graph::PositionIndex,
   },
   api::{
     Arity,
@@ -34,7 +40,6 @@ use crate::{
   },
   HashType,
 };
-
 
 #[repr(transparent)]
 pub struct FreeDagNode(DagNodeCore);
@@ -183,7 +188,6 @@ impl DagNode for FreeDagNode {
     }
   }
 
-
   fn compute_base_sort(&mut self) {
     let symbol = self.symbol();
     // assert_eq!(self as *const _, subject.symbol() as *const _, "bad symbol");
@@ -207,5 +211,43 @@ impl DagNode for FreeDagNode {
       state = symbol.sort_table().traverse(state.idx(), term_idx);
     }
     self.set_sort_index(state);
+  }
+
+
+  fn stack_arguments(
+    &mut self,
+    stack              : &mut Vec<RedexPosition>,
+    parent_index       : VariableIndex,
+    _respect_frozen    : bool,
+    respect_unstackable: bool,
+    is_eager_context   : bool
+  ) {
+
+    let nr_args = self.arity();
+    if nr_args.is_zero() {
+      return;
+    }
+
+    // ToDo: Implement strategies
+    // let frozen = self.strategy().frozen;
+    let args = self.get_arguments();
+
+    for (i, dag_node) in args.iter().enumerate() {
+      // ToDo: Implement strategies
+      let is_frozen      = false; //respect_frozen && frozen.contains(i);
+      let is_unstackable = respect_unstackable && dag_node.is_unstackable();
+
+      if !is_frozen && !is_unstackable {
+        let eager = is_eager_context; // && self.eager_argument(i); // ToDo: Implement strategies
+        let flags = if eager { RedexPositionFlag::Eager.into() } else{ RedexPositionFlag::empty() };
+        let redex_position = RedexPosition {
+          dag_node,
+          parent_index,
+          arg_index: ArgIndex::from_usize(i),
+          flags
+        };
+        stack.push(redex_position);
+      }
+    }
   }
 }

@@ -1,24 +1,12 @@
-/*!
-
-A state transition graph with hash consing.
-
-*/
-
-use mod2_abs::{HashMap, HashSet};
-use crate::api::DagNodePtr;
-use crate::core::{pre_equation::PreEquationPtr as RulePtr, rewriting_context::BxRewritingContext, HashConsSet, StateGraphIndex};
-
-type ArcMap = HashMap<u32, HashSet<RulePtr>>;
-
-pub struct State{
-  hash_cons_index: u32,
-  state_dag      : DagNodePtr,
-  parent         : u32,
-  next_states    : Vec<u32>,
-  //rewrite_state: Option<RewriteSearchState>,
-  forward_arcs   : ArcMap,
-  fully_explored : bool,
-}
+use crate::{
+  api::DagNodePtr,
+  core::{
+    HashConsSet,
+    StateGraphIndex,
+    rewriting_context::BxRewritingContext,
+    state_transition_graph::State
+  }
+};
 
 pub struct StateTransitionGraph {
   pub(crate) initial_context: BxRewritingContext,
@@ -31,9 +19,9 @@ impl StateTransitionGraph {
   pub fn new(initial_context: BxRewritingContext) -> StateTransitionGraph {
     StateTransitionGraph{
       initial_context,
-      seen: Vec::new(),
+      seen             : Vec::new(),
       hash_cons_to_seen: Vec::new(),
-      hash_cons_set: HashConsSet::new()
+      hash_cons_set    : HashConsSet::new()
     }
   }
 

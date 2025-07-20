@@ -8,7 +8,6 @@ implemented.) The subclass is implemented as enum `PreEquationKind`.
 pub mod condition;
 // mod membership;
 mod sort_constraint_table;
-mod state_transition_graph;
 
 use std::fmt::{Display, Formatter};
 
