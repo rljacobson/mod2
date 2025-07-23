@@ -10,7 +10,6 @@ use crate::{
     Arity,
     DagNodePtr,
     MaybeExtensionInfo,
-    MaybeSubproblem
   },
   core::{
     symbol::{
@@ -38,7 +37,7 @@ use crate::{
   },
   HashType,
 };
-
+use crate::api::MaybeSubproblemRef;
 
 pub struct SymbolCore {
   pub name       : IString,
@@ -167,9 +166,16 @@ impl SymbolCore {
           context.substitution.clear_first_n(*fast_variable_count as usize);
           if let Some(lhs_automaton) = &mut eq2.deref_mut().lhs_automaton {
             if let (true, sp) = lhs_automaton.match_(subject, &mut context.substitution, extension_info) {
-              if sp.is_some() || context.is_trace_enabled() {
-                self.apply_replace_slow_case(subject, eq3, sp, context, extension_info);
-              }
+              match sp {
+                None => {
+                  if context.is_trace_enabled() {
+                    self.apply_replace_slow_case(subject, eq3, None, context, extension_info);
+                  }
+                },
+                Some(mut subproblem) => {
+                  self.apply_replace_slow_case(subject, eq3, Some(subproblem.as_mut()) , context, extension_info);
+                }
+              };
 
               if extension_info.is_none() || extension_info.unwrap().matched_whole() {
                 rhs_builder.replace(subject, &mut context.substitution);
@@ -198,7 +204,15 @@ impl SymbolCore {
               &mut context.substitution,
               extension_info,
             ) {
-              self.apply_replace_slow_case(subject, eq, sp, context, extension_info);
+              match sp {
+                None => {
+                  self.apply_replace_slow_case(subject, eq, None, context, extension_info);
+
+                },
+                Some(mut subproblem) => {
+                  self.apply_replace_slow_case(subject, eq, Some(subproblem.as_mut()), context, extension_info);
+                }
+              };
             }
           }
           context.finished();
@@ -215,7 +229,7 @@ impl SymbolCore {
     &mut self,
     subject       : DagNodePtr,
     mut eq        : PreEquationPtr,
-    mut sp        : MaybeSubproblem,
+    mut sp        : MaybeSubproblemRef,
     context       : &mut RewritingContext,
     extension_info: MaybeExtensionInfo,
   ) -> bool {

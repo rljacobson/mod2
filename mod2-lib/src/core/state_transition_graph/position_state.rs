@@ -4,32 +4,20 @@ use crate::{
     ExtensionInfo
   },
   core::{
-    ArgIndex,
-    VariableIndex,
     state_transition_graph::{PositionDepth, PositionIndex},
+    ArgIndex,
     RedexPosition,
+    VariableIndex,
   },
 };
 
-use enumflags2::{bitflags, BitFlags};
-
-#[bitflags]
-#[repr(u8)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum PositionStateFlag {
-  RespectFrozen,
-  SetUnstackable,
-  RespectUnstackable,
-  ExtensionInfoValid,
-}
-
-pub type PositionStateFlags = BitFlags<PositionStateFlag>;
+use crate::core::state_transition_graph::{StateFlag, StateFlags};
 
 pub struct PositionState {
-  flags         : PositionStateFlags,
+  flags         : StateFlags,
   min_depth     : PositionDepth,
   max_depth     : PositionDepth,
-  extension_info: Option<ExtensionInfo>,
+  pub(crate) extension_info: Option<ExtensionInfo>,
 
   // For breadth-first traversal over positions
   position_queue : Vec<RedexPosition>,
@@ -41,14 +29,14 @@ pub struct PositionState {
 impl PositionState {
   pub fn new(
     top      : DagNodePtr,
-    flags    : PositionStateFlags,
+    flags    : StateFlags,
     min_depth: PositionDepth,
     max_depth: PositionDepth
   ) -> Self
   {
     debug_assert!(
-      !flags.contains(PositionStateFlag::RespectUnstackable)
-          || flags.contains(PositionStateFlag::RespectFrozen),
+      !flags.contains(StateFlag::RespectUnstackable)
+          || flags.contains(StateFlag::RespectFrozen),
       "can't respect unstackable if not respecting frozen otherwise we might miss frozen positions"
     );
 
@@ -91,8 +79,8 @@ impl PositionState {
       let mut dag_node   = redex_position.dag_node;
 
       // Determine which flags to use
-      let respect_frozen      = self.flags.contains(PositionStateFlag::RespectFrozen);
-      let respect_unstackable = self.flags.contains(PositionStateFlag::RespectUnstackable);
+      let respect_frozen      = self.flags.contains(StateFlag::RespectFrozen);
+      let respect_unstackable = self.flags.contains(StateFlag::RespectUnstackable);
       let is_eager            = redex_position.is_eager();
 
       dag_node.stack_physical_arguments(
@@ -118,7 +106,7 @@ impl PositionState {
         }
 
         break;
-      } else if self.flags.contains(PositionStateFlag::SetUnstackable) && dag_node.is_unrewritable() {
+      } else if self.flags.contains(StateFlag::SetUnstackable) && dag_node.is_unrewritable() {
         dag_node.set_unstackable();
       }
     }

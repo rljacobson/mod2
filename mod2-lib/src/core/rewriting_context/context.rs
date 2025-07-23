@@ -89,6 +89,12 @@ impl RewritingContext {
     self.attributes.contains(ContextAttribute::Trace)
   }
 
+  /// Only for use when you know a root exists.
+  #[inline(always)]
+  pub fn get_root(&self) -> DagNodePtr {
+    self.root.as_ref().unwrap().node()
+  }
+
   // endregion Getters
 
   // region Statistics

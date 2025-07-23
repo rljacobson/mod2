@@ -76,7 +76,7 @@ RuleKeyword      : () = { "rule",       "rl" };
 EquationKeyword  : () = { "equation",   "eq" };
 MembershipKeyword: () = { "membership", "mb" };
 TrueKeyword      : () = { "true" };
-FalseKeyword      : () = { "false" };
+FalseKeyword     : () = { "false" };
 
 // Grammar rules
 

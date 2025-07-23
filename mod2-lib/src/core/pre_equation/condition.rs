@@ -15,10 +15,7 @@ conjunction of `Condition`s just `Conditions` (plural). Instead of subclasses,
 
 */
 
-use std::{
-  fmt::Display,
-  ops::Deref
-};
+use std::fmt::Display;
 use mod2_abs::NatSet;
 use crate::{
   api::{
@@ -71,7 +68,7 @@ impl MatchConditionState {
     rhs_context.reduce();
     original.add_counts_from(rhs_context.as_ref());
 
-    let (succeeded, subproblem) = matcher.match_(rhs_context.root.as_ref().unwrap().node(), &mut original.substitution, None);
+    let (succeeded, subproblem) = matcher.match_(rhs_context.get_root(), &mut original.substitution, None);
 
     MatchConditionState {
       saved,
@@ -512,7 +509,7 @@ impl Condition {
         rhs_context.reduce();
         solution.add_counts_from(&rhs_context);
 
-        (*lhs_context.root.unwrap().as_ref()).deref() == (*rhs_context.root.unwrap().as_ref()).deref()
+        (*lhs_context.get_root()) == (*rhs_context.get_root())
       }
 
       SortMembership {

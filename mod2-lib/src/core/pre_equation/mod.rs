@@ -16,27 +16,26 @@ use mod2_abs::{join_string, warning, IString, NatSet, UnsafePtr};
 
 use crate::{
   api::{
-  BxLHSAutomaton,
-  DagNodePtr,
-  MaybeSubproblem,
-  BxTerm
-},
-  core::{
-  format::{FormatStyle, Formattable},
-  gc::ok_to_collect_garbage,
-  interpreter::InterpreterAttribute,
-  pre_equation::{
-    condition::ConditionState,
-    condition::Conditions
+    BxLHSAutomaton,
+    DagNodePtr,
+    BxTerm,
   },
-  automata::RHSBuilder,
-  rewriting_context::RewritingContext,
-  VariableInfo,
-  TermBag,
-  VariableIndex,
-},
+  core::{
+    format::{FormatStyle, Formattable},
+    gc::ok_to_collect_garbage,
+    interpreter::InterpreterAttribute,
+    pre_equation::{
+      condition::ConditionState,
+      condition::Conditions,
+    },
+    automata::RHSBuilder,
+    rewriting_context::RewritingContext,
+    VariableInfo,
+    TermBag,
+    VariableIndex,
+  },
   impl_display_debug_for_formattable,
-  NONE
+  NONE,
 };
 use super::sort::SortPtr;
 pub use sort_constraint_table::SortConstraintTable;
@@ -114,6 +113,8 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
+use crate::api::Subproblem;
+use crate::core::RuleIndex;
 
 impl PreEquationKind {
   pub fn noun(&self) -> &'static str {
@@ -511,13 +512,13 @@ impl PreEquation {
 
   ///  This is the most general condition checking function that allows multiple distinct successes; caller must provide
   ///  trial_ref variable and condition state stack in order to preserve this information between calls.
-  pub(crate) fn check_condition_find_first(
+  pub(crate) fn check_condition_find_first<'a>(
     &mut self,
     mut find_first: bool,
     _subject      : DagNodePtr, // Used only for tracing
     context       : &mut RewritingContext,
-    mut subproblem: MaybeSubproblem,
-    trial_ref     : &mut Option<i32>,
+    mut subproblem: Option<&'a mut dyn Subproblem>,
+    trial_ref     : &mut RuleIndex,
     state         : &mut Vec<ConditionState>,
   ) -> bool
   {
@@ -525,7 +526,7 @@ impl PreEquation {
     assert!(!find_first || state.is_empty(), "non-empty condition state stack");
 
     if find_first {
-      *trial_ref = None;
+      *trial_ref = RuleIndex::None;
     }
 
     loop {
@@ -559,7 +560,7 @@ impl PreEquation {
       }
       assert!(state.is_empty(), "non-empty condition state stack");
       find_first = true;
-      *trial_ref = None;
+      *trial_ref = RuleIndex::None;
 
       // Condition evaluation may create nodes without doing rewrites so run GC safe point.
       ok_to_collect_garbage();
@@ -583,10 +584,10 @@ impl PreEquation {
     &mut self,
     subject   : DagNodePtr,
     context   : &mut RewritingContext,
-    subproblem: MaybeSubproblem,
+    subproblem: Option<&mut dyn Subproblem>,
   ) -> bool
   {
-    let mut trial_ref: Option<i32>         = None;
+    let mut trial_ref: RuleIndex           = RuleIndex::None;
     let mut state    : Vec<ConditionState> = Vec::new();
 
     let result = self.check_condition_find_first(true, subject, context, subproblem, &mut trial_ref, &mut state);
@@ -601,7 +602,7 @@ impl PreEquation {
   fn solve_condition(
     &mut self,
     mut find_first: bool,
-    _trial_ref    : &mut Option<i32>,
+    _trial_ref    : &mut RuleIndex,
     solution      : &mut RewritingContext,
     state         : &mut Vec<ConditionState>,
   ) -> bool {

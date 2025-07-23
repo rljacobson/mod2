@@ -79,6 +79,7 @@ use std::fmt::{Display, Formatter};
 use mod2_abs::special_index::{OuterEnumType, SpecialIndex};
 
 pub type RawSortIndex       = u16;
+pub type RawRuleIndex       = u16;
 pub type RawSlotIndex       = u16;
 pub type RawArgIndex        = u16;
 // Can probably be `u16`, but Maude uses `i32`.
@@ -100,6 +101,8 @@ pub type VariableIndex   = SpecialIndex<RawVariableIndex  , SentinelIndex, 2>;
 pub type SymbolIndex     = SpecialIndex<RawSymbolIndex    , SentinelIndex, 2>;
 /// Internal state representation of a `StateTransitionGraph`
 pub type StateGraphIndex = SpecialIndex<RawStateGraphIndex, SentinelIndex, 2>;
+/// Index of a rule in the `RuleTable`
+pub type RuleIndex       = SpecialIndex<RawRuleIndex      , SentinelIndex, 2>;
 
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

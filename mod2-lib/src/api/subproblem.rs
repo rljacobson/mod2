@@ -1,5 +1,9 @@
 /*!
 
+`Subproblem`s are designed to be stateful iterators that can generate multiple
+solutions through successive calls to `Subproblem::solve()`. The `find_first` parameter
+controls whether you're starting fresh or continuing from where you left off.
+
 A `Subproblem` corresponds roughly to the `MatchGenerator`s of Loris. These traits must be
 derived from for equational theories that need to generate matching or unification subproblems.
 
@@ -48,7 +52,8 @@ use crate::{
 };
 use super::automaton::LHSAutomaton;
 
-pub type MaybeSubproblem = Option<Box<dyn Subproblem>>;
+pub type MaybeSubproblem        = Option<Box<dyn Subproblem>>;
+pub type MaybeSubproblemRef<'s> = Option<&'s mut dyn Subproblem>;
 
 /// Represents a subproblem of a matching problem.
 pub trait Subproblem {
@@ -60,7 +65,7 @@ pub struct VariableAbstractionSubproblem {
   pub abstraction_variable: VariableIndex,
   pub variable_count      : u32,
   pub difference          : Option<LocalBindings>,
-  pub subproblem          : Option<Box<dyn Subproblem>>,
+  pub subproblem          : MaybeSubproblem,
   pub local               : Substitution, // Todo: How does this differ from `difference`?
   pub solved              : bool,
 }

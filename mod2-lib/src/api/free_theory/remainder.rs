@@ -355,7 +355,15 @@ impl FreeRemainder {
       // Save and restore stack if rewriting the condition clobbers it
       let mut saved_stack = vec![];
       std::mem::swap(&mut saved_stack, stack);
-      let condition_passed = self.equation.check_condition(subject, context, maybe_subproblem);
+      let condition_passed =
+          match maybe_subproblem {
+            None => {
+              self.equation.check_condition(subject, context, None)
+            }
+            Some(mut subproblem) => {
+              self.equation.check_condition(subject, context, Some(subproblem.as_mut()))
+            }
+          };
       std::mem::swap(&mut saved_stack, stack); // restore stack
 
       if !condition_passed {

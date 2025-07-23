@@ -207,13 +207,17 @@ impl SortConstraintTable {
                   .as_mut()
                   .match_(subject.clone(), &mut context.substitution, None)
               {
-                if subproblem.is_none() 
-                    || subproblem.as_mut().map_or(false, |s| s.solve(true, context)) 
+                if subproblem.is_none()
+                    || subproblem.as_mut().map_or(false, |s| s.solve(true, context))
                 {
 
-                  if !sort_constraint.has_condition()
-                      || sort_constraint.check_condition(subject.clone(), context, subproblem)
-                  {
+                  let condition = !sort_constraint.has_condition()
+                    || match subproblem {
+                    None => sort_constraint.check_condition(subject.clone(), context, None),
+                    Some(mut sp) => sort_constraint.check_condition(subject.clone(), context, Some(sp.as_mut()))
+                  };
+
+                  if condition {
                     // subproblem.take(); // equivalent to delete sp in C++
                     /* ToDo: Implement tracing
                     if trace_status() {
