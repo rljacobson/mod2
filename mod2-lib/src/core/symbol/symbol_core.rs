@@ -10,6 +10,7 @@ use crate::{
     Arity,
     DagNodePtr,
     MaybeExtensionInfo,
+    MaybeSubproblemRef,
   },
   core::{
     symbol::{
@@ -25,8 +26,9 @@ use crate::{
     pre_equation::{
       SortConstraintTable,
       PreEquationKind,
-      PreEquationPtr as EquationPtr,
-      PreEquationPtr
+      PreEquationPtr,
+      EquationPtr,
+      RulePtr,
     },
     gc::ok_to_collect_garbage,
     rewriting_context::RewritingContext,
@@ -37,7 +39,7 @@ use crate::{
   },
   HashType,
 };
-use crate::api::MaybeSubproblemRef;
+
 
 pub struct SymbolCore {
   pub name       : IString,
@@ -52,9 +54,10 @@ pub struct SymbolCore {
 
   /// The sort constraint table encapsulates functionality related to all membership constraints associated to
   /// this symbol. The "equation table" is much simpler, so we fold it into `SymbolCore`. In both cases, the
-  /// `accept_*` and compiler methods are virtual, so they live in the `Symbol` trait.
+  /// `accept_*` and compiler methods are virtual, so they live in the `Symbol` trait. Likewise for "rule table."
   pub sort_constraint_table: SortConstraintTable,
   pub equations            : Vec<EquationPtr>,
+  pub rules                : Vec<RulePtr>,
 
   /// > 0 for symbols that only produce an unique sort; -1 for fast case; 0 for slow case
   /// implemented as `SortIndex::FAST_CASE_UNIQUE_SORT`, `SortIndex::SLOW_CASE_UNIQUE_SORT`, and a normal value.
@@ -100,6 +103,7 @@ impl SymbolCore {
       sort_table           : SortTable::with_arity(arity),
       sort_constraint_table: SortConstraintTable::new(),
       equations            : vec![],
+      rules                : vec![],
       unique_sort_index    : SortIndex::Unknown,
       hash_value,
       strategy             : Default::default(),

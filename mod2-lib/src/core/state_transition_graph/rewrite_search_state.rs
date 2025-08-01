@@ -4,13 +4,12 @@ In Maude, RewriteSearchState is a subclass of SearchState.
 
 */
 
-use mod2_abs::{NatSet, UnsafePtr};
+use mod2_abs::{debug, IString, NatSet, UnsafePtr};
 use crate::{
-  api::{
-    Subproblem,
-    BxTerm
-  },
   core::{
+    SentinelIndex,
+    VariableIndex,
+    VariableInfo,
     gc::root_container::{BxRootVec, RootVec},
     pre_equation::{
       PreEquationPtr,
@@ -25,10 +24,14 @@ use crate::{
     },
     rewriting_context::BxRewritingContext,
     RuleIndex,
-  }
+    dag_node_core::DagNodeFlag
+  },
+  api::{
+    LHSAutomaton,
+    Subproblem,
+    BxTerm
+  },
 };
-use crate::api::LHSAutomaton;
-use crate::core::{VariableIndex, VariableInfo};
 
 pub struct RewriteSearchState {
   position_state: PositionState,
@@ -224,5 +227,77 @@ impl RewriteSearchState {
     bound.is_superset(&var_info.unbound_variables)
   }
 
+  pub fn find_next_rewrite(&mut self, label: Option<IString>, state_flags: StateFlags) -> bool {
+    let mut rewrite_seen_at_current_position = false;
+
+    if !self.rule_index.is(SentinelIndex::None) {
+      if self.find_next_solution() {
+        return true;
+      }
+      rewrite_seen_at_current_position = true;
+    } else {
+      if !self.position_state.find_next_position() {
+        return false;
+      }
+    }
+
+    self.rule_index += 1;
+    let allow_nonexec = state_flags.contains(StateFlag::AllowNonexec);
+
+    loop {
+      let mut root_node = self.context.get_root();
+
+      let respect_unrewritable = state_flags.contains(StateFlag::RespectUnrewritable);
+      let set_unrewritable = state_flags.contains(StateFlag::SetUnrewritable);
+
+      if !(respect_unrewritable && root_node.is_unrewritable()) {
+        let symbol = root_node.symbol();
+        let rules = symbol.rules();
+
+        while self.rule_index.idx() < rules.len() {
+          // ToDo: Get rid of this.
+          let rule_ptr = rules[self.rule_index.idx()];
+          let mut rule = rules[self.rule_index.idx()];
+
+          if (allow_nonexec || !rule.is_nonexec())
+              && (label.is_none() || rule.label == label)
+          {
+            debug!(
+                4,
+                "trying rule {:?} at position {} dagNode {:?}",
+                rule,
+                self.position_state.position_index(),
+                root_node
+            );
+
+            let lhs_automaton = if self.position_state.flags.contains(StateFlag::WithExtension) {
+              rule.get_ext_lhs_automaton()
+            } else {
+              rule.get_non_ext_lhs_automaton()
+            };
+
+            if self.find_first_solution(rule_ptr, lhs_automaton) {
+              return true;
+            }
+          }
+
+          self.rule_index += 1;
+        }
+
+        if !rewrite_seen_at_current_position && set_unrewritable {
+          root_node.core_mut().flags.insert(DagNodeFlag::Unrewritable);
+        }
+      }
+
+      rewrite_seen_at_current_position = false;
+      self.rule_index = RuleIndex::Zero;
+
+      if !self.position_state.find_next_position() {
+        break;
+      }
+    }
+
+    false
+  }
 
 }

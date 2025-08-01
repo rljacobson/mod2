@@ -4,19 +4,23 @@ use crate::{
     ExtensionInfo
   },
   core::{
-    state_transition_graph::{PositionDepth, PositionIndex},
+    state_transition_graph::{
+      PositionDepth,
+      PositionIndex,
+      PositionStateDepthSentinel,
+      StateFlag,
+      StateFlags
+    },
     ArgIndex,
     RedexPosition,
     VariableIndex,
-  },
+  }
 };
 
-use crate::core::state_transition_graph::{StateFlag, StateFlags};
-
 pub struct PositionState {
-  flags         : StateFlags,
-  min_depth     : PositionDepth,
-  max_depth     : PositionDepth,
+  pub(crate) flags         : StateFlags,
+  min_depth                : PositionDepth,
+  max_depth                : PositionDepth,
   pub(crate) extension_info: Option<ExtensionInfo>,
 
   // For breadth-first traversal over positions
@@ -57,6 +61,10 @@ impl PositionState {
       next_to_explore: PositionIndex::None,
       next_to_return : PositionIndex::None,
     }
+  }
+
+  pub fn position_index(&self) -> PositionIndex {
+    self.next_to_return
   }
 
   pub fn explore_next_position(&mut self) -> bool {
@@ -109,6 +117,31 @@ impl PositionState {
       } else if self.flags.contains(StateFlag::SetUnstackable) && dag_node.is_unrewritable() {
         dag_node.set_unstackable();
       }
+    }
+
+    true
+  }
+
+  pub fn find_next_position(&mut self) -> bool {
+    loop {
+      self.next_to_return += 1;
+
+      if self.next_to_return.idx() >= self.position_queue.len()
+          && !self.explore_next_position() {
+        return false;
+      }
+
+      // Skip positions shallower than the minimum depth
+      if self.depth[self.next_to_return.idx()] >= self.min_depth {
+        break;
+      }
+    }
+
+    // If there's a maximum depth restriction, invalidate extension info.
+    // This will force `make_extension_info()` if `get_extension_info()` is called.
+    if !self.max_depth.is(PositionStateDepthSentinel::TopWithoutExtension) {
+      self.flags.remove(StateFlag::ExtensionInfoValid);
+      self.extension_info = None;
     }
 
     true

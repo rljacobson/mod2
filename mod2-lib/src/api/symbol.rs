@@ -23,6 +23,7 @@ use crate::{
   },
   core::{
     format::{FormatStyle, Formattable},
+    pre_equation::RulePtr,
     symbol::{
       SortTable,
       SymbolCore,
@@ -104,7 +105,7 @@ pub trait Symbol {
   fn range_kind(&self) -> KindPtr {
     self.sort_table().range_kind()
   }
-  
+
   #[inline(always)]
   fn index_within_parent_module(&self) -> SymbolIndex {
     self.core().index_within_parent_module
@@ -142,6 +143,11 @@ pub trait Symbol {
   #[inline(always)]
   fn sort_constraint_free(&self) -> bool {
     self.core().sort_constraint_table.sort_constraint_free()
+  }
+
+  #[inline(always)]
+  fn rules(&self) -> &Vec<RulePtr> {
+    &self.core().rules
   }
 
   // endregion Accessors

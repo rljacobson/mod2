@@ -6,7 +6,6 @@ implemented.) The subclass is implemented as enum `PreEquationKind`.
 */
 
 pub mod condition;
-// mod membership;
 mod sort_constraint_table;
 
 use std::fmt::{Display, Formatter};
@@ -19,6 +18,7 @@ use crate::{
     BxLHSAutomaton,
     DagNodePtr,
     BxTerm,
+    Subproblem,
   },
   core::{
     format::{FormatStyle, Formattable},
@@ -29,7 +29,9 @@ use crate::{
       condition::Conditions,
     },
     automata::RHSBuilder,
+    sort::SortPtr,
     rewriting_context::RewritingContext,
+    RuleIndex,
     VariableInfo,
     TermBag,
     VariableIndex,
@@ -37,12 +39,15 @@ use crate::{
   impl_display_debug_for_formattable,
   NONE,
 };
-use super::sort::SortPtr;
+
 pub use sort_constraint_table::SortConstraintTable;
 
 
-pub type BxPreEquation  = Box<PreEquation>;
-pub type PreEquationPtr = UnsafePtr<PreEquation>;
+pub type BxPreEquation     = Box<PreEquation>;
+pub type PreEquationPtr    = UnsafePtr<PreEquation>;
+pub type EquationPtr       = PreEquationPtr;
+pub type RulePtr           = UnsafePtr<PreEquation>;
+pub type SortConstraintPtr = UnsafePtr<PreEquation>;
 
 
 #[bitflags]
@@ -73,6 +78,7 @@ impl Display for PreEquationAttribute {
   }
 }
 
+/// `PreEquationKind` without data fields.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum PreEquationKindLabel {
   Equation,
@@ -113,14 +119,13 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
-use crate::api::Subproblem;
-use crate::core::RuleIndex;
+use crate::api::LHSAutomaton;
 
 impl PreEquationKind {
   pub fn noun(&self) -> &'static str {
     match self {
-      Equation { .. } => "equation",
-      Rule { .. } => "rule",
+      Equation   { .. } => "equation",
+      Rule       { .. } => "rule",
       Membership { .. } => "sort constraint",
       // StrategyDefinition { .. } => "strategy definition",
     }
@@ -128,17 +133,17 @@ impl PreEquationKind {
 
   pub fn interpreter_trace_attribute(&self) -> InterpreterAttribute {
     match &self {
-      Equation { .. } => InterpreterAttribute::TraceEq,
-      Rule { .. } => InterpreterAttribute::TraceRl,
+      Equation   { .. } => InterpreterAttribute::TraceEq,
+      Rule       { .. } => InterpreterAttribute::TraceRl,
       Membership { .. } => InterpreterAttribute::TraceMb,
       // StrategyDefinition { .. } => InterpreterAttribute::TraceSd,
     }
   }
 
-  pub fn label(&self) -> PreEquationKindLabel {
+  pub fn pre_equation_kind_label(&self) -> PreEquationKindLabel {
     match self {
-      Equation { .. } => PreEquationKindLabel::Equation,
-      Rule { .. } => PreEquationKindLabel::Rule,
+      Equation   { .. } => PreEquationKindLabel::Equation,
+      Rule       { .. } => PreEquationKindLabel::Rule,
       Membership { .. } => PreEquationKindLabel::Membership,
     }
   }
@@ -153,6 +158,7 @@ pub struct PreEquation {
   pub lhs_automaton: Option<BxLHSAutomaton>,
   pub lhs_dag      : Option<DagNodePtr>,
   pub variable_info: VariableInfo,
+  pub label        : Option<IString>,
 
   // `ModuleItem`
   pub index_within_parent_module: i32,
@@ -178,6 +184,7 @@ impl PreEquation {
       lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
+      label        : None,
       pe_kind      : Rule{
         rhs_term,
         rhs_builder                : Default::default(),
@@ -203,6 +210,7 @@ impl PreEquation {
       lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
+      label        : None,
       pe_kind      : Equation{
         rhs_term,
         rhs_builder        : Default::default(),
@@ -227,6 +235,7 @@ impl PreEquation {
       lhs_automaton: None,
       lhs_dag      : None,
       variable_info: Default::default(),
+      label        : None,
       pe_kind      : Membership{ sort: rhs_sort },
       index_within_parent_module: 0,
     }
@@ -264,7 +273,7 @@ impl PreEquation {
   }
 
   #[inline(always)]
-  fn is_nonexec(&self) -> bool {
+  pub(crate) fn is_nonexec(&self) -> bool {
     self.attributes.contains(PreEquationAttribute::NonExecute)
   }
 
@@ -310,7 +319,7 @@ impl PreEquation {
 
     let mut available_terms = TermBag::default(); // terms available for reuse
 
-    let kind = self.pe_kind.label();
+    let kind = self.pe_kind.pre_equation_kind_label();
     match kind {
 
       PreEquationKindLabel::Equation => {
@@ -651,6 +660,46 @@ impl PreEquation {
   }
 
   // endregion `check*` methods
+
+  // region Methods on Rules
+
+  pub fn get_non_ext_lhs_automaton(&mut self) -> &mut dyn LHSAutomaton {
+    let Rule{non_extension_lhs_automaton, ..} = &mut self.pe_kind else {
+      unreachable!("called get_ext_lhs_automaton() on a non-extension rule");
+    };
+
+    if non_extension_lhs_automaton.is_none() {
+      let mut bound_uniquely_dummy = NatSet::default();
+      let (lhs, _) = self.lhs_term.compile_lhs(false, &self.variable_info, &mut bound_uniquely_dummy);
+      *non_extension_lhs_automaton = Some(lhs);
+    }
+
+    let Some(automaton) = non_extension_lhs_automaton else{
+      unreachable!("failed to compile non-extension rule");
+    };
+
+    automaton.as_mut()
+  }
+
+  pub fn get_ext_lhs_automaton(&mut self) -> &mut dyn LHSAutomaton {
+    let Rule{extension_lhs_automaton, ..} = &mut self.pe_kind else {
+      unreachable!("called get_ext_lhs_automaton() on a non-rule");
+    };
+
+    if extension_lhs_automaton.is_none() {
+      let mut bound_uniquely_dummy = NatSet::default();
+      let (lhs, _) = self.lhs_term.compile_lhs(false, &self.variable_info, &mut bound_uniquely_dummy);
+      *extension_lhs_automaton = Some(lhs);
+    }
+
+    let Some(automaton) = extension_lhs_automaton else{
+      unreachable!("failed to compile extension rule");
+    };
+
+    automaton.as_mut()
+  }
+
+  // endregion Methods on Rule
 
 }
 
