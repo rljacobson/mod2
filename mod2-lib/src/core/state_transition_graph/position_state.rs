@@ -146,4 +146,9 @@ impl PositionState {
 
     true
   }
+
+  pub fn get_dag_node(&self) -> DagNodePtr {
+    assert!(self.next_to_return.is_index(), "findNextPosition() not called");
+    self.position_queue[self.next_to_return.idx()].dag_node
+  }
 }

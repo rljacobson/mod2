@@ -263,6 +263,17 @@ impl PreEquation {
     self.index_within_parent_module
   }
 
+  pub(crate) fn get_rhs_builder(&self) -> &RHSBuilder {
+    match &self.pe_kind {
+      Equation { rhs_builder, .. }
+      | Rule { rhs_builder, .. } => rhs_builder,
+
+      Membership { .. } => {
+        unreachable!("cannot get_rhs_builder() on a membership constraint")
+      }
+    }
+  }
+
   //endregion
 
   // region  Attributes

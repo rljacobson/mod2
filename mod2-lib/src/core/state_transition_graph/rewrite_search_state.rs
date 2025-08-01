@@ -13,6 +13,7 @@ use crate::{
     gc::root_container::{BxRootVec, RootVec},
     pre_equation::{
       PreEquationPtr,
+      RulePtr,
       condition::ConditionState
     },
     state_transition_graph::{
@@ -29,7 +30,8 @@ use crate::{
   api::{
     LHSAutomaton,
     Subproblem,
-    BxTerm
+    BxTerm,
+    MaybeDagNode
   },
 };
 
@@ -245,14 +247,14 @@ impl RewriteSearchState {
     let allow_nonexec = state_flags.contains(StateFlag::AllowNonexec);
 
     loop {
-      let mut root_node = self.context.get_root();
+      let mut dag_node = self.position_state.get_dag_node();
 
       let respect_unrewritable = state_flags.contains(StateFlag::RespectUnrewritable);
-      let set_unrewritable = state_flags.contains(StateFlag::SetUnrewritable);
+      let set_unrewritable     = state_flags.contains(StateFlag::SetUnrewritable);
 
-      if !(respect_unrewritable && root_node.is_unrewritable()) {
-        let symbol = root_node.symbol();
-        let rules = symbol.rules();
+      if !(respect_unrewritable && dag_node.is_unrewritable()) {
+        let symbol = dag_node.symbol();
+        let rules  = symbol.rules();
 
         while self.rule_index.idx() < rules.len() {
           // ToDo: Get rid of this.
@@ -267,7 +269,7 @@ impl RewriteSearchState {
                 "trying rule {:?} at position {} dagNode {:?}",
                 rule,
                 self.position_state.position_index(),
-                root_node
+                dag_node
             );
 
             let lhs_automaton = if self.position_state.flags.contains(StateFlag::WithExtension) {
@@ -285,7 +287,7 @@ impl RewriteSearchState {
         }
 
         if !rewrite_seen_at_current_position && set_unrewritable {
-          root_node.core_mut().flags.insert(DagNodeFlag::Unrewritable);
+          dag_node.core_mut().flags.insert(DagNodeFlag::Unrewritable);
         }
       }
 
@@ -300,4 +302,16 @@ impl RewriteSearchState {
     false
   }
 
+  pub fn get_rule(&self) -> RulePtr {
+    let node   = self.position_state.get_dag_node();
+    let symbol = node.symbol();
+    let rules  = symbol.rules();
+    rules[self.rule_index.idx()]
+  }
+
+  pub fn get_replacement(&mut self) -> MaybeDagNode {
+    let rule = self.get_rule();
+    let rhs_builder = rule.get_rhs_builder();
+    rhs_builder.construct(&mut self.context.substitution)
+  }
 }
