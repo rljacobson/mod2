@@ -145,7 +145,7 @@ impl RHSAutomaton for FreeRHSAutomaton {
     }
   }
 
-  fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
+  fn construct(&self, matcher: &mut Substitution) -> DagNodePtr {
     let mut new_dag_node: MaybeDagNode = None;
 
     for i in self.instructions.iter() {
@@ -156,7 +156,7 @@ impl RHSAutomaton for FreeRHSAutomaton {
       new_dag_node = Some(new_node);
     }
 
-    new_dag_node
+    new_dag_node.unwrap()
   }
 
   fn replace(&self, mut old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {

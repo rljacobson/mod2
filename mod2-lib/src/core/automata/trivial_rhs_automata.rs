@@ -9,7 +9,7 @@ use std::any::Any;
 
 use crate::{
   core::{
-    substitution::{MaybeDagNode, Substitution},
+    substitution::Substitution,
     VariableInfo,
     VariableIndex
   },
@@ -40,8 +40,11 @@ impl RHSAutomaton for TrivialRHSAutomaton {
     self.index = variable_info.remap_index(self.index);
   }
 
-  fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
-    matcher.value(self.index)
+  fn construct(&self, matcher: &mut Substitution) -> DagNodePtr {
+    // ToDo: This appears to be the only implementation that can conceivably return a null pointer.
+    //       If this ever happens in practice, this unwrap is illegitimate, and `construct` needs to
+    //       return a `MaybeDagNode`.
+    matcher.value(self.index).unwrap()
   }
 
   fn replace(&self, old: DagNodePtr, matcher: &mut Substitution) -> DagNodePtr {

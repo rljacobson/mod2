@@ -186,7 +186,7 @@ impl SymbolCore {
               }
               else {
                 subject.partial_replace(
-                  rhs_builder.construct(&mut context.substitution).unwrap(),
+                  rhs_builder.construct(&mut context.substitution),
                   extension_info,
                 );
               }

@@ -24,16 +24,16 @@ pub use index::*;
 pub use position_state::*;
 use rewrite_search_state::RewriteSearchState;
 
-type ArcMap = HashMap<u32, HashSet<RulePtr>>;
+type ArcMap = HashMap<StateGraphIndex, HashSet<RulePtr>>;
 
 struct State{
-  hash_cons_index: u32,
-  state_dag      : DagNodePtr,
-  parent         : StateGraphIndex,
-  next_states    : Vec<u32>,
-  rewrite_state  : Option<RewriteSearchState>,
-  forward_arcs   : ArcMap,
-  fully_explored : bool,
+  // pub hash_cons_index: u32,
+  pub state_dag      : DagNodePtr,
+  pub parent         : StateGraphIndex,
+  pub next_states    : Vec<StateGraphIndex>,
+  pub rewrite_state  : Option<RewriteSearchState>,
+  pub forward_arcs   : ArcMap,
+  pub fully_explored : bool,
 }
 
 #[bitflags]

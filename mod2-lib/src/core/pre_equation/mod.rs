@@ -9,7 +9,7 @@ pub mod condition;
 mod sort_constraint_table;
 
 use std::fmt::{Display, Formatter};
-
+use std::hash::{Hash, Hasher};
 use enumflags2::{bitflags, BitFlags};
 use mod2_abs::{join_string, warning, IString, NatSet, UnsafePtr};
 
@@ -79,7 +79,7 @@ impl Display for PreEquationAttribute {
 }
 
 /// `PreEquationKind` without data fields.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub enum PreEquationKindLabel {
   Equation,
   Rule,
@@ -274,7 +274,7 @@ impl PreEquation {
     }
   }
 
-  //endregion
+  //endregion Accessors
 
   // region  Attributes
   #[inline(always)]
@@ -718,15 +718,15 @@ impl Formattable for PreEquation {
   fn repr(&self, f: &mut dyn std::fmt::Write, _style: FormatStyle) -> std::fmt::Result {
     match &self.pe_kind {
 
-      PreEquationKind::Equation { rhs_term, .. } => {
+      Equation { rhs_term, .. } => {
         write!(f, "equation {} = {}", self.lhs_term,  rhs_term)?;
       }
 
-      PreEquationKind::Rule { rhs_term, .. } => {
+      Rule { rhs_term, .. } => {
         write!(f, "rule {} => {}", self.lhs_term,  rhs_term)?;
       }
 
-      PreEquationKind::Membership { sort } => {
+      Membership { sort } => {
         write!(f, "membership {} : {}", self.lhs_term,  sort)?;
       }
 
@@ -755,3 +755,16 @@ impl Formattable for PreEquation {
 }
 
 impl_display_debug_for_formattable!(PreEquation);
+
+impl Hash for PreEquation {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    // We make an assumption that an equation isn't moved once it's constructed.
+    let ptr = self as *const PreEquation;
+    ptr.hash(state);
+
+    // An alternative is to do something like this:
+    // self.name.hash(state);
+    // self.pe_kind.pre_equation_kind_label().hash(state);
+    // self.index_within_parent_module.hash(state);
+  }
+}

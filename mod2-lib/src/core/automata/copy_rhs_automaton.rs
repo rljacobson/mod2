@@ -11,7 +11,6 @@ use crate::{
   api::{
     RHSAutomaton,
     DagNodePtr,
-    MaybeDagNode
   },
   core::{
     substitution::Substitution,
@@ -60,7 +59,7 @@ impl RHSAutomaton for CopyRHSAutomaton {
   }
   */
 
-  fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
+  fn construct(&self, matcher: &mut Substitution) -> DagNodePtr {
     let orig = matcher.value(self.original_index);
     if let Some(mut orig_dag_node) = orig {
       debug!(
@@ -72,7 +71,11 @@ impl RHSAutomaton for CopyRHSAutomaton {
       let new_dag_node = orig_dag_node.copy_eager_upto_reduced();
       orig_dag_node.clear_copied_pointers();
       matcher.bind(self.copy_index, new_dag_node.clone());
-      new_dag_node
+
+      // ToDo: This and the TrivialRHSAutomaton appear to be the only implementations that can conceivably return a
+      //       null pointer. If this ever happens in practice, this unwrap is illegitimate, and `construct` needs to
+      //       return a `MaybeDagNode`.
+      new_dag_node.unwrap()
     } else {
       unreachable!("No DagNode for original index. This is a bug.");
     }

@@ -51,6 +51,7 @@ use crate::{
         GCVectorRefMut
       }
     },
+    ArgIndex,
     DagNodeArguments,
     EquationalTheory,
     HashConsSet,
@@ -66,7 +67,6 @@ use crate::{
   impl_display_debug_for_formattable,
   HashType,
 };
-
 
 // A fat pointer to a trait object. For a thin pointer to a DagNodeCore, use ThinDagNodePtr
 pub type DagNodePtr          = UnsafePtr<dyn DagNode + 'static>;
@@ -488,6 +488,32 @@ pub trait DagNode {
   /// The implementor-specific part of `copy_eager_upto_reduced()`
   fn copy_eager_upto_reduced_aux(&mut self) -> DagNodePtr;
 
+  /// A version of `copy_with_replacements` for a single replacement.
+  fn copy_with_replacement(&self, arg_index: ArgIndex, replacement: DagNodePtr) -> DagNodePtr {
+    let symbol = self.symbol();
+    assert!(arg_index.is_index() && symbol.arity().get() > arg_index.get_unchecked(), "bad arg_index");
+
+    let mut arguments = DagNodeArguments::from_args(self.shallow_copy_args(), self.arity());
+    match &mut arguments {
+
+      DagNodeArguments::Inline(args) => {
+        *args = replacement;
+      }
+
+      DagNodeArguments::Vec(node_vec) => {
+        node_vec[arg_index.idx()] = replacement;
+      }
+
+      _ => {
+        // Should be impossible
+        unreachable!();
+      }
+    }
+
+    // Construct DAG node
+    symbol.make_dag_node(arguments.as_args())
+  }
+
   fn copy_with_replacements(&self, redex_stack: &Vec<RedexPosition>, first_idx: usize, last_idx: usize) -> DagNodePtr {
     let mut arguments = DagNodeArguments::from_args(self.shallow_copy_args(), self.arity());
 
@@ -513,6 +539,14 @@ pub trait DagNode {
 
     // Construct DAG node
     self.symbol().make_dag_node(arguments.as_args())
+  }
+
+  /// Only relevant for theories in which partial matching can occur, associative theories
+  /// specifically. This method is called during rewriting when a rule matches only part of a term
+  /// structure. It is used in rule application (`RuleTable::applyRules()`), configuration rewriting
+  /// (`ConfigSymbol::leftOverRewrite()`), and position rebuilding (`PositionState::rebuildDag()`).
+  fn partial_construct(&self, _replacement: DagNodePtr, _extension_info: &mut ExtensionInfo) -> DagNodePtr {
+    unreachable!("Called on subject {}", self.symbol())
   }
 
   // endregion Copy Constructors

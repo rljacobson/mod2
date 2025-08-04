@@ -39,10 +39,10 @@ impl RHSAutomaton for NonalgebraicRHSAutomaton {
     variable_info.remap_index(self.destination);
   }
 
-  fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
+  fn construct(&self, matcher: &mut Substitution) -> DagNodePtr {
     let dag_node = self.term.dagify_aux(&mut DagNodeCache::default());
     matcher.bind(self.destination, Some(dag_node));
-    Some(dag_node)
+    dag_node
   }
 
   fn replace(&self, old: DagNodePtr, _matcher: &mut Substitution) -> DagNodePtr {

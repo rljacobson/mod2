@@ -117,7 +117,7 @@ impl RewritingContext {
   }
 
   #[inline(always)]
-  fn transfer_counts_from(&mut self, other: &mut RewritingContext) {
+  pub fn transfer_counts_from(&mut self, other: &mut RewritingContext) {
     self.add_counts_from(other);
     other.clear_counts();
   }

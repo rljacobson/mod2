@@ -9,7 +9,6 @@ use crate::{
   api::{
     BxRHSAutomaton,
     DagNodePtr, 
-    MaybeDagNode
   },
   core::{
     substitution::Substitution,
@@ -67,15 +66,14 @@ impl RHSBuilder {
     }
   */
 
-  pub fn construct(&self, matcher: &mut Substitution) -> MaybeDagNode {
+  pub fn construct(&self, matcher: &mut Substitution) -> DagNodePtr {
     for automaton in self.automata.iter() {
       automaton.construct(matcher);
     }
-    if let Some(last_automaton) = &self.last_automaton {
-      last_automaton.construct(matcher)
-    } else {
-      None
-    }
+    let Some(last_automaton) = &self.last_automaton else {
+      unreachable!("RHSBuilder.last_automaton should not be None")
+    };
+    last_automaton.construct(matcher)
   }
 
   pub fn safe_construct(&self, matcher: &mut Substitution) {

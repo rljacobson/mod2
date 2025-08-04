@@ -17,6 +17,7 @@ use crate::{
   }
 };
 
+
 pub struct PositionState {
   pub(crate) flags         : StateFlags,
   min_depth                : PositionDepth,
@@ -150,5 +151,54 @@ impl PositionState {
   pub fn get_dag_node(&self) -> DagNodePtr {
     assert!(self.next_to_return.is_index(), "findNextPosition() not called");
     self.position_queue[self.next_to_return.idx()].dag_node
+  }
+
+  /// Rebuilds the dag node and returns a pair of dag nodes. The first dag is the
+  /// rebuilt dag up to the root. The second dag is the replacement, possibly extended by
+  /// extension information when only part of the redex is replaced (useful for tracing).
+  pub fn rebuild_dag_with_extension(
+    &mut self,
+    mut replacement: DagNodePtr,
+    extension_info : &mut Option<ExtensionInfo>,
+    mut index      : PositionIndex,
+  ) -> (DagNodePtr, DagNodePtr) {
+    // If we matched only part of a subterm, use partialConstruct to extend the replacement.
+    // Only relevant for associative theories.
+    if let Some(info) = extension_info {
+      if !info.matched_whole() {
+        replacement = self.position_queue[index.idx()].dag_node.partial_construct(replacement.clone(), info);
+      }
+    }
+
+    // Walk up the stack rebuilding
+    let original_replacement = replacement.clone();
+    let mut arg_index        = self.position_queue[index.idx()].arg_index;
+
+    while let Some(i) = self.position_queue[index.idx()].parent_index.get() {
+      let rp      = &self.position_queue[i as usize];
+      replacement = rp.dag_node.copy_with_replacement(arg_index, replacement);
+      arg_index   = rp.arg_index;
+      index       = PositionIndex::new(i);
+    }
+
+    // Maude: We return the rebuilt dag, and the extended replacement term since the caller may
+    // need the latter for tracing purposes.
+    (replacement, original_replacement)
+  }
+
+  /// Rebuilds the dag node and returns a pair of dag nodes. The first dag is the
+  /// rebuilt dag up to the root. The second dag is the replacement, possibly extended by
+  /// extension information when only part of the redex is replaced (useful for tracing).
+  #[inline(always)]
+  pub(crate) fn rebuild_dag(&mut self, replacement: DagNodePtr) -> (DagNodePtr, DagNodePtr) {
+    // We need mutable access to `extension_info`.
+    let mut extension_info = self.extension_info.take();
+    let result = self.rebuild_dag_with_extension(
+        replacement,
+        &mut extension_info,
+        self.next_to_return
+      );
+    self.extension_info = extension_info;
+    result
   }
 }

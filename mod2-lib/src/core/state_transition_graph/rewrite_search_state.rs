@@ -7,38 +7,42 @@ In Maude, RewriteSearchState is a subclass of SearchState.
 use mod2_abs::{debug, IString, NatSet, UnsafePtr};
 use crate::{
   core::{
-    SentinelIndex,
-    VariableIndex,
+    gc::root_container::{
+      BxRootVec,
+      RootVec
+    },
+    dag_node_core::DagNodeFlag,
     VariableInfo,
-    gc::root_container::{BxRootVec, RootVec},
+    VariableIndex,
+    SentinelIndex,
+    RuleIndex,
     pre_equation::{
-      PreEquationPtr,
       RulePtr,
+      PreEquationPtr,
       condition::ConditionState
     },
+    rewriting_context::BxRewritingContext,
     state_transition_graph::{
-      PositionState,
       PositionDepth,
+      PositionState,
       PositionStateDepthSentinel,
       StateFlag,
       StateFlags
-    },
-    rewriting_context::BxRewritingContext,
-    RuleIndex,
-    dag_node_core::DagNodeFlag
+    }
   },
   api::{
     LHSAutomaton,
     Subproblem,
     BxTerm,
-    MaybeDagNode
+    DagNodePtr,
   },
 };
 
 pub struct RewriteSearchState {
   position_state: PositionState,
-  context       : BxRewritingContext,
+  pub context   : BxRewritingContext,
   pre_equation  : Option<PreEquationPtr>,
+  label         : Option<IString>,
 
   // Initial (partial) substitution
   substitution_variables: Vec<BxTerm>,
@@ -56,24 +60,23 @@ pub struct RewriteSearchState {
 impl RewriteSearchState {
   pub fn new(
     context  : BxRewritingContext,
+    label    : Option<IString>,
     mut flags: StateFlags,
     min_depth: PositionDepth,
     max_depth: PositionDepth,
   ) -> Self {
     flags.insert(StateFlag::RespectFrozen);
 
-    /*
-    if label != Label::NONE {
+    if label.is_some() {
       assert!(
-        !flags.contains(StateFlags::SET_UNREWRITABLE),
+        !flags.contains(StateFlag::SetUnrewritable),
         "shouldn't set unrewritable flag if only looking at rules with a given label"
       );
       assert!(
-        !flags.contains(StateFlags::SET_UNSTACKABLE),
+        !flags.contains(StateFlag::SetUnstackable),
         "shouldn't set unstackable flag if only looking at rules with a given label"
       );
     }
-    */
     if flags.contains(StateFlag::AllowNonexec) {
       assert!(
         !flags.contains(StateFlag::RespectUnrewritable),
@@ -89,7 +92,7 @@ impl RewriteSearchState {
       flags.insert(StateFlag::WithExtension);
     }
 
-    // SearchState uses the provided context for constructing
+    // `SearchState` uses the provided context for constructing
     // matches, resolving conditions and accumulating rewrite counts.
 
     let position_state = PositionState::new(
@@ -103,6 +106,7 @@ impl RewriteSearchState {
       position_state,
       context,
       pre_equation          : None,
+      label,
       substitution_variables: vec![],
       substitution_values   : RootVec::new(),
       matching_subproblem   : None,
@@ -229,7 +233,9 @@ impl RewriteSearchState {
     bound.is_superset(&var_info.unbound_variables)
   }
 
-  pub fn find_next_rewrite(&mut self, label: Option<IString>, state_flags: StateFlags) -> bool {
+  pub fn find_next_rewrite(&mut self) -> bool {
+    let state_flags = self.position_state.flags;
+    let label = self.label.clone();
     let mut rewrite_seen_at_current_position = false;
 
     if !self.rule_index.is(SentinelIndex::None) {
@@ -309,9 +315,13 @@ impl RewriteSearchState {
     rules[self.rule_index.idx()]
   }
 
-  pub fn get_replacement(&mut self) -> MaybeDagNode {
+  pub fn get_replacement(&mut self) -> DagNodePtr {
     let rule = self.get_rule();
     let rhs_builder = rule.get_rhs_builder();
     rhs_builder.construct(&mut self.context.substitution)
+  }
+
+  pub fn rebuild_dag(&mut self, dag_node: DagNodePtr) -> (DagNodePtr, DagNodePtr) {
+    self.position_state.rebuild_dag(dag_node)
   }
 }
