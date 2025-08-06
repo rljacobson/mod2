@@ -35,7 +35,6 @@ paste         = "1"  # Concat identifiers in `implement_data_atom!` macro
 rand          = "0.9"  # Testing
 smallvec      = { version = "2.0.0-alpha.11", features = ["std"] }
 string_cache  = "0.8"   # String interning
-nu-ansi-term  = "0.46"
 
 ## Logging ##
 tracing            = "0.1"

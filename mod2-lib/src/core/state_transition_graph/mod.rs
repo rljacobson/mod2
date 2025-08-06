@@ -28,7 +28,7 @@ type ArcMap = HashMap<StateGraphIndex, HashSet<RulePtr>>;
 
 struct State{
   // pub hash_cons_index: u32,
-  pub state_dag      : DagNodePtr,
+  pub state_dag      : DagNodePtr, // Plays the role of `hash_cons_index`.
   pub parent         : StateGraphIndex,
   pub next_states    : Vec<StateGraphIndex>,
   pub rewrite_state  : Option<RewriteSearchState>,
