@@ -1,3 +1,4 @@
+use mod2_abs::debug;
 use crate::{
   api::{
     DagNodePtr,
@@ -16,7 +17,8 @@ use crate::{
     VariableIndex,
   }
 };
-
+use crate::core::state_transition_graph::PositionStateSentinel;
+use crate::core::substitution::Substitution;
 
 pub struct PositionState {
   pub(crate) flags         : StateFlags,
@@ -201,4 +203,78 @@ impl PositionState {
     self.extension_info = extension_info;
     result
   }
+
+  /// Rebuilds the DAG up to the root while **instantiating variables** along the path.
+  ///
+  /// Differences from `rebuild_dag_with_extension`:
+  /// - **No extension support**: this is for narrowing; we assert that any extension info
+  ///   was either absent or matched the whole redex in the original C++.
+  /// - **Instantiation**: along the upward walk, we instantiate with a substitution, and
+  ///   when the position is marked eager we provide eager copies of the substitution’s
+  ///   bindings to avoid sharing dags across eager/lazy boundaries.
+  ///
+  /// Returns the rebuilt root DAG.
+  pub fn rebuild_and_instantiate_dag(
+    &self,
+    mut replacement   : DagNodePtr,
+    substitution      : &mut Substitution,
+    first_variable    : PositionIndex,
+    last_variable     : PositionIndex,
+    mut index         : PositionIndex,
+  ) -> DagNodePtr {
+    // Extension is not supported for narrowing
+    assert!(
+      self.extension_info.is_none() || self.extension_info.as_ref().unwrap().matched_whole(),
+      "Extension not supported"
+    );
+
+    // Walk up the stack rebuilding
+    if index.is(PositionStateSentinel::None) {
+      index = self.next_to_return;
+    }
+    // Start from the replacement term at the current redex position.
+    let mut new_dag   = replacement;
+    let mut arg_index = self.position_queue[index.idx()].arg_index;
+
+    // Parent of the redex we’re rebuilding from.
+    let mut parent = self.position_queue[index.idx()].parent_index.get();
+
+    if parent.is_some() {
+
+      // Maude: Make eager copies of bindings we will use to avoid sharing
+      // dags that might rewrite between eager and lazy positions.
+      debug!(5, "first_variable = {}  last_variable = {}", first_variable, last_variable);
+      let mut eager_copies: Vec<Option<DagNodePtr>> = vec![None; last_variable.idx() + 1];
+
+      for j in first_variable.idx()..=last_variable.idx() {
+        // ToDo: Justify this unwrap
+        let mut v = substitution.value(VariableIndex::from_usize(j)).unwrap();
+        eager_copies[j] = v.copy_eager_upto_reduced();
+      }
+
+      for j in first_variable.idx()..=last_variable.idx() {
+        substitution.value(VariableIndex::from_usize(j)).unwrap().clear_copied_pointers();
+      }
+
+      // Rebuild upwards, instantiating with eager/lazy bindings as appropriate
+      while let Some(pidx) = parent {
+        let redex_position = &self.position_queue[pidx as usize];
+
+        // If the position is eager, pass the eager copies; otherwise pass no bindings (lazy).
+        let bindings: Option<&Vec<Option<DagNodePtr>>> = if redex_position.is_eager() {
+          Some(&eager_copies)
+        } else {
+          None
+        };
+
+        new_dag   = redex_position.dag_node.instantiate_with_replacement(substitution, bindings, arg_index, new_dag);
+        arg_index = redex_position.arg_index;
+        parent    = redex_position.parent_index.get();
+      }
+    }
+
+    // Return the rebuilt DAG (root).
+    new_dag
+  }
+
 }

@@ -514,6 +514,8 @@ pub trait DagNode {
     symbol.make_dag_node(arguments.as_args())
   }
 
+  /// Creates a copy of the DAG node with multiple replacements using a redex stack.
+  /// This is used during rewriting when specific subterms need to be replaced.
   fn copy_with_replacements(&self, redex_stack: &Vec<RedexPosition>, first_idx: usize, last_idx: usize) -> DagNodePtr {
     let mut arguments = DagNodeArguments::from_args(self.shallow_copy_args(), self.arity());
 
@@ -547,6 +549,19 @@ pub trait DagNode {
   /// (`ConfigSymbol::leftOverRewrite()`), and position rebuilding (`PositionState::rebuildDag()`).
   fn partial_construct(&self, _replacement: DagNodePtr, _extension_info: &mut ExtensionInfo) -> DagNodePtr {
     unreachable!("Called on subject {}", self.symbol())
+  }
+
+  /// Used specifically in narrowing contexts to create a new DAG node
+  /// by applying a substitution while replacing one specific argument.
+  fn instantiate_with_replacement(
+    &self,
+    _substitution: &Substitution,
+    _eager_copies: Option<&Vec<Option<DagNodePtr>>>,
+    _arg_index   : ArgIndex,
+    _new_dag_node: DagNodePtr
+  ) -> DagNodePtr
+  {
+    unreachable!("Not implemented for theory {}", self.theory());
   }
 
   // endregion Copy Constructors

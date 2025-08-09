@@ -1,10 +1,6 @@
 # In Progress
 
-- Everything in `state_transition_graph.rs`
-  - `StateTransitionGraph`
-  - `PositionState`
-  - `SearchState`
-  - `RewriteSearchState`
+Determine the control flow of module initialization.
 
 # Next Steps
 
@@ -16,7 +12,6 @@
 
 - rewriter
   - rewriting methods on `core::rewriting_context::context::RewritingContext`
-  - `StateTransitionGraph`
 - Incorporate the remaining commented automata in the free theory: 
   * FreeFast3RHSAutomaton
   * FreeFast2RHSAutomaton
@@ -24,11 +19,6 @@
   * FreeBinaryRHSAutomaton
   * FreeUnaryRHSAutomaton
   * FreeNullaryRHSAutomaton
-
-
-# Stubs
-
-- Implement `StateTransitionGraph`
 
 # Saved for later
 
