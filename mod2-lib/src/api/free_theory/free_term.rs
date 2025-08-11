@@ -801,6 +801,16 @@ impl Term for FreeTerm {
       }
     }
   }
+
+  /// Sets the eager context flag for terms in an eager position.
+  fn mark_eager_arguments(&mut self, variable_count: usize, eager_variables: &NatSet, problem_variables: &mut Vec<VariableIndex>) {
+    let symbol = self.symbol();
+    for (idx, arg) in self.args.iter_mut().enumerate() {
+      if symbol.eager_argument(idx) {
+        arg.mark_eager(variable_count, eager_variables, problem_variables);
+      }
+    }
+  }
   // endregion
 }
 

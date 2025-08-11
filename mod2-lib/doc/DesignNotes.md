@@ -1,3 +1,31 @@
+# Design
+
+Much of mod2-lib follows Maude's implementation very closely. There are some important differences:
+
+- Strategies are not implemented.
+- Object oriented features are not implemented.
+- There isn't a semantics for modules and imports yet, so they are not implemented.
+- Since mod2-lib is meant to only implement the internal algorithms, details specific to the Maude language itself are
+  either not implemented or are different.
+- In particular, features related to Maude's sophisticated customizable syntax are not implemented.
+- In Maude, `HashConsSet`s return an ID number for a DAG node. We just return the pointer. This might change if we need
+  to swap out the node dynamically without invalidating already hash consed nodes.
+
+# Issues
+
+## Overwriting in place
+Overwriting in-place is really problematic with fat pointers, because you aren't
+overwriting the vtable pointer in the fat pointer. If you can guarantee that
+the vtable/theory doesn't change–which you can't–then it's ok.
+
+One option is to store the vtable pointer in `DagNodeCore` (or just use
+the theory tag) and reconstruct the fat pointer in `UnsafePointer`.
+
+## `SymbolType`
+
+The same symbol can have different `SymbolType`s in different modules. So the symbol
+type of a symbol is maintained in the module, not in the symbol itself.
+
 # Notes
 
 Built-in data types are in the Non-Algebraic Theory (NATheory). Their value is stored in both the `Term` and `DagNode`.

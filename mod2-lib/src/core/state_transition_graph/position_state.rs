@@ -216,11 +216,11 @@ impl PositionState {
   /// Returns the rebuilt root DAG.
   pub fn rebuild_and_instantiate_dag(
     &self,
-    mut replacement   : DagNodePtr,
-    substitution      : &mut Substitution,
-    first_variable    : PositionIndex,
-    last_variable     : PositionIndex,
-    mut index         : PositionIndex,
+    replacement   : DagNodePtr,
+    substitution  : &mut Substitution,
+    first_variable: PositionIndex,
+    last_variable : PositionIndex,
+    mut index     : PositionIndex,
   ) -> DagNodePtr {
     // Extension is not supported for narrowing
     assert!(

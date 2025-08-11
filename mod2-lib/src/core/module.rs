@@ -3,8 +3,8 @@
 A `Module` owns all items defined within it. A module is a kind of namespace. Reduction/matching/evaluation
 happens within the context of some module.
 
-The `Module` structure is designed for Mod2 but can conceivably be used in other contexts. In any case, it implements
-algorithms any client application would also require.<br>
+The `Module` structure is designed for mod2 but can conceivably be used in other contexts. In any case, it implements
+algorithms any client application would also require.
 
 ## Module Construction
 
@@ -24,7 +24,7 @@ subsort relation. This is done by calling the method `Module::compute_kind_closu
 
 use std::fmt::{Debug, Display, Formatter};
 
-use mod2_abs::{HashMap, IString, warning, join_iter, heap_destroy, UnsafePtr, debug};
+use mod2_abs::{HashMap, IString, join_iter, heap_destroy, UnsafePtr, debug, error};
 
 use crate::{
   api::{
@@ -38,12 +38,13 @@ use crate::{
       BxKind,
       Kind,
       KindError
-    }
+    },
+    SymbolIndex
   },
 };
 #[cfg(feature = "profiling")]
 use crate::core::profile::{StatementProfile, SymbolProfile};
-use crate::core::SymbolIndex;
+
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default, Debug)]
 pub enum ModuleStatus {
@@ -54,6 +55,7 @@ pub enum ModuleStatus {
   FixUpsClosed,
   TheoryClosed,
   StackMachineCompiled,
+  Poisoned, // Indicates a fatal error.
 }
 
 pub type BxModule       = Box<Module>;
@@ -156,6 +158,19 @@ impl Module {
     new_module
   }
 
+  /// Performs initialization tasks for a new module. This method contains the computational parts of Maude's
+  /// `SyntacticPreModule::process()` method. The module progresses through the `ModuleStatus` variants.
+  /// Called by client code, not by constructor.
+  pub fn initialize(&mut self) {
+    self.compute_kind_closures();
+    if self.status == ModuleStatus::Poisoned {
+      return;
+    }
+
+    self.close_signature();
+    
+  }
+
   /**
   Computes the transitive closure of the subsort relation, constructing the lattice of sorts. This only needs to be
   done once when the module is constructed. It is not idempotent.
@@ -171,7 +186,7 @@ impl Module {
   */
   pub fn compute_kind_closures(&mut self) {
     assert_eq!(self.status, ModuleStatus::Open, "tried to compute kind closure when module status is not open");
-    // Temporarily swap out the sort collection with a dummy.
+    // Temporarily swap out the sort collection with a dummy so we have mutable access.
     let mut sorts = SortCollection::new();
     std::mem::swap(&mut self.sorts, &mut sorts);
 
@@ -188,8 +203,7 @@ impl Module {
 
             KindError::NoMaximalSort { kind, .. }
             | KindError::CycleDetected { kind, .. } => {
-              warning!(1, "{}", msg.as_str());
-              // Box::into_raw(kind)
+              error!(1, "{}", msg.as_str());
               kind
             }
 
@@ -209,6 +223,24 @@ impl Module {
     self.status = ModuleStatus::SortSetClosed
   }
 
+  fn close_signature(&mut self) {
+    assert_eq!(self.status, ModuleStatus::SortSetClosed, "tried to close signature when module status is not sort set closed");
+    // Todo: When tracing and pretty printing are implemented, this method will need to be implemented.
+    /*
+    The method processes all polymorphic operators to compute their precedence
+    and gather information for pretty printing.
+
+    For each polymorph that has mixfix syntax defined, it calls
+    computePrecAndGather() to determine how the operator should be displayed.
+
+    The method then processes all regular symbols in the module.
+
+    For each symbol with mixfix syntax, it computes precedence and gather
+    information. Additionally, for configuration symbols (used in object-oriented
+    modules), it adds the collected object, message, and portal symbols.
+    */
+    self.status = ModuleStatus::SignatureClosed;
+  }
 
   /// Formats the module for display with `prefix` for each line. The `Debug` impl defers to this method. Interior
   /// indentation is affixed to `prefix`.
@@ -283,6 +315,7 @@ impl Module {
       self.minimum_substitution_size = size;
     }
   }
+
 }
 
 impl Drop for Module {

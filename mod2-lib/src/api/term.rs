@@ -144,6 +144,13 @@ pub trait Term: Formattable {
   }
 
   #[inline(always)]
+  fn mark_eager(&mut self, variable_count: usize, eager_variables: &NatSet, problem_variables: &mut Vec<VariableIndex>) {
+    self.set_attribute(TermAttribute::EagerContext);
+    self.mark_eager_arguments(variable_count, eager_variables, problem_variables);
+  }
+
+
+  #[inline(always)]
   fn is_variable(&self) -> bool {
     self.core().is_variable()
   }
@@ -542,9 +549,6 @@ pub trait Term: Formattable {
 
 
   /// Recursively collects the terms in a set for structural sharing.
-  ///
-  /// This is a free function, because we want it wrapped in the Rc so that when we call `find_available_terms()`
-  /// it's possible to add the Rc to the term set.
   fn find_available_terms(&self, available_terms: &mut TermBag, eager_context: bool, at_top: bool) {
     if self.ground() {
       return;
@@ -557,6 +561,13 @@ pub trait Term: Formattable {
     // Now do theory-specific stuff
     self.find_available_terms_aux(available_terms, eager_context, at_top);
   }
+
+  fn mark_eager_arguments(
+    &mut self,
+    variable_count   : usize,
+    eager_variables  : &NatSet,
+    problem_variables: &mut Vec<VariableIndex>
+  );
 
   // endregion Compiler-related Function
 

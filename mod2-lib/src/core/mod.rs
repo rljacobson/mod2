@@ -31,6 +31,7 @@ pub(crate) mod automata;
 mod dag_node_args;
 pub(crate) mod index;
 pub(crate) mod state_transition_graph;
+mod cached_dag;
 
 // Reexports to flatten some of the smaller modules
 pub(crate) use local_bindings::LocalBindings;

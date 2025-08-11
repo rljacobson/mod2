@@ -50,7 +50,8 @@ pub(crate) struct ModuleAST {
 
 impl ModuleAST {
 
-  /// Constructs a `Module` representation of `self`, consuming `self`.
+  /// Constructs a `Module` representation of `self`, consuming `self`. This method corresponds roughly to
+  /// Maude's `SyntacticPreModule::process()`. Computational initialization is done in `Module::initialize()`.
   // ToDo: Inherit parent's environment (symbols/sorts/variables)
   pub fn construct_module(mut self) -> BxModule {
     // The items of the module are binned according to type before processing.
@@ -98,10 +99,8 @@ impl ModuleAST {
           let mut supersort = sorts.get_or_create_sort(supersort_name.clone());
           // ToDo: Check that this constraint has not already been declared by checking that `subsort.supersorts` does
           //       not already contain `supersort` (and vice versa).
-          unsafe {
-            subsort.supersorts.push(supersort);
-            supersort.subsorts.push(subsort);
-          }
+          subsort.supersorts.push(supersort);
+          supersort.subsorts.push(subsort);
         }
       }
     }
@@ -214,7 +213,7 @@ impl ModuleAST {
       rules,
       membership,
     );
-    new_module.compute_kind_closures();
+    new_module.initialize();
 
     new_module
   }

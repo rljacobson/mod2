@@ -185,6 +185,10 @@ impl Term for VariableTerm {
     }
   }
 
+  fn mark_eager_arguments(&mut self, _variable_count: usize, _eager_variables: &NatSet, _problem_variables: &mut Vec<VariableIndex>) {
+    /* nothing to do */
+  }
+
   // endregion Compiler related methods
 }
 

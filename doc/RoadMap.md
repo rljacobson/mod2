@@ -2,6 +2,10 @@
 
 Determine the control flow of module initialization.
 
+- Symbol info struct owned by module?
+- Module initialization
+  - symbol fixups (type checking identities)
+
 # Next Steps
 
 - compiler
@@ -9,6 +13,7 @@ Determine the control flow of module initialization.
    - Implement `FreeTerm::compile_lhs`
    - uncomment `api/free_theory/compiler.rs`
    - `core::automata::*` - uncomment `binding_lhs_automaton`, `copy_rhs_automaton`, and `trivial_rhs_automata`.
+  - `StackMachineRhsCompiler`
 
 - rewriter
   - rewriting methods on `core::rewriting_context::context::RewritingContext`
@@ -34,17 +39,3 @@ Determine the control flow of module initialization.
     - `MemoMap`
     - `SymbolCore`
 
-# Issues
-
-## Overwriting in place
-Overwriting in-place is really problematic with fat pointers, because you aren't 
-overwriting the vtable pointer in the fat pointer. If you can guarantee that
-the vtable/theory doesn't change–which you can't–then it's ok.
-
-One option is to store the vtable pointer in `DagNodeCore` (or just use
-the theory tag) and reconstruct the fat pointer in `UnsafePointer`.
-
-## `SymbolType`
-
-The same symbol can have different `SymbolType`s in different modules. So the symbol 
-type of a symbol is maintained in the module, not in the symbol itself. 

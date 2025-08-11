@@ -198,13 +198,13 @@ impl<T: NADataType> Term for NATerm<T> {
   fn deep_copy_aux(&self) -> BxTerm {
     Box::new(self.clone())
   }
-  
+
   /// Overwrites `old_node` in place with the value of `self`. Returns a new fat pointer, which might be
-  /// necessary if the vtable has changed. 
+  /// necessary if the vtable has changed.
   fn overwrite_with_dag_node(&self, mut old_node: DagNodePtr) -> DagNodePtr {
     // ToDo: overwrite without allocating a new node.
     let new_node = self.dagify_aux(&mut DagNodeCache::default());
-    
+
     old_node.overwrite_with_clone(new_node)
   }
 
@@ -259,6 +259,10 @@ impl<T: NADataType> Term for NATerm<T> {
   }
 
   fn find_available_terms_aux(&self, _available_terms: &mut TermBag, _eager_context: bool, _at_top: bool) {
+    /* nothing to do */
+  }
+
+  fn mark_eager_arguments(&mut self, _variable_count: usize, _eager_variables: &NatSet, _problem_variables: &mut Vec<VariableIndex>) {
     /* nothing to do */
   }
 }

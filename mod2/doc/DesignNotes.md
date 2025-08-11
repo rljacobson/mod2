@@ -60,37 +60,43 @@ within `Term`s to `Symbols`, can be normal `Rc`s or `RcCell`s.
 | `Module`   | `Module`  | `Sort`, `Symbol`,  |                                   |
 
 
-```plantuml
-class Sort
+```mermaid
+classDiagram
+    class Sort
 
+    class Symbol {
+        theory_symbol: TheorySymbol
+        sort: Sort
+    }
 
-class Symbol {
-    theory_symbol: TheorySymbol
-    sort: Sort
-}
-class Term {
-    theory_term: TheoryTerm
-    symbol: Symbol
-    args: Vec<Term>
-}
-abstract TheorySymbol
-abstract TheoryTerm
+    class Term {
+        theory_term: TheoryTerm
+        symbol: Symbol
+        args: Vec<Term>
+    }
 
+    class TheorySymbol
+    class TheoryTerm
 
-Term --* Symbol
-TheorySymbol *-- Symbol
-Sort *-- Symbol
+%% Mark abstracts via stereotypes (separate lines)
+    <<abstract>> TheorySymbol
+    <<abstract>> TheoryTerm
 
-TheorySymbol <|-- FreeSymbol
-TheorySymbol <|-- VariableSymbol
-TheorySymbol <|-- ACUSymbol
+%% Associations / compositions
+    Term --* Symbol
+    TheorySymbol *-- Symbol
+    Sort *-- Symbol
 
-TheoryTerm *-- Term
+%% Inheritance
+    TheorySymbol <|-- FreeSymbol
+    TheorySymbol <|-- VariableSymbol
+    TheorySymbol <|-- ACUSymbol
 
-TheoryTerm <|-- FreeTerm
-TheoryTerm <|-- VariableTerm
-TheoryTerm <|-- ACUTerm
+    TheoryTerm *-- Term
 
+    TheoryTerm <|-- FreeTerm
+    TheoryTerm <|-- VariableTerm
+    TheoryTerm <|-- ACUTerm
 ```
 
 ## Confused Maude Terminology
