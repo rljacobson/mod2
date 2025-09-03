@@ -24,12 +24,8 @@ use num_traits::{Bounded, ConstOne, ConstZero, Unsigned};
 
 pub trait InnerIndexType: Unsigned + Bounded + PartialOrd + Ord + PartialEq + Eq + From<u8> + Copy + Into<u64> + ConstZero + ConstOne {}
 pub trait OuterEnumType<N: InnerIndexType>: TryFrom<N> + Into<N> + Copy + PartialEq + Eq {}
-impl InnerIndexType for u8 { }
-impl InnerIndexType for u16 { }
-impl InnerIndexType for u32 { }
-impl InnerIndexType for u64 { }
-// impl InnerIndexType for u128 { }
-// impl InnerIndexType for usize { }
+
+impl<T> InnerIndexType for T where T: Unsigned + Bounded + PartialOrd + Ord + PartialEq + Eq + From<u8> + Copy + Into<u64> + ConstZero + ConstOne {}
 
 /// Parameterized by an integral type `N` and an enum `E` that is convertible to/from `N`,
 /// `SpecialIndex<N, E, RESERVED>` represents either an `N` (for most values of `N`) OR an `E`.
@@ -39,7 +35,7 @@ pub struct SpecialIndex<N, E, const RESERVED: u8>
     where E: OuterEnumType<N>,
           N: InnerIndexType,
 {
-  inner: N,
+  inner   : N,
   _phantom: PhantomData<E>,
 }
 

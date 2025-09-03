@@ -138,14 +138,38 @@ impl Module {
         #[cfg(feature = "profiling")]
         rl_info    : vec![],
         // #[cfg(feature = "profiling")]
-        // sd_info    : vec![],
+        // sd_info : vec![],
       }
     );
 
-    // Make the owned symbols point to this module as their parent.
-    let parent_ptr = new_module.as_ptr();
+    // Should only be called once the module will no longer be moved, i.e. after heap allocation.
+    new_module.initialize();
 
-    for (idx, symbol) in new_module.symbols.values_mut().enumerate() {
+    new_module
+  }
+
+  /// Performs initialization tasks for a new module. This method contains the computational parts of Maude's
+  /// `SyntacticPreModule::process()` method. The module progresses through the `ModuleStatus` variants.
+  /// Called by client code, not by constructor.
+  pub fn initialize(&mut self) {
+
+    self.initialize_ownership();
+
+    self.compute_kind_closures();
+    if self.status == ModuleStatus::Poisoned {
+      return;
+    }
+
+    self.close_signature();
+
+  }
+
+  /// Sets the parent module pointer of owned symbols and the index within parent values of all items.
+  fn initialize_ownership(&mut self) {
+    // Make the owned symbols point to this module as their parent.
+    let parent_ptr = self.as_ptr();
+
+    for (idx, symbol) in self.symbols.values_mut().enumerate() {
       let symbol = symbol.core_mut();
       if symbol.parent_module.is_none() {
         symbol.parent_module = Some(parent_ptr);
@@ -155,20 +179,17 @@ impl Module {
       }
     }
 
-    new_module
-  }
-
-  /// Performs initialization tasks for a new module. This method contains the computational parts of Maude's
-  /// `SyntacticPreModule::process()` method. The module progresses through the `ModuleStatus` variants.
-  /// Called by client code, not by constructor.
-  pub fn initialize(&mut self) {
-    self.compute_kind_closures();
-    if self.status == ModuleStatus::Poisoned {
-      return;
+    for (idx, equation) in self.equations.iter_mut().enumerate() {
+      equation.index_within_parent_module = SymbolIndex::from_usize(idx);
     }
 
-    self.close_signature();
-    
+    for (idx, rule) in self.rules.iter_mut().enumerate() {
+      rule.index_within_parent_module = SymbolIndex::from_usize(idx);
+    }
+
+    for (idx, constraint) in self.membership.iter_mut().enumerate() {
+      constraint.index_within_parent_module = SymbolIndex::from_usize(idx);
+    }
   }
 
   /**

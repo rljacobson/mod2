@@ -265,7 +265,9 @@ impl SortTable {
 
     if self.arity.is_zero() {
       let (sort_index, unique) = self.find_min_sort_index(all);
-      assert!(unique, "sort declarations for constant do not have a unique least sort.");
+      if !unique {
+        warning!(1, "sort declarations for constant {} do not have a unique least sort.", symbol_ptr);
+      }
       self.sort_diagram.push(sort_index);
       self.single_non_error_sort = Some(self.arg_kinds[0].sort(sort_index));
       return;
@@ -526,8 +528,11 @@ impl SortTable {
     }
 
     // Emit warning
-    let kind  = if prereg_problem { "sort" } else { "constructor" };
-    let check = if prereg_problem { "preregularity" } else { "constructor consistency" };
+    let (kind, check) = if prereg_problem {
+      ("sort", "preregularity")
+    } else {
+      ("constructor", "constructor consistency")
+    };
 
     warning!(
       0,

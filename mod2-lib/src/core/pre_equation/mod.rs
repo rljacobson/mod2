@@ -18,6 +18,7 @@ use crate::{
     BxLHSAutomaton,
     DagNodePtr,
     BxTerm,
+    LHSAutomaton,
     Subproblem,
   },
   core::{
@@ -35,6 +36,7 @@ use crate::{
     VariableInfo,
     TermBag,
     VariableIndex,
+    PreEquationIndex,
   },
   impl_display_debug_for_formattable,
   NONE,
@@ -119,7 +121,6 @@ pub enum PreEquationKind {
 }
 
 pub use PreEquationKind::*;
-use crate::api::LHSAutomaton;
 
 impl PreEquationKind {
   pub fn noun(&self) -> &'static str {
@@ -161,7 +162,7 @@ pub struct PreEquation {
   pub label        : Option<IString>,
 
   // `ModuleItem`
-  pub index_within_parent_module: i32,
+  pub index_within_parent_module: PreEquationIndex,
   // pub parent_module             : WeakModule,
 }
 
@@ -191,7 +192,7 @@ impl PreEquation {
         non_extension_lhs_automaton: None,
         extension_lhs_automaton    : None
       },
-      index_within_parent_module: 0,
+      index_within_parent_module: PreEquationIndex::Zero,
     }
   }
 
@@ -216,7 +217,7 @@ impl PreEquation {
         rhs_builder        : Default::default(),
         fast_variable_count: 0
       },
-      index_within_parent_module: 0,
+      index_within_parent_module: PreEquationIndex::Zero,
     }
   }
 
@@ -237,7 +238,7 @@ impl PreEquation {
       variable_info: Default::default(),
       label        : None,
       pe_kind      : Membership{ sort: rhs_sort },
-      index_within_parent_module: 0,
+      index_within_parent_module: PreEquationIndex::Zero,
     }
   }
 
@@ -259,7 +260,7 @@ impl PreEquation {
   }
 
   #[inline(always)]
-  pub(crate) fn get_index_within_module(&self) -> i32 {
+  pub(crate) fn get_index_within_module(&self) -> PreEquationIndex {
     self.index_within_parent_module
   }
 

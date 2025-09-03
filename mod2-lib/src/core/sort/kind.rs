@@ -111,6 +111,8 @@ impl Kind {
     kind.register_connected_sorts(error_sort, &mut visited_sort_count);
     kind.register_connected_sorts(initial_sort, &mut visited_sort_count);
 
+    kind.maximal_sort_count = (kind.sorts.len() - 1) as u32;
+
     if visited_sort_count == 1 {
       // ToDo: Recording the error here might not be necessary considering we are returning the `Kind` wrapped in an
       //       error.
@@ -137,7 +139,7 @@ impl Kind {
 
     // Process subsorts. Length of `kind.sorts` may increase.
     {
-      let mut i = 0;
+      let mut i = 1;
       loop {
         if i >= kind.sorts.len() { break; }
         kind.process_subsorts(kind.sorts[i]);

@@ -78,101 +78,145 @@ However, Maude uses sort indices _as indices_ into arrays, for example
 use std::fmt::{Display, Formatter};
 use mod2_abs::special_index::{OuterEnumType, SpecialIndex};
 
-pub type RawSortIndex       = u16;
-pub type RawRuleIndex       = u16;
-pub type RawSlotIndex       = u16;
-pub type RawArgIndex        = u16;
+pub type RawSortIndex        = u16;
+pub type RawRuleIndex        = u16;
+pub type RawSlotIndex        = u16;
+pub type RawArgIndex         = u16;
 // Can probably be `u16`, but Maude uses `i32`.
-pub type RawVariableIndex   = u32;
+pub type RawVariableIndex    = u32;
 // Can probably be `u16`, but Maude uses `i32`.
-pub type RawSymbolIndex     = u32;
+pub type RawSymbolIndex      = u32;
+// Can probably be `u16`, but Maude uses `i32`.
+pub type RawPreEquationIndex = u32;
 // Maude uses `i32`, but that's probably too large, and smaller state tables are more cache friendly.
-pub type RawStateGraphIndex = u16;
+pub type RawStateGraphIndex  = u16;
 
 /// The index of a sort within its kind
-pub type SortIndex       = SpecialIndex<RawSortIndex      , SentinelIndex, 2>;
+pub type SortIndex        = SpecialIndex<RawSortIndex       , NoneSentinelIndex, 1>;
 /// Represents a position in the match stack
-pub type SlotIndex       = SpecialIndex<RawSlotIndex      , SentinelIndex, 2>;
+pub type SlotIndex        = SpecialIndex<RawSlotIndex       , NoneSentinelIndex, 1>;
 /// Represents a position in the argument list
-pub type ArgIndex        = SpecialIndex<RawSlotIndex      , SentinelIndex, 2>;
+pub type ArgIndex         = SpecialIndex<RawSlotIndex       , NoneSentinelIndex, 1>;
 /// The index of a variable within its parent module
-pub type VariableIndex   = SpecialIndex<RawVariableIndex  , SentinelIndex, 2>;
+pub type VariableIndex    = SpecialIndex<RawVariableIndex   , VariableSentinelIndex, 2>;
 /// The index of a symbol within its parent module
-pub type SymbolIndex     = SpecialIndex<RawSymbolIndex    , SentinelIndex, 2>;
+pub type SymbolIndex      = SpecialIndex<RawSymbolIndex     , NoneSentinelIndex, 1>;
+/// The index of a symbol within its parent module
+pub type PreEquationIndex = SpecialIndex<RawPreEquationIndex, NoneSentinelIndex, 1>;
 /// Internal state representation of a `StateTransitionGraph`
-pub type StateGraphIndex = SpecialIndex<RawStateGraphIndex, SentinelIndex, 2>;
+pub type StateGraphIndex  = SpecialIndex<RawStateGraphIndex , NoneSentinelIndex, 1>;
 /// Index of a rule in the `RuleTable`
-pub type RuleIndex       = SpecialIndex<RawRuleIndex      , SentinelIndex, 2>;
+pub type RuleIndex        = SpecialIndex<RawRuleIndex       , NoneSentinelIndex, 1>;
 
+
+// region None Sentinel Enum
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u8)]
-pub enum SentinelIndex {
+pub enum NoneSentinelIndex {
+  None,
+}
+
+impl NoneSentinelIndex {
+  #![allow(non_upper_case_globals)]
+  pub const Unknown   : NoneSentinelIndex = NoneSentinelIndex::None;
+  pub const Undefined : NoneSentinelIndex = NoneSentinelIndex::None;
+  pub const Impossible: NoneSentinelIndex = NoneSentinelIndex::None;
+}
+
+impl Display for NoneSentinelIndex {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    match self {
+      NoneSentinelIndex::None => {
+        write!(f, "None")
+      }
+    }
+  }
+}
+
+impl TryFrom<u8> for NoneSentinelIndex {
+  type Error = ();
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    match value {
+      0 => Ok(NoneSentinelIndex::None),
+      _ => Err(()),
+    }
+  }
+}
+
+// endregion None Sentinel Enum
+
+// region Variable Sentinel Enum
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(u8)]
+pub enum VariableSentinelIndex {
   None,
   /// Used in `RewritingContext`, indicates that a term does not need rebuilding.
   RootOk,
 }
 
-impl SentinelIndex {
+impl VariableSentinelIndex {
   #![allow(non_upper_case_globals)]
-  pub const Unknown   : SentinelIndex = SentinelIndex::None;
-  pub const Undefined : SentinelIndex = SentinelIndex::None;
-  pub const Impossible: SentinelIndex = SentinelIndex::None;
+  pub const Unknown   : VariableSentinelIndex = VariableSentinelIndex::None;
+  pub const Undefined : VariableSentinelIndex = VariableSentinelIndex::None;
+  pub const Impossible: VariableSentinelIndex = VariableSentinelIndex::None;
 }
 
-impl Display for SentinelIndex {
+impl Display for VariableSentinelIndex {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      SentinelIndex::None => {
+      VariableSentinelIndex::None => {
         write!(f, "None")
       }
-      SentinelIndex::RootOk => {
+      VariableSentinelIndex::RootOk => {
         write!(f, "RootOk")
       }
     }
   }
 }
 
-impl TryFrom<u8> for SentinelIndex {
+impl TryFrom<u8> for VariableSentinelIndex {
   type Error = ();
 
   fn try_from(value: u8) -> Result<Self, Self::Error> {
     match value {
-      0 => Ok(SentinelIndex::None),
-      1 => Ok(SentinelIndex::RootOk),
+      0 => Ok(VariableSentinelIndex::None),
+      1 => Ok(VariableSentinelIndex::RootOk),
       _ => Err(()),
     }
   }
 }
 
+// endregion Variable Sentinel Enum
+
+
 macro_rules! implement_from_traits {
-    ($ty:ty) => {
-      impl TryFrom<$ty> for SentinelIndex {
+    ($raw_index:ty, $sentinel_index:ty) => {
+      impl TryFrom<$raw_index> for $sentinel_index {
         type Error = ();
 
-        fn try_from(value: $ty) -> Result<Self, Self::Error> {
+        fn try_from(value: $raw_index) -> Result<Self, Self::Error> {
           // Delegate to the u8 version if within range
           u8::try_from(value).ok().and_then(|v| v.try_into().ok()).ok_or(())
         }
       }
 
-      impl From<SentinelIndex> for $ty {
-        fn from(value: SentinelIndex) -> Self {
-          value as u8 as $ty
+      impl From<$sentinel_index> for $raw_index {
+        fn from(value: $sentinel_index) -> Self {
+          value as u8 as $raw_index
         }
       }
 
-      impl OuterEnumType<$ty> for SentinelIndex {}
-
+      impl OuterEnumType<$raw_index> for $sentinel_index {}
     };
 }
 
-implement_from_traits!(RawSortIndex);
-// implement_from_traits!(RawSlotIndex); // Same type as `RawSortIndex`
-// implement_from_traits!(RawArgIndex);  // Same type as `RawSortIndex`
-implement_from_traits!(RawVariableIndex);
-// implement_from_traits!(RawSymbolIndex);     // Same as `RawVariableIndex`
-// implement_from_traits!(RawStateGraphIndex); // Same as `RawVariableIndex`
+implement_from_traits!(u16, VariableSentinelIndex);
+implement_from_traits!(u32, VariableSentinelIndex);
+implement_from_traits!(u16, NoneSentinelIndex);
+implement_from_traits!(u32, NoneSentinelIndex);
 
 
 
@@ -187,14 +231,14 @@ mod tests {
 
     #[test]
     fn check_values_round_trip() {
-      let a = VariableIndex::from_variant(SentinelIndex::None);
-      let b = VariableIndex::from_variant(SentinelIndex::RootOk);
+      let a = VariableIndex::from_variant(VariableSentinelIndex::None);
+      let b = VariableIndex::from_variant(VariableSentinelIndex::RootOk);
 
-      assert!(a.is(SentinelIndex::None));
-      assert!(b.is(SentinelIndex::RootOk));
+      assert!(a.is(VariableSentinelIndex::None));
+      assert!(b.is(VariableSentinelIndex::RootOk));
 
-      assert_eq!(a.variant(), Some(SentinelIndex::None));
-      assert_eq!(b.variant(), Some(SentinelIndex::RootOk));
+      assert_eq!(a.variant(), Some(VariableSentinelIndex::None));
+      assert_eq!(b.variant(), Some(VariableSentinelIndex::RootOk));
 
       assert!(!a.is_index());
       assert!(!b.is_index());
@@ -206,8 +250,8 @@ mod tests {
 
     #[test]
     fn variants_order_by_variant_value() {
-      let a = VariableIndex::from_variant(SentinelIndex::None);
-      let b = VariableIndex::from_variant(SentinelIndex::RootOk);
+      let a = VariableIndex::from_variant(VariableSentinelIndex::None);
+      let b = VariableIndex::from_variant(VariableSentinelIndex::RootOk);
       assert!(a < b);
       assert!(b > a);
       assert_eq!(a.cmp(&a), Ordering::Equal);
@@ -215,7 +259,7 @@ mod tests {
 
     #[test]
     fn variant_is_less_than_non_variant() {
-      let a = VariableIndex::from_variant(SentinelIndex::None);
+      let a = VariableIndex::from_variant(VariableSentinelIndex::None);
       let b = VariableIndex::new(0);
       assert!(a < b);
       assert!(b > a);
@@ -234,8 +278,8 @@ mod tests {
 
     #[test]
     fn symmetry_and_equality() {
-      let a = VariableIndex::from_variant(SentinelIndex::None);
-      let b = VariableIndex::from_variant(SentinelIndex::None);
+      let a = VariableIndex::from_variant(VariableSentinelIndex::None);
+      let b = VariableIndex::from_variant(VariableSentinelIndex::None);
       assert_eq!(a.cmp(&b), Ordering::Equal);
       assert_eq!(b.cmp(&a), Ordering::Equal);
 

@@ -3,6 +3,7 @@
 Determine the control flow of module initialization.
 
 - Symbol info struct owned by module?
+  - create symbol info during symbol construction
 - Module initialization
   - symbol fixups (type checking identities)
 

@@ -3,13 +3,13 @@
 Roughly speaking, an `OpDeclaration` corresponds to an op declaration in a source file:
 
 ```maude
-op _+_ : Nat Nat -> Nat [assoc comm] . 
+op _+_ : Nat Nat -> Nat [assoc comm] .
 ```
 
-However, most of the attribute information is encoded elsewhere (in the symbol) and so does not appear in the 
+However, most of the attribute information is encoded elsewhere (in the symbol) and so does not appear in the
 `OpDeclaration` struct. The only thing we need to keep track of is whether the op is a constructor.
 
-Recall: 
+Recall:
 
 > Assuming that the equations in a functional module are (ground) Church-Rosser and terminating,
 > then every ground term in the module (that is, every term without variables) will be simplified
@@ -65,7 +65,7 @@ impl From<bool> for ConstructorStatus {
 }
 
 
-#[derive(PartialEq, Eq, Default)]
+#[derive(PartialEq, Eq, Default, Debug)]
 pub struct OpDeclaration {
   pub sort_spec     : TypeSignature,
   pub is_constructor: ConstructorStatus,
@@ -86,7 +86,7 @@ impl OpDeclaration {
   pub fn push(&mut self, sort: SortPtr) {
     self.sort_spec.push(sort);
   }
-  
+
   #[inline(always)]
   pub fn iter(&self) -> core::slice::Iter<SortPtr> {
     self.sort_spec.iter()

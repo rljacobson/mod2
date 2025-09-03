@@ -67,7 +67,7 @@ pub struct SymbolCore {
   /// has lower bits equal to the value of an integer that is incremented every time
   /// a symbol is created and upper 8 bits (bits 24..32) equal to the arity. Note:
   /// We enforce symbol creation with `Symbol::new()` by making hash_value private.
-  hash_value : HashType,
+  hash_value: HashType,
 
   // ToDo: Possibly replace with `Option<Box<Strategy>>`, where `None` means "standard strategy".
   // `Strategy`
@@ -196,7 +196,7 @@ impl SymbolCore {
               return true;
             }
           } else {
-            unreachable!("LHS automaton expected. This is a bug.")
+            unreachable!("LHS automaton expected. This is a bug.");
           }
         } else {
           // General case

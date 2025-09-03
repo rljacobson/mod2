@@ -4,6 +4,7 @@ A thin wrapper around BitSet (the bit-set crate). We could just use a type alias
 
 */
 
+use std::fmt::{Debug, Formatter};
 use bit_set::BitSet;
 pub use bit_set::Iter as BitSetIterator;
 
@@ -148,5 +149,11 @@ impl NatSet {
   #[inline(always)]
   pub fn with_capacity(nbits: usize) -> NatSet {
     NatSet(BitSet::with_capacity(nbits))
+  }
+}
+
+impl Debug for NatSet {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "NatSet({:?})", self.0)
   }
 }

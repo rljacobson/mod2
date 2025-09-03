@@ -6,7 +6,7 @@ use crate::{
     rewriting_context::{ContextAttribute, ContextAttributes},
     substitution::Substitution,
     VariableIndex,
-    SentinelIndex
+    VariableSentinelIndex
   }
 };
 
@@ -48,8 +48,8 @@ impl RewritingContext {
         variant_narrowing_count: 0,
         redex_stack            : vec![],
         redex_stack_roots      : RootVec::new(),
-        stale_marker           : SentinelIndex::RootOk.into(),
-        lazy_marker            : SentinelIndex::None.into(),
+        stale_marker           : VariableSentinelIndex::RootOk.into(),
+        lazy_marker            : VariableSentinelIndex::None.into(),
         current_index          : VariableIndex::Zero,
         substitution           : Substitution::default(),
         attributes             : ContextAttributes::default(),
@@ -148,7 +148,7 @@ impl RewritingContext {
     }
 
     self.root = Some(RootVec::with_node(self.redex_stack[0].dag_node));
-    self.stale_marker = SentinelIndex::RootOk.into();
+    self.stale_marker = VariableSentinelIndex::RootOk.into();
 
     // println!("root is {:?}", self.root_node);
   }

@@ -32,6 +32,7 @@ use mod2_abs::{
   NatSet,
   IString,
   UnsafePtr,
+  int_to_subscript
 };
 use crate::{
   api::{built_in::get_built_in_sort},
@@ -180,7 +181,11 @@ impl Formattable for Sort {
     if self.index_within_kind == SortIndex::Zero {
       write!(out, "[{}]", self.name)
     } else {
-      write!(out, "{}", self.name)
+        write!(out, "{}", self.name)?;
+      if self.index_within_kind.is_index() {
+        write!(out, "{}", int_to_subscript(self.index_within_kind.idx() as u32))?;
+      }
+      Ok(())
     }
   }
 }

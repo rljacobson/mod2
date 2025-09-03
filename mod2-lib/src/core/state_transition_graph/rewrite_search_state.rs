@@ -14,7 +14,7 @@ use crate::{
     dag_node_core::DagNodeFlag,
     VariableInfo,
     VariableIndex,
-    SentinelIndex,
+    NoneSentinelIndex,
     RuleIndex,
     pre_equation::{
       RulePtr,
@@ -37,6 +37,7 @@ use crate::{
     DagNodePtr,
   },
 };
+
 
 pub struct RewriteSearchState {
   position_state: PositionState,
@@ -238,7 +239,7 @@ impl RewriteSearchState {
     let label = self.label.clone();
     let mut rewrite_seen_at_current_position = false;
 
-    if !self.rule_index.is(SentinelIndex::None) {
+    if !self.rule_index.is(NoneSentinelIndex::None) {
       if self.find_next_solution() {
         return true;
       }

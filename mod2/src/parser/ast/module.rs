@@ -213,7 +213,6 @@ impl ModuleAST {
       rules,
       membership,
     );
-    new_module.initialize();
 
     new_module
   }

@@ -20,3 +20,6 @@ mod2-abs.workspace = true
 mod2-lib.workspace = true
 
 lalrpop-util.workspace = true
+
+[lints]
+workspace = true

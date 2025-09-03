@@ -39,3 +39,7 @@ string_cache  = "0.8"   # String interning
 ## Logging ##
 tracing            = "0.1"
 tracing-subscriber = "0.3"
+
+
+[workspace.lints]
+rust.mismatched_lifetime_syntaxes = "allow"

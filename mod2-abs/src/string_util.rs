@@ -36,7 +36,8 @@ pub fn join_string<T:Display>(iter: impl Iterator<Item = T>, sep: &str) -> Strin
 }
 
 /// Expresses the number using Unicode subscript digits
-pub fn int_to_subscript(value: u32) -> String {
+pub fn int_to_subscript<T: Into<u32>>(value: T) -> String {
+  let value: u32 = value.into();
   let subscript_digits = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
   value
       .to_string()
